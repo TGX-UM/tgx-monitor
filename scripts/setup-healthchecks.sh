@@ -34,7 +34,18 @@ for tool in curl jq ssh gh; do
   command -v "$tool" >/dev/null || { echo "needs $tool" >&2; exit 1; }
 done
 read -rsp "healthchecks.io API key (read-write, project TGX monitor): " key; echo
+# Drop anything a paste can drag along: spaces, newlines, bracketed-paste escapes.
+key=$(printf '%s' "$key" | sed 's/\x1b\[20[01]~//g' | tr -cd 'A-Za-z0-9_-')
 [ -n "$key" ] || { echo "no key" >&2; exit 2; }
+echo "  key: ${#key} characters (a project API key is 32)"
+# Is it a key of this project at all, and may it write? (GET works with read-only keys too.)
+code=$(curl -sS -o /dev/null -w '%{http_code}' "$API" -H "X-Api-Key: $key")
+if [ "$code" = 401 ]; then
+  unset key
+  echo "healthchecks.io does not know this key (HTTP 401). Copy the key on the 'API key' row" >&2
+  echo "of the TGX monitor project's Settings > API Access (not the read-only or ping key)." >&2
+  exit 1
+fi
 
 urls='{}'
 while IFS='|' read -r name timeout grace desc; do
@@ -46,6 +57,8 @@ while IFS='|' read -r name timeout grace desc; do
   code=${resp##*$'\n'}; json=${resp%$'\n'*}
   case "$code" in
     200|201) ;;
+    401|403) unset key; echo "$name: HTTP $code. The key can read but not write: that is the" \
+               "read-only key. Use the key on the 'API key' row instead." >&2; exit 1 ;;
     *) unset key; echo "$name: healthchecks.io answered HTTP $code" >&2; exit 1 ;;
   esac
   url=$(jq -r '.ping_url // empty' <<<"$json")
