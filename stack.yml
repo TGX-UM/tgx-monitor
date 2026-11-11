@@ -32,7 +32,7 @@ secrets:
   tgxmon_ghcr_read_pat: {external: true}
   tgxmon_smtp: {external: true}
   tgxmon_contacts: {external: true}
-  tgxmon_users: {external: true}
+  tgxmon_users: {external: true, name: tgxmon_users_v2}  # mounted as tgxmon_users
   tgxmon_session_key: {external: true}
   tgxmon_push_tokens: {external: true}
   tgxmon_hc_urls: {external: true}
