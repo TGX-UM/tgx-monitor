@@ -1,4 +1,4 @@
-"""The private UI, served by core at monitor.cloud.vhp4safety.nl.
+"""The private UI, served by core at monitor.bigcat-bioinformatics.org.
 
 Deny by default: :class:`Gate` sends every request without a session to the login page,
 except ``/livez`` (the swarm healthcheck), ``/login``, the static assets and

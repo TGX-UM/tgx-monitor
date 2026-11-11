@@ -48,8 +48,8 @@ expands to `TGX-UM` and Docker rejects uppercase). **Stack** `tgx-monitor`.
 ```mermaid
 flowchart TB
   internet["Internet / GitHub Actions probe<br/>(through each node IP)"] --> traefik["Traefik (core network)"]
-  traefik -- "status.cloud.vhp4safety.nl" --> public["public: static snapshot, read-only"]
-  traefik -- "monitor.cloud.vhp4safety.nl<br/>(login; /api/push not routed)" --> core
+  traefik -- "status.bigcat-bioinformatics.org" --> public["public: static snapshot, read-only"]
+  traefik -- "monitor.bigcat-bioinformatics.org<br/>(login; /api/push not routed)" --> core
   core -- "tgxmon_dockerapi<br/>internal, encrypted" --> proxy["docker-proxy x2"] --> sock["docker.sock (ro)"]
   agent["agent x2"] -- "tgxmon_int, encrypted" --> core
   agent --> hostsig["/proc, statvfs,<br/>root status.json (Egon's cron)"]
@@ -304,7 +304,7 @@ resolves itself after 5 minutes.
 
 ## 6. UI
 
-**Public, `status.cloud.vhp4safety.nl`:** a static snapshot rebuilt every 60 s by core
+**Public, `status.bigcat-bioinformatics.org`:** a static snapshot rebuilt every 60 s by core
 and served by `public`. Service groups with their state in words and glyphs and 90-day
 bars; data-release lines ("AOP-Wiki RDF: release 2026-11-08, loaded Sun 06:12 UTC");
 open incidents (public summary only); upcoming windows; per target, what is checked;
@@ -312,7 +312,7 @@ a "data as of" banner so the page stays truthful during a core outage; `/status.
 (`generated_at`, `last_cycle_at`, `outbox_oldest_age_s`) for the watchdogs; a Traefik
 rate limit.
 
-**Private, `monitor.cloud.vhp4safety.nl`:** deny by default. Nodes, RAID, disk,
+**Private, `monitor.bigcat-bioinformatics.org`:** deny by default. Nodes, RAID, disk,
 Gluster; swarm, local images, digest drift; backups; the cron timeline from `job_runs`;
 pipelines; silences, known issues, incidents, the outbox log, the catalogue with its
 sha, the test-alert form.
@@ -405,8 +405,8 @@ the Traefik dynamic directory, each backup directory and HiDrive (ro, under
 `/mnt/gluster-brick` (statvfs only) and `/mnt/hidrive` (ro), `agent-hb/` (rw); never `/`
 or `/var/run`.
 
-**Traefik:** core ``Host(`monitor.cloud.vhp4safety.nl`) && !PathPrefix(`/api/push`)``
-plus a rate-limited `/login` router; public ``Host(`status.cloud.vhp4safety.nl`)``;
+**Traefik:** core ``Host(`monitor.bigcat-bioinformatics.org`) && !PathPrefix(`/api/push`)``
+plus a rate-limited `/login` router; public ``Host(`status.bigcat-bioinformatics.org`)``;
 `websecure`, `letsencrypt`, `traefik.docker.network=core`. The routers stay
 `traefik.enable=false` until the A records exist, because an HTTP-01 challenge for a
 name that does not resolve here loops. Cron jobs push to `tgx-monitor_core:8000` over

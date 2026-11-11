@@ -1,7 +1,7 @@
 # When an alert arrives
 
 Every alert names a **target** (a service, endpoint, job, backup or node) and links to
-the private page `https://monitor.cloud.vhp4safety.nl/check/<check-id>`. Start there: it
+the private page `https://monitor.bigcat-bioinformatics.org/check/<check-id>`. Start there: it
 shows the exact request, each assertion with what was expected and what was found, how
 long it has been failing, the dependency path, and the delivery log. Nothing in this
 runbook needs root unless it says "Egon".

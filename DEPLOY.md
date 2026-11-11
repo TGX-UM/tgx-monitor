@@ -251,11 +251,13 @@ elsewhere go to `catalogue/known_issues.yaml` with an owner and an expiry.
 
 ## 8. DNS, then the Traefik routers
 
-Once Egon's A records resolve:
+Both names are covered by the `*.bigcat-bioinformatics.org` wildcard (a CNAME to the
+apex, which is an A record for tgx1), so no DNS change is needed (switched over from the
+planned `*.cloud.vhp4safety.nl` names on 2026-11-11, which needed explicit records):
 
 ```bash
-dig +short status.cloud.vhp4safety.nl  @1.1.1.1    # 81.169.246.233
-dig +short monitor.cloud.vhp4safety.nl @1.1.1.1    # 81.169.246.233
+dig +short status.bigcat-bioinformatics.org  @1.1.1.1    # bigcat-bioinformatics.org. 81.169.246.233
+dig +short monitor.bigcat-bioinformatics.org @1.1.1.1    # bigcat-bioinformatics.org. 81.169.246.233
 ```
 
 change `traefik.enable=false` to `true` for **both** `core` and `public` in `stack.yml`,
@@ -264,10 +266,10 @@ in a commit on `main` (so the next deploy does not undo it), then on tgx1:
 ```bash
 cd ~/tgx-monitor && git pull && sed -i "s|tgx-monitor:latest|tgx-monitor:sha-${SHA}|" stack.yml
 docker stack deploy -c stack.yml tgx-monitor
-curl -sI https://status.cloud.vhp4safety.nl/ | head -1           # 200 (after the first snapshot)
-curl -s  https://status.cloud.vhp4safety.nl/status.json | head -c 300
-curl -sI https://monitor.cloud.vhp4safety.nl/login | head -1     # 200
-curl -s -o /dev/null -w '%{http_code}\n' https://monitor.cloud.vhp4safety.nl/api/push/x  # 404: not routed
+curl -sI https://status.bigcat-bioinformatics.org/ | head -1           # 200 (after the first snapshot)
+curl -s  https://status.bigcat-bioinformatics.org/status.json | head -c 300
+curl -sI https://monitor.bigcat-bioinformatics.org/login | head -1     # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://monitor.bigcat-bioinformatics.org/api/push/x  # 404: not routed
 ```
 
 `/api/push` is deliberately not routed: cron jobs reach `http://tgx-monitor_core:8000`
@@ -356,8 +358,7 @@ image reads a newer database. To stop alerting at once without a rollback:
 
 One batched request, LO-TGX in cc:
 
-1. **A records** `status.cloud.vhp4safety.nl` and `monitor.cloud.vhp4safety.nl` →
-   81.169.246.233, before the Traefik rules go in (step 8).
+1. *(no longer needed: the monitor moved to the `*.bigcat-bioinformatics.org` wildcard)*
 2. **`tgxmon_slack_webhook`**: an incoming webhook for `#monitoring_alerts`, created with
    `docker secret create` (replacing the placeholder, see the rotation recipe).
 3. **Review and install `host/tgx-monitor-status.sh`** as a 5-minute root cron on both nodes:

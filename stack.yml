@@ -63,7 +63,8 @@ services:
       TGXMON_TMP: /tmp
       TGXMON_DOCKER_PROXY: tasks.docker-proxy
       TGXMON_AGENTS: tasks.agent
-      TGXMON_PRIVATE_URL: https://monitor.cloud.vhp4safety.nl
+      TGXMON_PRIVATE_URL: https://monitor.bigcat-bioinformatics.org
+      TGXMON_PUBLIC_URL: https://status.bigcat-bioinformatics.org
       # GitHub issues are opened by the App tgx-monitor[bot] (its key is the secret
       # tgxmon_gh_app_key). Ids are not secret; empty means "App not set up yet" and
       # the channel falls back to tgxmon_gh_token. DEPLOY.md step 2.
@@ -137,14 +138,14 @@ services:
       labels:
         # Off until the A record exists: HTTP-01 for a name that does not resolve here
         # loops the ACME challenge (AGENTS.md). DEPLOY.md step 8 flips this to true.
-        - traefik.enable=false
-        - traefik.http.routers.tgxmon-core.rule=Host(`monitor.cloud.vhp4safety.nl`) && !PathPrefix(`/api/push`)
+        - traefik.enable=true
+        - traefik.http.routers.tgxmon-core.rule=Host(`monitor.bigcat-bioinformatics.org`) && !PathPrefix(`/api/push`)
         - traefik.http.routers.tgxmon-core.entrypoints=websecure
         - traefik.http.routers.tgxmon-core.tls=true
         - traefik.http.routers.tgxmon-core.tls.certresolver=letsencrypt
         - traefik.http.routers.tgxmon-core.service=tgxmon-core
         # /login gets its own router so it can carry a tight rate limit.
-        - traefik.http.routers.tgxmon-login.rule=Host(`monitor.cloud.vhp4safety.nl`) && Path(`/login`)
+        - traefik.http.routers.tgxmon-login.rule=Host(`monitor.bigcat-bioinformatics.org`) && Path(`/login`)
         - traefik.http.routers.tgxmon-login.entrypoints=websecure
         - traefik.http.routers.tgxmon-login.tls=true
         - traefik.http.routers.tgxmon-login.tls.certresolver=letsencrypt
@@ -190,8 +191,8 @@ services:
         reservations:
           memory: 64M
       labels:
-        - traefik.enable=false
-        - traefik.http.routers.tgxmon-public.rule=Host(`status.cloud.vhp4safety.nl`)
+        - traefik.enable=true
+        - traefik.http.routers.tgxmon-public.rule=Host(`status.bigcat-bioinformatics.org`)
         - traefik.http.routers.tgxmon-public.entrypoints=websecure
         - traefik.http.routers.tgxmon-public.tls=true
         - traefik.http.routers.tgxmon-public.tls.certresolver=letsencrypt

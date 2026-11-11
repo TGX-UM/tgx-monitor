@@ -1,7 +1,7 @@
 # tgx-monitor
 
-**Status page: [status.cloud.vhp4safety.nl](https://status.cloud.vhp4safety.nl/)** ·
-private detail: `monitor.cloud.vhp4safety.nl` (login)
+**Status page: [status.bigcat-bioinformatics.org](https://status.bigcat-bioinformatics.org/)** ·
+private detail: `monitor.bigcat-bioinformatics.org` (login)
 
 Monitoring and alerting for the web estate of the Department of Translational Genomics
 (Maastricht University): about fifty public hostnames on the two-node Docker Swarm

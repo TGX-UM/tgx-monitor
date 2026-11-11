@@ -10,7 +10,7 @@ What it checks, through **each node IP separately** (TLS with the real name as S
 like ``curl --resolve``), because DNS points at tgx1 only and a dead tgx2 edge would
 otherwise stay invisible until the day it is needed:
 
-1. ``https://status.cloud.vhp4safety.nl/status.json`` answers and its ``generated_at``
+1. ``https://status.bigcat-bioinformatics.org/status.json`` answers and its ``generated_at``
    is younger than 15 minutes (the public snapshot is rebuilt every 60 s by core);
 2. about fifteen sentinel URLs across the estate answer with the expected content;
 3. the A records of the monitor and sentinel hostnames are tgx1 (DNS-over-HTTPS to
@@ -51,7 +51,7 @@ import urllib.request
 from typing import Any
 
 NODES = {"tgx1": "81.169.246.233", "tgx2": "85.214.252.63"}
-STATUS_URL = "https://status.cloud.vhp4safety.nl/status.json"
+STATUS_URL = "https://status.bigcat-bioinformatics.org/status.json"
 MAX_STATUS_AGE = dt.timedelta(minutes=15)
 DOH = "https://cloudflare-dns.com/dns-query"
 ISSUE_TITLE = "Outside probe: cluster unreachable or stale"

@@ -15,7 +15,7 @@ authors:
     orcid: "https://orcid.org/0000-0003-2230-0840"
     affiliation: "Department of Translational Genomics, Maastricht University"
 repository-code: "https://github.com/TGX-UM/tgx-monitor"
-url: "https://status.cloud.vhp4safety.nl/"
+url: "https://status.bigcat-bioinformatics.org/"
 license: MIT
 version: 0.1.0
 keywords:
