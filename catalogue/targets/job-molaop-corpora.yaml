@@ -72,30 +72,33 @@ checks:
     inv_ids: [corp-reactome-lag]
 
   - id: corpora-go-current
-    kind: compare
-    every: 6h
-    alert_after: 35d
-    describe: The Gene Ontology release behind the Builder's GO suggestions is the current GO release.
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: At the last refresh the GO corpus matched the current GO release, or was rebuilt for it.
+    # /get_data_versions reports the upstream release since molAOP-builder ab3f518, so it can no
+    # longer show what the corpus was built from; the refresh job's own table does.
     request:
-      left: {http_json: {url: "https://molaop-builder.vhp4safety.nl/get_data_versions", path: gene_ontology.version}}
-      right:
-        http_regex: {url: "https://current.geneontology.org/ontology/go-basic.obo", re: 'data-version: releases/(\d{4}-\d{2}-\d{2})', headers: {Range: "bytes=0-400"}}
-        on_error: unknown
+      service: cronjobs_molaop-builder-refresh-corpora
+      grace: 30m
+      marker_re: '\bgene_ontology\s+\S+\s+\S+\s+(current|DRIFTED)\b'
     assert:
-      - {that: relation, eq: equal, label: "deployed GO release == current GO data-version"}
+      - {that: marker_found, eq: true, label: "gene_ontology row says current or DRIFTED (rebuilt), not upstream unavailable"}
     inv_ids: [corp-go-lag]
 
   - id: corpora-wikipathways-current
-    kind: compare
-    every: 6h
-    alert_after: 8d
-    timeout: 30s
-    describe: The WikiPathways release behind the Builder's pathway suggestions is the one the WikiPathways endpoint serves.
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: At the last refresh the WikiPathways corpus matched the release the WikiPathways endpoint serves, or was rebuilt for it.
+    # Not /get_data_versions: it reports the upstream release, so comparing it with upstream
+    # was always equal. The refresh job's table compares deployed with upstream.
     request:
-      left: {http_json: {url: "https://molaop-builder.vhp4safety.nl/get_data_versions", path: wikipathways.version}}
-      right: {sparql: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/ops-jobs/wp-release.rq, value: dataset}, extract: '(\d{8})'}
+      service: cronjobs_molaop-builder-refresh-corpora
+      grace: 30m
+      marker_re: '\bwikipathways\s+\S+\s+\S+\s+(current|DRIFTED)\b'
     assert:
-      - {that: relation, eq: equal, label: "Builder WikiPathways release == served release"}
+      - {that: marker_found, eq: true, label: "wikipathways row says current or DRIFTED (rebuilt), not upstream unavailable"}
     inv_ids: [corp-wp-aopwiki-lag]
 
   - id: corpora-apply-ran
