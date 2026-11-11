@@ -3,6 +3,8 @@
 #
 # Run it on the swarm node where tgx-monitor_core runs, as the person whose login it is:
 #   /mnt/gluster/docker/tgx-monitor/deploy/scripts/add-ui-user.sh <github-handle>
+# or, for a login through "Sign in with GitHub" only (no password; anyone may run it):
+#   /mnt/gluster/docker/tgx-monitor/deploy/scripts/add-ui-user.sh --github <github-handle>
 # The password is typed here, hashed with argon2 inside the monitor image and never shown
 # or written to disk. The existing users are carried over from the running core into a new
 # secret version tgxmon_users_v<n+1>, and core is pointed at it (a stop-first restart of
@@ -10,7 +12,9 @@
 # Roles come from catalogue/owners.yaml, not from here.
 set -euo pipefail
 
-handle="${1:?usage: add-ui-user.sh <github-handle>}"
+github_only=0
+if [ "${1:-}" = "--github" ]; then github_only=1; shift; fi
+handle="${1:?usage: add-ui-user.sh [--github] <github-handle>}"
 [[ "$handle" =~ ^[A-Za-z0-9-]{1,39}$ ]] || { echo "not a GitHub handle: $handle" >&2; exit 2; }
 
 svc=tgx-monitor_core
@@ -30,16 +34,20 @@ if docker secret inspect "$next" >/dev/null 2>&1; then
   exit 1
 fi
 
-read -rsp "New password for $handle (12+ characters): " p1; echo
-read -rsp "Again: " p2; echo
-if [ "$p1" != "$p2" ] || [ "${#p1}" -lt 12 ]; then
+if [ "$github_only" = 1 ]; then
+  hash=github  # never a valid argon2 hash: this login works only through GitHub
+else
+  read -rsp "New password for $handle (12+ characters): " p1; echo
+  read -rsp "Again: " p2; echo
+  if [ "$p1" != "$p2" ] || [ "${#p1}" -lt 12 ]; then
+    unset p1 p2
+    echo "the passwords differ or are shorter than 12 characters" >&2
+    exit 2
+  fi
+  hash=$(printf %s "$p1" | docker run --rm -i "$image" \
+    python -c 'import sys, argon2; print(argon2.PasswordHasher().hash(sys.stdin.read()))')
   unset p1 p2
-  echo "the passwords differ or are shorter than 12 characters" >&2
-  exit 2
 fi
-hash=$(printf %s "$p1" | docker run --rm -i "$image" \
-  python -c 'import sys, argon2; print(argon2.PasswordHasher().hash(sys.stdin.read()))')
-unset p1 p2
 
 # First line: the new hash; the rest: the users JSON core reads now (empty if a placeholder).
 { printf '%s\n' "$hash"; docker exec "$cid" cat /run/secrets/tgxmon_users; } |
