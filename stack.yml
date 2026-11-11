@@ -217,7 +217,9 @@ services:
     read_only: true
     environment:
       TGXMON_NODE: "{{.Node.Hostname}}"
-      TGXMON_DRY_RUN: "1"
+      # The agent's only output is its healthchecks.io dead-man ping, which must run in
+      # shadow mode too (like core's delivery watchdog): it goes to our own project.
+      TGXMON_DRY_RUN: "0"
       TGXMON_AGENT_PORT: "8001"
       TGXMON_AGENT_STATUS: "/hostfs/root-status/{host}.json"
       TGXMON_AGENT_HB_DIR: /hb
