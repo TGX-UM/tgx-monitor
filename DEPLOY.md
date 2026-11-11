@@ -121,6 +121,10 @@ cat > "$d/users.json" <<'EOF'
 EOF
 "${EDITOR:-nano}" "$d/users.json"; docker secret create tgxmon_users "$d/users.json"
 
+# Later logins: the person runs scripts/add-ui-user.sh <handle> on the node where core
+# runs. It hashes their password in the image, carries the existing users over into
+# tgxmon_users_v<n+1> and points core at it; then set that name in stack.yml.
+
 # Session signing key, push tokens for the cron jobs (job name -> random token)
 openssl rand -hex 32 | tr -d '\n' | docker secret create tgxmon_session_key -
 printf '{"wikipathways-reload": "%s", "wikipathways-switch": "%s", "aopwiki-snorql-reload": "%s"}' \
