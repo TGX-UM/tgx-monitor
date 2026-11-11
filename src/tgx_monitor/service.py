@@ -228,7 +228,7 @@ class Service:
             secure_cookies=env("TGXMON_INSECURE_COOKIES") != "1",
             base_url=env("TGXMON_PRIVATE_URL"),
             gh_client_id=env("TGXMON_GH_CLIENT_ID"),
-            password_login=env("TGXMON_PASSWORD_LOGIN", "1") != "0"))
+            password_login=env("TGXMON_GITHUB_ONLY") != "1"))
         server = uvicorn.Server(uvicorn.Config(
             app, host="0.0.0.0", port=int(env("TGXMON_PORT", "8000")), log_level="warning",
             proxy_headers=False, access_log=False, lifespan="off"))

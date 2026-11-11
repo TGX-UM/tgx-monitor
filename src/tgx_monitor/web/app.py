@@ -80,7 +80,7 @@ class WebSettings:
     base_url: str = ""  # the private UI's public https address (messages, OAuth callback)
     gh_client_id: str = ""  # GitHub App client id for "Sign in with GitHub" (not secret)
     gh_transport: Any = None  # httpx transport override (tests)
-    password_login: bool = True  # TGXMON_PASSWORD_LOGIN=0: GitHub sign-in only
+    password_login: bool = True  # False with TGXMON_GITHUB_ONLY=1
     max_tick_age_s: float = 180.0
     push_max_bytes: int = 65536
     now: Callable[[], dt.datetime] = utcnow

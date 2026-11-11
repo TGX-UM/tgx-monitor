@@ -68,7 +68,7 @@ agent-hb, root-status) are created in step 1.
    secret and store it without it touching a file:
    `ssh tgx1 'read -rsp "client secret: " s; echo; printf %s "$s" | docker secret create tgxmon_gh_oauth_secret -'`.
    Only handles that are keys of `tgxmon_users` get in; the value may be a password hash
-   or the word `github` (GitHub sign-in only). Once it works, `TGXMON_PASSWORD_LOGIN: "0"`
+   or the word `github` (GitHub sign-in only). Once it works, `TGXMON_GITHUB_ONLY: "1"`
    turns the password form off.
 2. **`tgxmon_gh_token`** (optional since the App): a fine-grained PAT with read-only
    *Actions* and *Metadata* on the private repositories whose workflows the catalogue

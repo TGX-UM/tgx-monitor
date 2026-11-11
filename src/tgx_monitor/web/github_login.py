@@ -12,7 +12,7 @@ state, swaps the code for a user token, asks GitHub who this is, revokes the tok
 ``tgxmon_users``. The value there may be an argon2 hash (password login too) or the word
 ``github`` (GitHub sign-in only). Roles still come from ``owners.yaml``.
 
-``TGXMON_PASSWORD_LOGIN=0`` turns the password form off once GitHub sign-in works, so a
+``TGXMON_GITHUB_ONLY=1`` turns the password form off once GitHub sign-in works, so a
 leaked password alone no longer opens the page.
 """
 
