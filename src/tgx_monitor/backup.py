@@ -206,17 +206,38 @@ def cmd_restore_verify(args: argparse.Namespace) -> int:
     return 0 if out["ok"] else 1
 
 
+def hc_ping(check: str, ok: bool, body: str) -> str:
+    """Ping healthchecks.io ``check`` from a one-shot job, with the URL from the
+    tgxmon_hc_urls secret. Never raises: a missing URL or a failed ping is reported."""
+    import httpx
+
+    from .secrets import read_secret_json
+
+    urls = read_secret_json("tgxmon_hc_urls")
+    url = urls.get(check) if isinstance(urls, dict) else None
+    if not url:
+        return f"healthchecks: no URL for {check}"
+    try:
+        r = httpx.post(str(url).rstrip("/") + ("" if ok else "/fail"),
+                       content=body[:10000].encode(), timeout=15)
+        return f"healthchecks: {check} {'success' if ok else 'fail'} -> {r.status_code}"
+    except httpx.HTTPError as exc:
+        return f"healthchecks: {check} ping failed: {type(exc).__name__}"
+
+
 def cmd_offsite_copy(args: argparse.Namespace) -> int:
     try:
         out = offsite_copy(Path(args.src), Path(args.dest), keep=args.keep)
     except (OSError, ValueError) as exc:
         out = {"ok": False, "problems": [f"{type(exc).__name__}: {exc}"]}
     print(json.dumps(out, indent=1, sort_keys=True))
-    if out.get("ok"):
-        print(f"Done: {out['file']} verified")
-        return 0
-    print(f"FAILED: {'; '.join(out.get('problems') or ['unknown'])}", file=sys.stderr)
-    return 1
+    ok = bool(out.get("ok"))
+    line = (f"Done: {out['file']} verified" if ok
+            else f"FAILED: {'; '.join(out.get('problems') or ['unknown'])}")
+    if args.hc_check:
+        print(hc_ping(args.hc_check, ok, line))
+    print(line, file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 1
 
 
 def add_commands(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -235,4 +256,6 @@ def add_commands(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-
     o.add_argument("src", metavar="SRC_DIR")
     o.add_argument("dest", metavar="DEST_DIR")
     o.add_argument("--keep", type=int, default=KEEP)
+    o.add_argument("--hc-check", metavar="NAME",
+                   help="healthchecks.io check to ping (URL from the tgxmon_hc_urls secret)")
     o.set_defaults(fn=cmd_offsite_copy)

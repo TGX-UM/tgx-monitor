@@ -315,3 +315,24 @@ def test_offsite_copy_without_backups_fails_loudly(tmp_path):
     out = B.offsite_copy(tmp_path / "empty", tmp_path)
     assert not out["ok"] and "no monitor-" in out["problems"][0]
     assert main(["offsite-copy", str(tmp_path / "empty"), str(tmp_path)]) == 1
+
+
+def test_offsite_copy_pings_healthchecks(store, tmp_path, monkeypatch):
+    import httpx
+
+    fill(store)
+    src, dst, sec = tmp_path / "g", tmp_path / "h", tmp_path / "secrets"
+    dst.mkdir()
+    sec.mkdir()
+    (sec / "tgxmon_hc_urls").write_text(json.dumps({"hidrive-copy": "https://hc.example/p/abc"}))
+    monkeypatch.setattr("tgx_monitor.secrets.SECRETS_DIR", sec)
+    sent = []
+    monkeypatch.setattr(httpx, "post", lambda url, **kw: sent.append(url) or
+                        httpx.Response(200, request=httpx.Request("POST", url)))
+    B.backup(store, src, now=NOW)
+    assert main(["offsite-copy", str(src), str(dst), "--hc-check", "hidrive-copy"]) == 0
+    assert sent == ["https://hc.example/p/abc"]
+    assert main(["offsite-copy", str(tmp_path / "none"), str(dst), "--hc-check",
+                 "hidrive-copy"]) == 1
+    assert sent[-1] == "https://hc.example/p/abc/fail"
+    assert "no URL" in B.hc_ping("other", True, "x")

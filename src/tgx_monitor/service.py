@@ -134,6 +134,7 @@ class Service:
             ("snapshot", 60, self._snapshot),
             ("reconcile", 300, self._reconcile),
             ("nightly", 3600, self._nightly),
+            ("hc-cycle", 120, self._hc_cycle),
         ]
         for name, every, fn in jobs:
             if not self._due(name, every):
@@ -179,7 +180,23 @@ class Service:
 
         await reconcile.run(self.engine, self.channels.get("github"))
 
-    def _nightly(self) -> None:
+    async def _hc_cycle(self) -> None:
+        """healthchecks.io core-cycle: success while the scheduler completes its cycles,
+        /fail with the age when it has stalled. Sent directly, not through the outbox, so
+        a stuck outbox cannot hide a stuck scheduler (delivery-watchdog covers the outbox)."""
+        hc = self.channels.get("hc")
+        if hc is None:
+            return
+        from .snapshot import parse_ts
+
+        last = parse_ts(self.store.get_meta("last_tick"))
+        age = (utcnow() - last).total_seconds() if last else None
+        if age is not None and age < 180:
+            await hc.ping("core-cycle", "success", f"tick {age:.0f}s ago")
+        else:
+            await hc.ping("core-cycle", "fail", f"scheduler tick {age}s old")
+
+    async def _nightly(self) -> None:
         """Once a day, after 01:00 UTC: rollups + retention, then a backup."""
         now = utcnow()
         day = now.date().isoformat()
@@ -189,8 +206,18 @@ class Service:
         log.info("rollup and prune: %s", stats)
         from .backup import backup
 
-        manifest = backup(self.store, self.backup_dir)
+        hc = self.channels.get("hc")
+        try:
+            manifest = backup(self.store, self.backup_dir)
+        except Exception as exc:
+            if hc is not None:
+                await hc.ping("monitor-backup", "fail", f"{type(exc).__name__}: {exc}")
+            raise
         log.info("backup: %s", manifest)
+        if hc is not None:
+            await hc.ping("monitor-backup", "success" if manifest.get("ok") else "fail",
+                          f"{manifest.get('file')} {manifest.get('bytes')} bytes "
+                          f"integrity {manifest.get('integrity')}")
         self.store.set_meta("nightly_done", day)
 
     def _maybe_reload(self) -> None:

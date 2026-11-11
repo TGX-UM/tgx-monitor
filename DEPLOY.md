@@ -77,7 +77,9 @@ agent-hb, root-status) are created in step 1.
    Expiry: one year; the `self` check warns 30 days ahead.
 3. **`tgxmon_ghcr_read_pat`**: a *classic* PAT with only `read:packages` (GHCR rejects
    App tokens), for the manifest checks of private packages such as `oppbk`.
-4. **healthchecks.io**: one project, ten checks, each e-mailing Marvin and Egon:
+4. **healthchecks.io**: one project with seven checks, created by
+   `scripts/setup-healthchecks.sh` (asks for a read-write API key; sets the Docker
+   secret and `HC_PROBE_URL` without printing a URL). The original plan of ten:
 
    | Check | Period / grace |
    |---|---|
