@@ -38,6 +38,7 @@ secrets:
   tgxmon_hc_urls: {external: true}
   tgxmon_private_checks: {external: true}
   tgxmon_slack_webhook: {external: true}
+  tgxmon_gh_oauth_secret: {external: true}  # GitHub App client secret, for Sign in with GitHub
 
 services:
   # Scheduler, checks, the single SQLite writer, alert engine and outbox, private UI,
@@ -108,6 +109,7 @@ services:
       - tgxmon_smtp
       - tgxmon_contacts
       - tgxmon_users
+      - tgxmon_gh_oauth_secret
       - tgxmon_session_key
       - tgxmon_push_tokens
       - tgxmon_hc_urls
