@@ -442,6 +442,8 @@ async def record_job_runs(store: Any, docker: DockerAPI) -> int:
     are fetched). Call it every couple of minutes: logs disappear with the task.
     Returns the number of rows inserted.
     """
+    if not store.get_meta("job_recorder_started"):
+        store.set_meta("job_recorder_started", iso(dt.datetime.now(dt.UTC)))
     aliases = {n.get("ID"): n.get("Alias", "") for n in await docker.nodes()}
     inserted = 0
     for s in await docker.services():
@@ -558,6 +560,13 @@ class JobRunKind(Kind):
                                          iso(due + dt.timedelta(seconds=grace)))))
         last = _run_row(ctx.store.one(
             "SELECT * FROM job_runs WHERE job=? ORDER BY started_at DESC LIMIT 1", (r["service"],)))
+        # Swarm keeps only the last few tasks per job, so a slot from before the monitor
+        # started recording may simply be invisible: that is "cannot tell", not "missed".
+        since = parse_ts(ctx.store.get_meta("job_recorder_started") or "")
+        if not run and since is not None and due < since:
+            return Observation(unknown=f"slot {iso(due)} predates the monitor's job record "
+                                       f"(since {iso(since)}); judged from the next run",
+                               calls=calls)
         values: dict[str, Any] = {
             "schedule": expr, "last_scheduled_at": iso(latest), "checked_slot": iso(due),
             "pending": due != latest, "ran": bool(run), "run": run, "last_run": last,

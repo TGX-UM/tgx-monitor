@@ -216,7 +216,7 @@ services:
       TGXMON_AGENT_PORT: "8001"
       TGXMON_AGENT_STATUS: "/hostfs/root-status/{host}.json"
       TGXMON_AGENT_HB_DIR: /hb
-      TGXMON_AGENT_PATHS: "rootfs=/hostfs/rootfs-probe,gluster-brick=/hostfs/gluster-brick,hidrive=/hostfs/hidrive"
+      TGXMON_AGENT_PATHS: "rootfs=/hostfs/rootfs-probe,brick=/hostfs/gluster-brick,hidrive=/hostfs/hidrive"
       TGXMON_AGENT_HIDRIVE: "tgx-monitor=/hostfs/hidrive/docker/tgx-monitor,aopwiki-dashboard=/hostfs/hidrive/docker/aopwiki-dashboard/virtuoso"
     networks: [tgxmon_int]
     volumes:

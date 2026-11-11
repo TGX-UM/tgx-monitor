@@ -305,3 +305,8 @@ def test_max_age_parses_http_dates():
     assert A.evaluate({"that": "lm", "max_age": {"crit": "3d"}}, vals, now).status == "ok"
     assert A.evaluate({"that": "lm", "max_age": {"crit": "1d"}}, vals, now).status == "failed"
     assert A.evaluate({"that": "v", "max_age": {"crit": "8d"}}, vals, now).status == "ok"
+
+
+def test_ordering_against_none_fails_instead_of_raising():
+    o = A.evaluate({"that": "age", "lt": 5}, {"age": None}, NOW)
+    assert o.status == "failed" and "assertion error" not in o.found

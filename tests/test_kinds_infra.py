@@ -273,6 +273,7 @@ async def test_job_run_ran(swarm: FakeSwarm, store: Store) -> None:
 
 async def test_job_run_missed_slot(swarm: FakeSwarm, store: Store) -> None:
     swarm.tasks = [t for t in reload_tasks() if t["ID"] != "tok2"]
+    store.set_meta("job_recorder_started", "2026-10-01T00:00:00+00:00")  # recording all along
     await record_job_runs(store, swarm.api())
     o = await observe("job_run", ctx_for(swarm, store), service="cronjobs_aopwiki-snorql-reload")
     assert o.values["ran"] is False and o.values["run"] == {}
@@ -421,3 +422,15 @@ async def test_docs_drift(swarm: FakeSwarm, tmp_path: Path) -> None:
     assert "@" not in json.dumps(v)
     o = await observe("docs_drift", ctx, mount="nope")
     assert o.unknown
+
+
+
+async def test_job_run_slot_before_recording_started_is_unknown(swarm: FakeSwarm,
+                                                               store: Store) -> None:
+    """Swarm keeps only a few tasks per job: a slot before the monitor began recording
+    cannot be judged, so it is unknown rather than a missed run."""
+    swarm.tasks = [t for t in reload_tasks() if t["ID"] != "tok2"]
+    store.set_meta("job_recorder_started", "2099-01-01T00:00:00+00:00")
+    await record_job_runs(store, swarm.api())
+    o = await observe("job_run", ctx_for(swarm, store), service="cronjobs_aopwiki-snorql-reload")
+    assert o.unknown and "predates" in o.unknown

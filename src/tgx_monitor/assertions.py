@@ -234,6 +234,10 @@ def evaluate(
                 lhs, rhs = str(got), v
             elif gn is not None and vn is not None:
                 lhs, rhs = gn, vn
+            elif op not in ("eq", "ne") and got is None:
+                # A value the target did not supply: the assertion does not hold. (Ordering
+                # against a word stays an assertion error, reported as unknown.)
+                return out(False, f"{op} {v!r}", got)
             else:
                 lhs, rhs = got, v
             res = {
