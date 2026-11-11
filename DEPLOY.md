@@ -72,9 +72,8 @@ agent-hb, root-status) are created in step 1.
    | `hidrive-copy`, `restore-verify`, `monitor-backup` | 1 day (restore-verify 7 days) / 6 h |
 
 5. **Repository settings** of `TGX-UM/tgx-monitor`: Actions secret `HC_PROBE_URL` (the
-   `gha-probe` ping URL), Actions secret `GITLEAKS_LICENSE` (free key from gitleaks.io,
-   required for organisation repositories). The variable `OUTSIDE_PROBE_ENABLED` comes
-   in step 9.
+   `gha-probe` ping URL). The variable `OUTSIDE_PROBE_ENABLED` comes in step 9. (CI runs
+   the open-source gitleaks binary, pinned by checksum, so no gitleaks licence is needed.)
 
 ## 3. Docker secrets
 

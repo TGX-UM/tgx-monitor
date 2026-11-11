@@ -60,6 +60,16 @@ def _cert(subject: x509.Name, issuer: x509.Name, key, sign_key, *, san: list[str
     if san:
         b = b.add_extension(x509.SubjectAlternativeName([x509.DNSName(n) for n in san]),
                             critical=False)
+    # Python 3.13 verifies with VERIFY_X509_STRICT, which wants these as real CAs set them.
+    b = b.add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()),
+                        critical=False)
+    b = b.add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(
+        sign_key.public_key()), critical=False)
+    if ca:
+        b = b.add_extension(x509.KeyUsage(
+            digital_signature=True, content_commitment=False, key_encipherment=False,
+            data_encipherment=False, key_agreement=False, key_cert_sign=True, crl_sign=True,
+            encipher_only=False, decipher_only=False), critical=True)
     return b.sign(sign_key, hashes.SHA256())
 
 
