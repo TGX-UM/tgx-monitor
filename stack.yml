@@ -35,7 +35,7 @@ secrets:
   tgxmon_users: {external: true, name: tgxmon_users_v3}  # mounted as tgxmon_users (marvinm2, egonw)
   tgxmon_session_key: {external: true}
   tgxmon_push_tokens: {external: true}
-  tgxmon_hc_urls: {external: true}
+  tgxmon_hc_urls: {external: true, name: tgxmon_hc_urls_v2}  # mounted as tgxmon_hc_urls; from scripts/setup-healthchecks.sh
   tgxmon_private_checks: {external: true}
   tgxmon_slack_webhook: {external: true}
   tgxmon_gh_oauth_secret: {external: true}  # GitHub App client secret, for Sign in with GitHub
