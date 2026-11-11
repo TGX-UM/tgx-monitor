@@ -1,0 +1,50 @@
+id: backup-tgx-monitor
+name: The monitor's own database, copied off the cluster
+group: Jobs and backups
+class: backup
+criticality: medium
+owners: [marvinm2]
+depends_on: [swarm, backup-hidrive]
+public: false
+public_summary: The monitor's history is backed up every night and copied off the cluster, where the copy is opened and checked.
+# Core writes monitor-<date>.db + .json to /data/backups (GlusterFS) after 01:00 UTC;
+# cronjobs_tgx-monitor-offsite (15 3 * * *) copies the newest to HiDrive
+# (docker/tgx-monitor/), runs restore-verify on the copy (.verified.json) and keeps 14.
+checks:
+  - id: bk-monitor-offsite-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The nightly off-cluster copy ran at its slot and verified the copy.
+    request:
+      service: cronjobs_tgx-monitor-offsite
+      grace: 30m
+      marker_re: 'Done: (monitor-\d{4}-\d{2}-\d{2}\.db) verified'
+    assert:
+      - {that: schedule, eq: "15 3 * * *", label: "scheduled daily 03:15 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true, label: "log has 'Done: monitor-<date>.db verified'"}
+
+  - id: bk-monitor-offsite-fresh
+    kind: file_age
+    every: 1h
+    via: [core]
+    describe: A copy less than 26 hours old is on the off-cluster drive and is not suspiciously small.
+    request: {mount: hidrive, glob: "tgx-monitor/monitor-*.db", small_bytes: 100000, verify_gzip: false}
+    assert:
+      - {that: count, gte: 1}
+      - {that: count, lte: 16, warn: true, label: "pruning keeps it at about 14"}
+      - {that: newest_age_h, lt: 26}
+      - {that: small_count, eq: 0}
+
+  - id: bk-monitor-offsite-verified
+    kind: restore_marker
+    every: 1h
+    via: [core]
+    describe: The newest copy was opened on the drive, passed integrity_check and matched its manifest.
+    request: {mount: hidrive, file: "tgx-monitor/monitor-*.verified.json", format: json}
+    assert:
+      - {that: exists, eq: true}
+      - {that: ok, eq: true}
+      - {that: age_h, lt: 26}

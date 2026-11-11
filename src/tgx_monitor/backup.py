@@ -11,6 +11,12 @@ the manifest and writes ``<name>.verified.json`` (``{verified_at, ok, counts, ..
 which the ``restore_marker`` check reads. A backup nobody has opened is a hope, not a
 backup, so the marker is written on failure too, with ``ok: false``.
 
+``tgx-monitor offsite-copy SRC_DIR DEST_DIR`` is the nightly cluster job
+(``cronjobs_tgx-monitor-offsite``): it copies the newest backup and its manifest from
+GlusterFS to HiDrive (``.part`` then rename, so a half-written copy never carries the
+real name), runs :func:`restore_verify` on the copy, prunes to 14 and logs
+``Done: monitor-<date>.db verified``. Without it every copy sits on the volume it backs up.
+
 Why the command opens the live database read-only instead of through :class:`Store`:
 ``Store()`` creates the schema and writes ``meta``, and the database on GlusterFS has
 exactly one writer (core). A second writer from ``docker exec`` is the very thing the
@@ -143,6 +149,39 @@ def restore_verify(file: Path, marker: Path | None = None) -> dict[str, Any]:
     return out
 
 
+def _copy(src: Path, dest: Path) -> None:
+    part = dest.with_name(dest.name + ".part")
+    with src.open("rb") as fi, part.open("wb") as fo:
+        while chunk := fi.read(1 << 20):
+            fo.write(chunk)
+        fo.flush()
+        os.fsync(fo.fileno())
+    part.replace(dest)
+
+
+def offsite_copy(src_dir: Path, dest_dir: Path, keep: int = KEEP) -> dict[str, Any]:
+    """Copy the newest backup + manifest to ``dest_dir``, verify the copy, prune."""
+    src_dir, dest_dir = Path(src_dir), Path(dest_dir)
+    dbs = sorted(src_dir.glob(f"{PREFIX}*.db"))
+    if not dbs:
+        return {"ok": False, "problems": [f"no {PREFIX}*.db in {src_dir}"]}
+    newest = dbs[-1]
+    manifest = newest.with_suffix(".json")
+    if not manifest.is_file():
+        return {"ok": False, "problems": [f"{manifest.name} missing beside {newest.name}"]}
+    dest = dest_dir / newest.name
+    want = json.loads(manifest.read_text()).get("sha256")
+    copied = False
+    if not (dest.is_file() and want and sha256(dest) == want):
+        _copy(manifest, dest.with_suffix(".json"))
+        _copy(newest, dest)
+        copied = True
+    out = restore_verify(dest)
+    out["copied"] = copied
+    out["pruned"] = _prune(dest_dir, keep)
+    return out
+
+
 # ---------------------------------------------------------------------- CLI
 def cmd_backup(args: argparse.Namespace) -> int:
     try:
@@ -167,6 +206,19 @@ def cmd_restore_verify(args: argparse.Namespace) -> int:
     return 0 if out["ok"] else 1
 
 
+def cmd_offsite_copy(args: argparse.Namespace) -> int:
+    try:
+        out = offsite_copy(Path(args.src), Path(args.dest), keep=args.keep)
+    except (OSError, ValueError) as exc:
+        out = {"ok": False, "problems": [f"{type(exc).__name__}: {exc}"]}
+    print(json.dumps(out, indent=1, sort_keys=True))
+    if out.get("ok"):
+        print(f"Done: {out['file']} verified")
+        return 0
+    print(f"FAILED: {'; '.join(out.get('problems') or ['unknown'])}", file=sys.stderr)
+    return 1
+
+
 def add_commands(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
     p = sub.add_parser("backup", help="online backup of the monitor database, keep 14")
     p.add_argument("dest", metavar="DEST_DIR")
@@ -178,3 +230,9 @@ def add_commands(sub: argparse._SubParsersAction) -> None:  # type: ignore[type-
     v.add_argument("file", metavar="FILE")
     v.add_argument("--marker", help="where to write the marker (default: beside FILE)")
     v.set_defaults(fn=cmd_restore_verify)
+
+    o = sub.add_parser("offsite-copy", help="copy the newest backup off the cluster, verify it")
+    o.add_argument("src", metavar="SRC_DIR")
+    o.add_argument("dest", metavar="DEST_DIR")
+    o.add_argument("--keep", type=int, default=KEEP)
+    o.set_defaults(fn=cmd_offsite_copy)

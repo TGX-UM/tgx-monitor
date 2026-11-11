@@ -1,0 +1,111 @@
+name: Re-lock Python dependencies
+
+# Dependabot cannot update the hashed .lock files, so once a month this re-resolves
+# them with uv, keeping the two-week rule (--exclude-newer = 14 days ago), and opens a
+# pull request when anything changed. The new packages are installed and tested in a
+# job with a read-only token; only the second job, which runs no package code, may
+# write a branch and open the PR. Merging never deploys (DEPLOY.md names exact images).
+on:
+  schedule:
+    - cron: "0 5 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  relock:
+    if: github.repository == 'TGX-UM/tgx-monitor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      cutoff: ${{ steps.lock.outputs.cutoff }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+        with:
+          version: "0.10.4"
+          enable-cache: false
+
+      - name: Re-lock (nothing published in the last 14 days)
+        id: lock
+        run: |
+          cutoff=$(date -u -d '14 days ago' +%Y-%m-%d)
+          echo "cutoff=$cutoff" >> "$GITHUB_OUTPUT"
+          common="--generate-hashes --python-version 3.13 --exclude-newer $cutoff"
+          uv pip compile pyproject.toml $common -o requirements.lock
+          uv pip compile requirements-dev.in $common --no-header --no-annotate -o requirements-dev.lock
+          uv pip compile scripts/browser-requirements.in $common --no-header --no-annotate \
+            -o scripts/browser-requirements.lock
+
+      - name: Did anything change?
+        id: diff
+        run: |
+          locks="requirements.lock requirements-dev.lock scripts/browser-requirements.lock"
+          if git diff --quiet -- $locks; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "Locks are current."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"; git diff --stat -- $locks
+          fi
+
+      - name: Test with the new locks
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          pip install --require-hashes --no-deps -r requirements.lock
+          pip install --no-deps -e .
+          pip install --require-hashes --no-deps -r requirements-dev.lock
+          tgx-monitor doctor
+          ruff check src tests scripts
+          pytest -q
+
+      - name: Keep the new locks
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: locks
+          path: |
+            requirements.lock
+            requirements-dev.lock
+            scripts/browser-requirements.lock
+          retention-days: 7
+
+  pull-request:
+    needs: relock
+    if: needs.relock.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: locks
+          path: .
+
+      - name: Branch, commit, pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CUTOFF: ${{ needs.relock.outputs.cutoff }}
+        run: |
+          branch="relock/$CUTOFF"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add requirements.lock requirements-dev.lock scripts/browser-requirements.lock
+          git commit -m "Re-lock Python dependencies (published before $CUTOFF)"
+          git push --force origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Re-lock Python dependencies (published before $CUTOFF)" \
+            --body "Monthly re-lock by relock.yml. The tests passed with these locks in the workflow run. A pull request opened with the workflow token does not start CI by itself: close and reopen it, or add a commit, to run CI." \
+            || echo "a pull request for $branch already exists"

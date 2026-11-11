@@ -1,0 +1,3 @@
+# Inputs for browser-requirements.lock (re-locked monthly by .github/workflows/relock.yml).
+playwright
+pyyaml

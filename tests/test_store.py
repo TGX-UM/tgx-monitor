@@ -267,3 +267,51 @@ def test_db_path_from_env(monkeypatch):
     assert str(B.db_path()) == "/data/monitor.db"
     monkeypatch.setenv("TGXMON_DB", "/tmp/x.db")
     assert str(B.db_path()) == "/tmp/x.db"
+
+
+# ---------------------------------------------------------------- offsite-copy
+def test_offsite_copy_copies_verifies_and_skips_a_second_time(store, tmp_path):
+    fill(store)
+    src, dst = tmp_path / "gluster", tmp_path / "hidrive"
+    dst.mkdir()
+    for d in range(3):
+        B.backup(store, src, now=NOW - dt.timedelta(days=2 - d))
+    out = B.offsite_copy(src, dst)
+    assert out["ok"], out["problems"]
+    assert out["copied"] and out["file"] == "monitor-2026-11-11.db"
+    assert sorted(p.name for p in dst.iterdir()) == [
+        "monitor-2026-11-11.db", "monitor-2026-11-11.json", "monitor-2026-11-11.verified.json"]
+    again = B.offsite_copy(src, dst)
+    assert again["ok"] and not again["copied"]
+
+
+def test_offsite_copy_keeps_fourteen(store, tmp_path):
+    fill(store)
+    src, dst = tmp_path / "gluster", tmp_path / "hidrive"
+    dst.mkdir()
+    for d in range(16):
+        B.backup(store, src, now=NOW - dt.timedelta(days=15 - d), keep=1)
+        assert B.offsite_copy(src, dst)["ok"]
+    assert len(list(dst.glob("monitor-*.db"))) == 14
+    assert not list(dst.glob("*.part"))
+
+
+def test_offsite_copy_catches_a_damaged_copy(store, tmp_path):
+    fill(store)
+    src, dst = tmp_path / "gluster", tmp_path / "hidrive"
+    dst.mkdir()
+    m = B.backup(store, src, now=NOW)
+    (dst / m["file"]).write_bytes(b"not a database")  # a stale, wrong file is replaced
+    assert B.offsite_copy(src, dst)["ok"]
+    # A source file damaged after its manifest was written: the copy must fail verification.
+    (dst / m["file"]).unlink()
+    (src / m["file"]).write_bytes((src / m["file"]).read_bytes()[:-4096])
+    out = B.offsite_copy(src, dst)
+    assert not out["ok"] and out["problems"]
+    assert json.loads((dst / "monitor-2026-11-11.verified.json").read_text())["ok"] is False
+
+
+def test_offsite_copy_without_backups_fails_loudly(tmp_path):
+    out = B.offsite_copy(tmp_path / "empty", tmp_path)
+    assert not out["ok"] and "no monitor-" in out["problems"][0]
+    assert main(["offsite-copy", str(tmp_path / "empty"), str(tmp_path)]) == 1

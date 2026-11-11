@@ -1,0 +1,4 @@
+# Inputs for requirements-dev.lock (re-locked monthly by .github/workflows/relock.yml).
+pytest
+pytest-asyncio
+ruff

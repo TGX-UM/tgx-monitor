@@ -1,0 +1,19 @@
+# Dependency updates as pull requests, which CI must pass before anything is merged.
+# cooldown matches the lock policy: nothing younger than 14 days.
+# Python packages are not here: Dependabot cannot rewrite the hashed .lock files, so
+# .github/workflows/relock.yml re-locks them monthly and opens a tested PR instead.
+# Merging never deploys: a deploy still names an exact sha-<7> image (DEPLOY.md).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly, day: monday}
+    cooldown: {default-days: 14}
+    groups:
+      actions: {patterns: ["*"]}
+
+  # the python:3.13-slim base image digest in the Dockerfile
+  - package-ecosystem: docker
+    directory: /
+    schedule: {interval: weekly, day: monday}
+    cooldown: {default-days: 14}
