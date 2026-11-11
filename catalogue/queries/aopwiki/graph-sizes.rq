@@ -1,0 +1,9 @@
+# AOP-Wiki RDF: triples in the data, VoID and service-description graphs.
+SELECT ?k (COUNT(*) AS ?n)
+WHERE {
+  VALUES (?g ?k) { (<http://aopwiki.org/> "data")
+                   (<http://aopwiki.org/void> "void")
+                   (<http://aopwiki.org/servicedescription> "sd") }
+  GRAPH ?g { ?s ?p ?o }
+}
+GROUP BY ?k

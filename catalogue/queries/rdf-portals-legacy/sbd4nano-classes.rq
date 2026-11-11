@@ -1,0 +1,10 @@
+# SbD4Nano landscape classes (sbd:Database, Framework, GuidanceTool and GuidanceDocument
+# are absent by design: all.ttl is not loaded).
+SELECT ?k (COUNT(?s) AS ?n) FROM <https://h2020-sbd4nano.github.io/sbd-data-landscape/> WHERE {
+  VALUES (?c ?k) {
+    (<https://www.sbd4nano.eu/bel/#CausalAssertion> "causalAssertion")
+    (<https://www.sbd4nano.eu/rdf/#Model> "model")
+    (<https://www.sbd4nano.eu/rdf/#Dataset> "dataset")
+  }
+  ?s a ?c
+} GROUP BY ?k

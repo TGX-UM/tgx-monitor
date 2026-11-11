@@ -1,0 +1,106 @@
+id: qaop
+name: qAOP app
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [marvinm2, ditilliof, ozancinar]
+depends_on: [edge-tgx1]
+public: true
+public_summary: Quantitative AOP predictions of cisplatin-induced kidney injury, in vitro and in vivo.
+links: [https://qaop.vhp4safety.nl/]
+notes: >-
+  The prediction model samples its parameters at random, so the known-answer bounds are wide.
+  The predict calls are compute-only and store nothing.
+checks:
+  - id: qaop-home
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The prediction form loads through public DNS and on each node.
+    request: {url: "https://qaop.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "qAOP Prediction"}
+      - {that: body, contains: "<form"}
+      - {that: latency_ms, lt: 3000, warn: true}
+    inv_ids: [qaop-presence-tls]
+  - id: qaop-http-redirect
+    kind: http
+    every: 1h
+    describe: Plain http is redirected to https on the same name.
+    request: {url: "http://qaop.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, eq: "https://qaop.vhp4safety.nl/"}
+    inv_ids: [qaop-presence-tls]
+  - id: qaop-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    request: {host: qaop.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: qaop.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [qaop-presence-tls]
+  - id: qaop-api-health
+    kind: http
+    every: 5m
+    describe: The health endpoint reports both models and all their parameter sets loaded.
+    request: {url: "https://qaop.vhp4safety.nl/api/health", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: healthy}
+      - {that: json.checks.data.invitro_params, eq: true}
+      - {that: json.checks.data.invivo_params, eq: true}
+      - {that: json.checks.data.pk_params, eq: true}
+      - {that: json.checks.models.invitro_sampling, eq: true}
+      - {that: json.checks.models.invivo_sampling, eq: true}
+      - {that: json.models, eq: [invitro, invivo]}
+    inv_ids: [qaop-api-health]
+  - id: qaop-predict
+    kind: roundtrip
+    every: 1h
+    timeout: 30s
+    describe: An in vitro prediction at 1 and 100 µM cisplatin gives DNA damage and necrosis in the known ranges.
+    request:
+      base: https://qaop.vhp4safety.nl
+      steps:
+        - {method: POST, url: /api/predict, json: {model_type: invitro, dose: 1, time: 24, simulation_count: 20}}
+        - {method: POST, url: /api/predict, json: {model_type: invitro, dose: 100, time: 24, simulation_count: 20}}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.0.latency_ms, lt: 10000}
+      - {that: steps.1.latency_ms, lt: 10000}
+      - {that: steps.0.json.endpoints.dna_damage.final_value.median, gte: 0.30}
+      - {that: steps.0.json.endpoints.dna_damage.final_value.median, lte: 0.60}
+      - {that: steps.1.json.endpoints.dna_damage.final_value.median, gte: 2.8}
+      - {that: steps.1.json.endpoints.dna_damage.final_value.median, lte: 4.5}
+      - {that: steps.0.json.endpoints.necrosis.final_value.median, lt: 1.0e-10, label: "necrosis negligible at 1 µM"}
+      - {that: steps.1.json.endpoints.necrosis.final_value.median, gt: 1.0e-10, label: "necrosis present at 100 µM"}
+      - {that: steps.0.json.endpoints.dna_damage.time_series.median, len_eq: 100}
+      - {that: steps.1.json.endpoints.necrosis.time_series.median, len_eq: 100}
+    inv_ids: [qaop-predict-known-answer]
+  - id: qaop-models
+    kind: roundtrip
+    every: 1d
+    describe: The model list and the in vitro parameter ranges have their documented shape.
+    request:
+      base: https://qaop.vhp4safety.nl
+      steps:
+        - {url: /api/models}
+        - {url: "/api/ranges?model_type=invitro"}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.json.models.invitro.endpoints, eq: [dna_damage, necrosis]}
+      - {that: steps.0.json.models.invivo.endpoints, len_eq: 4}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.json.parameters.dose.min, eq: 0.001}
+      - {that: steps.1.json.parameters.dose.max, eq: 150}
+    inv_ids: [qaop-models-shape]

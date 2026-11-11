@@ -1,0 +1,22 @@
+{% extends "private.html" %}
+{% from "_macros.html" import ts %}
+{% macro table(rows) %}
+<div class="tbl"><table>
+<thead><tr><th>#</th><th>Created</th><th>Channel</th><th>Event</th><th>Incident</th><th>To</th><th>Attempts</th><th>Next / sent</th><th>Reply</th><th>Payload</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr><td>{{ r.id }}</td><td>{{ ts(r.created_at) }}</td><td>{{ r.channel }}{% if r.dry_run %} (dry run){% endif %}</td><td>{{ r.event }}</td>
+<td>{{ ("#" ~ r.incident_id) if r.incident_id else "" }}</td><td>{{ r.recipients|join(", ") }}</td><td>{{ r.attempts }}</td>
+<td>{{ ts(r.sent_at) if r.sent_at else ts(r.next_attempt_at) }}</td><td class="wrapcell">{{ r.reply }}</td>
+<td><details><summary>show</summary><pre class="pre pre--sm">{{ r.payload }}</pre></details></td></tr>
+{% endfor %}
+</tbody></table></div>
+{% endmacro %}
+{% block main %}
+<h2>Pending ({{ pending|length }})</h2>
+{% if pending %}{{ table(pending) }}{% else %}<p class="muted">Nothing waiting.</p>{% endif %}
+<h2>Dead letters ({{ dead|length }})</h2>
+{% if dead %}<p class="strip strip--red">These gave up after retries. The channel needs attention.</p>{{ table(dead) }}{% else %}<p class="muted">None.</p>{% endif %}
+<h2>Sent (latest 100)</h2>
+{% if sent %}{{ table(sent) }}{% else %}<p class="muted">Nothing sent yet.</p>{% endif %}
+{% endblock %}

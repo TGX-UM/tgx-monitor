@@ -1,0 +1,9 @@
+# Review for what changes who is alerted, about what, and how. CODEOWNERS only takes
+# effect with branch protection requiring review; until then it is advisory.
+*                               @marvinm2
+/catalogue/                     @marvinm2 @egonw
+/src/tgx_monitor/alerts/        @marvinm2 @egonw
+/src/tgx_monitor/redact.py      @marvinm2 @egonw
+/stack.yml                      @marvinm2 @egonw
+/host/                          @egonw @marvinm2
+/.github/                       @marvinm2

@@ -1,0 +1,5 @@
+# Newest submission date and the number of submissions: an activity indicator.
+PREFIX omv: <http://omv.ontoware.org/2005/05/ontology#>
+SELECT (MAX(?d) AS ?latest) (COUNT(?d) AS ?n) WHERE {
+  GRAPH <http://data.bioontology.org/metadata/OntologySubmission> { ?sub omv:creationDate ?d }
+}

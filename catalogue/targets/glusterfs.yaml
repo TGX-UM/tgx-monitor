@@ -1,0 +1,51 @@
+id: glusterfs
+name: GlusterFS shared storage
+group: Cluster
+class: infra
+criticality: high
+owners: [egonw, marvinm2]
+depends_on: []
+public: false
+public_summary: The storage both servers share for service data is replicated and in sync.
+links: []
+notes: >-
+  Volume swarm-data, replica 2, mounted on both nodes. Heal and split-brain counts need
+  the gluster CLI, which only root can run, so they come from the root status file. The
+  agents' heartbeat files live on the volume itself: each agent writes its own and reads
+  the other node's, so a stalled or split mount shows as a peer heartbeat that stops
+  aging forward. Volume usage follows the bricks, checked in node-tgx1/node-tgx2.
+checks:
+  - id: gluster-heal
+    kind: host
+    every: 15m
+    via: ["agent:tgx1", "agent:tgx2"]
+    describe: Nothing waits to be healed, nothing is in split-brain, and both bricks and the peer are connected.
+    request: {signal: root_status}
+    assert:
+      - {that: gluster.available, eq: true, label: "the gluster CLI answered"}
+      - {that: gluster.heal_pending, eq: 0}
+      - {that: gluster.split_brain, eq: 0}
+      - {that: gluster.bricks_down, eq: 0}
+      - {that: gluster.peers_connected, eq: 1}
+      - {that: units.glusterd, eq: active}
+    inv_ids: [gl-heal-pending, gl-processes-ports]
+
+  - id: gluster-replication-tgx1
+    kind: host
+    every: 5m
+    via: ["agent:tgx1"]
+    describe: On tgx1 the shared volume shows the heartbeat that tgx2 wrote less than three minutes ago.
+    request: {signal: agent}
+    assert:
+      - {that: heartbeats.tgx2, lt: 180, label: "tgx2's heartbeat file, as tgx1 sees it, is younger than 180 s"}
+    inv_ids: [gl-replication-heartbeat, gl-mount]
+
+  - id: gluster-replication-tgx2
+    kind: host
+    every: 5m
+    via: ["agent:tgx2"]
+    describe: On tgx2 the shared volume shows the heartbeat that tgx1 wrote less than three minutes ago.
+    request: {signal: agent}
+    assert:
+      - {that: heartbeats.tgx1, lt: 180, label: "tgx1's heartbeat file, as tgx2 sees it, is younger than 180 s"}
+    inv_ids: [gl-replication-heartbeat, gl-mount]

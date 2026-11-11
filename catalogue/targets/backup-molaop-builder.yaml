@@ -1,0 +1,81 @@
+id: backup-molaop-builder
+name: molAOP Builder database backup
+group: Jobs and backups
+class: backup
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+public: true
+public_summary: The curated mappings of the Molecular AOP Builder are copied and integrity-checked every night at 02:00 UTC, with a week of copies kept.
+links:
+  - https://molaop-builder.vhp4safety.nl
+# cronjobs_molaop-builder-backup (0 2 * * *) runs the Builder's own scripts/backup_db.sh.
+# Backups sit on the same Gluster volume as the live database (mount
+# backups-molaop-builder); no copy leaves the cluster yet.
+checks:
+  - id: bk-molaop-builder-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The nightly backup ran at its slot and logged an integrity-checked copy with the usual number of mappings.
+    request:
+      service: cronjobs_molaop-builder-backup
+      grace: 30m
+      marker_re: '\[BACKUP OK\] \S+ke_wp_mapping_\d{8}_\d{6}\.db .* integrity ok, (\d+) mappings'
+    assert:
+      - {that: schedule, eq: "0 2 * * *", label: "scheduled daily 02:00 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true, label: "log has '[BACKUP OK] … integrity ok'"}
+      - {that: marker, gte: 425, label: "≥ 425 mappings in the copy"}
+      - {that: marker, max_drop_pct: 2, window: 14d}
+    inv_ids: [mbb-task-state, mbb-job-log, bmb-shape]
+
+  - id: bk-molaop-builder-files
+    kind: file_age
+    every: 1h
+    via: [core]
+    timeout: 2m
+    describe: A backup copy less than 26 hours old exists, about as large as the previous one, with a week of daily copies and no empty files.
+    request: {mount: backups-molaop-builder, glob: "ke_wp_mapping_*.db", small_bytes: 65536}
+    assert:
+      - {that: count, gte: 6, label: "≥ 6 daily copies kept"}
+      - {that: newest_age_h, lt: 26}
+      - {that: newest_size, gt: 80000000, label: "newest copy > 80 MB"}
+      - {that: size_change_pct, gte: -10, label: "not 10% smaller than the previous copy"}
+      - {that: small_count, eq: 0, label: "no empty or truncated copies"}
+    inv_ids: [mbb-newest-file, bmb-fresh, bmb-shape]
+
+  - id: bk-molaop-builder-integrity
+    kind: sqlite_backup
+    every: 1d
+    via: [core]
+    timeout: 5m
+    describe: The newest backup copy opens as a sound SQLite database and holds the mappings table with its usual rows.
+    request: {mount: backups-molaop-builder, glob: "ke_wp_mapping_*.db", tables: [mappings]}
+    assert:
+      - {that: integrity, eq: ok}
+      - {that: tables.mappings, gte: 425}
+    inv_ids: [mbb-newest-file]
+
+  - id: bk-molaop-builder-no-wal
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: The live database is not in write-ahead-log mode, which is unsafe on the shared cluster file system.
+    request: {mount: molaop-builder-data, glob: "*.db-[sw][ha][ml]", verify_gzip: false}
+    assert:
+      - {that: count, eq: 0, label: "no -wal or -shm file next to the live database"}
+    inv_ids: [mbb-no-wal]
+
+  - id: bk-molaop-builder-offsite
+    kind: file_age
+    every: 1h
+    via: [core]
+    public: false
+    describe: A copy of the Builder database less than eight days old exists outside the cluster file system.
+    request: {mount: hidrive, glob: "molaop-builder/*.db*", verify_gzip: false}
+    assert:
+      - {that: count, gte: 1, label: "an off-cluster copy exists"}
+      - {that: newest_age_h, lt: 192, label: "≤ 8 days old"}
+    inv_ids: [mbb-offcluster-copy, bmb-offsite]

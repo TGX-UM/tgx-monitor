@@ -1,0 +1,62 @@
+id: swarm-overlay-dns
+name: Service names on the core overlay network
+group: Cluster
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+maintenance: [wp-reload, wp-switch]
+public: false
+public_summary: Services on the cluster can find each other by name.
+links: []
+notes: >-
+  On 2026-10-09 about 15 services lost their overlay DNS records after a mass update.
+  Sites routed by labels stayed up, but routes from the proxy's dynamic files
+  (sparql.wikipathways.org) answered 502 for 36 hours, and nothing outside the cluster
+  could see why. These checks ask from inside the overlay, by service name, so they
+  only run in the monitor core (locally they fail to resolve). One ASK per Virtuoso
+  every 15 minutes.
+checks:
+  - id: overlay-dns-aopwiki-virtuoso
+    kind: sparql
+    every: 15m
+    via: [core]
+    describe: The AOP-Wiki Virtuoso answers by its swarm service name on the overlay network.
+    request: {endpoint: "http://aopwiki-snorql_virtuoso:8890/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+    inv_ids: [dns-core-records]
+
+  - id: overlay-dns-aopdb-virtuoso
+    kind: sparql
+    every: 15m
+    via: [core]
+    describe: The AOP-DB Virtuoso answers by its swarm service name on the overlay network.
+    request: {endpoint: "http://aopdb_virtuoso:8890/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+    inv_ids: [dns-core-records]
+
+  - id: overlay-dns-wp-ep
+    kind: sparql
+    every: 15m
+    via: [core]
+    describe: The WikiPathways Virtuoso answers by the alias the proxy's dynamic file routes to.
+    request: {endpoint: "http://wikipathways-ep:8890/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+    inv_ids: [dns-dynamic-backends, dns-core-records]
+
+  - id: overlay-dns-wp-ep2
+    kind: sparql
+    every: 15m
+    via: [core]
+    describe: The standby WikiPathways Virtuoso answers by its alias, so a blue-green switch has somewhere to go.
+    request: {endpoint: "http://wikipathways-ep2:8890/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+    inv_ids: [dns-dynamic-backends, dns-core-records]

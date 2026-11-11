@@ -1,0 +1,23 @@
+id: github-raw
+name: GitHub raw file hosting
+group: External upstreams
+class: service
+criticality: low
+owners: [marvinm2]
+depends_on: []
+public: true
+public_summary: GitHub's raw file service, from which several department sites load their configuration and example queries.
+links: [https://raw.githubusercontent.com/]
+notes: >-
+  Not ours. The SPARQL explorers, the VHP4Safety platform and the tool catalogue read
+  files from raw.githubusercontent.com; when it is down their failures are shown as
+  blocked. One HEAD request every 15 minutes.
+checks:
+  - id: github-raw-head
+    kind: http
+    every: 15m
+    describe: A known small file on raw.githubusercontent.com answers 200 to a HEAD request.
+    request: {url: "https://raw.githubusercontent.com/marvinm2/AOPWikiRDF/master/README.md", method: HEAD, follow: false}
+    assert:
+      - {that: status, eq: 200}
+      - {that: latency_ms, lt: 3000, warn: true}

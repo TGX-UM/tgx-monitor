@@ -1,0 +1,60 @@
+id: cytargetlinker-linksets
+name: CyTargetLinker WikiPathways linksets (quarterly, Zenodo)
+group: Pipelines
+class: pipeline
+criticality: low
+owners: [marvinm2, mkutmon]
+depends_on: [data-wikipathways]
+public: true
+public_summary: Every quarter GitHub Actions build CyTargetLinker linksets from the latest WikiPathways release and publish them on Zenodo.
+links:
+  - https://github.com/CyTargetLinker/linkset-automation/actions
+  - https://doi.org/10.5281/zenodo.4500957
+# create-linkset-wikipathways.yml runs on the 15th of Jan/Apr/Jul/Oct; update-bridgedb.yml
+# on the 1st of every second month. GitHub disables schedules after 60 days without
+# repository activity, shorter than the 90-day interval.
+checks:
+  - id: ctl-zenodo-latest
+    kind: http
+    every: 6h
+    describe: The newest linkset version on Zenodo is less than 100 days old, complete with its 13 files, and its release label never goes backwards.
+    request:
+      url: https://zenodo.org/api/records
+      params: {q: "conceptrecid:4500957", sort: mostrecent, size: 1, all_versions: "true"}
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.hits.hits.0.created, max_age: {crit: 100d}}
+      - {that: json.hits.hits.0.files, len_gte: 13, label: "≥ 13 files in the newest version"}
+      - {that: json.hits.hits.0.metadata.version, monotonic: true, label: "WikiPathways release label never goes back"}
+    inv_ids: [ctl-zenodo-latest]
+
+  - id: ctl-workflow-states
+    kind: gha
+    every: 1h
+    describe: No linkset workflow has been switched off by GitHub for inactivity.
+    request: {repo: CyTargetLinker/linkset-automation}
+    assert:
+      - {that: inactive, len_eq: 0, label: "no workflow disabled for inactivity"}
+      - {that: disabled, len_eq: 0, label: "no workflow disabled at all"}
+    inv_ids: [ctl-workflow-states]
+
+  - id: ctl-quarterly-run
+    kind: gha
+    every: 1h
+    describe: The quarterly WikiPathways linkset build succeeded within the past quarter.
+    request: {repo: CyTargetLinker/linkset-automation, workflow: create-linkset-wikipathways.yml}
+    assert:
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 95d}}
+    inv_ids: [ctl-quarterly-run]
+
+  - id: ctl-bridgedb-cache
+    kind: gha
+    every: 1h
+    describe: The two-monthly refresh of the BridgeDb cache for the linksets succeeded within the past nine weeks.
+    request: {repo: CyTargetLinker/linkset-automation, workflow: update-bridgedb.yml}
+    assert:
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 63d}}
+    inv_ids: [ctl-bridgedb-cache]

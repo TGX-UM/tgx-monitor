@@ -1,0 +1,6 @@
+# Submission states of the ontology processing pipeline (ncbo_cron), one row per state.
+PREFIX m: <http://data.bioontology.org/metadata/>
+SELECT ?status (COUNT(?sub) AS ?n) WHERE {
+  GRAPH m:OntologySubmission { ?sub m:submissionStatus ?status }
+}
+GROUP BY ?status

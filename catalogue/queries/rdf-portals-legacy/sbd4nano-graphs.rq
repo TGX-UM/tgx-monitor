@@ -1,0 +1,8 @@
+# Sizes of the two graphs loaded by initdb.d/load.sql (open.ttl, enanomapper-full.ttl).
+SELECT ?k (COUNT(*) AS ?n) WHERE {
+  VALUES (?g ?k) {
+    (<http://purl.enanomapper.org/onto/> "enm")
+    (<https://h2020-sbd4nano.github.io/sbd-data-landscape/> "landscape")
+  }
+  GRAPH ?g { ?s ?p ?o }
+} GROUP BY ?k

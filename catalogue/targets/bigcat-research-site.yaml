@@ -1,0 +1,21 @@
+id: bigcat-research-site
+name: BiGCaT research page
+group: External upstreams
+class: service
+criticality: low
+owners: [egonw]
+depends_on: []
+public: true
+public_summary: The department's BiGCaT bioinformatics page on the Maastricht University website.
+links:
+  - https://www.maastrichtuniversity.nl/research/bioinformatics
+checks:
+  - id: bigcat-um-page
+    kind: http
+    every: 15m
+    describe: The BiGCaT research page on the university website loads and still mentions BiGCaT.
+    request: {url: "https://www.maastrichtuniversity.nl/research/bioinformatics"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: BiGCaT}
+    inv_ids: [bigcat-um-page]

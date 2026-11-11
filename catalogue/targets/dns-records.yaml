@@ -1,0 +1,343 @@
+id: dns-records
+name: Public DNS for the cluster's names and zones
+group: Cluster
+class: infra
+criticality: high
+owners: [egonw, marvinm2]
+depends_on: []
+public: true
+public_summary: The public names of the department services point at the cluster, and their zones are delegated and signed as expected.
+links: []
+notes: >-
+  Only Egon can change these zones: vhp4safety.nl, bigcat-bioinformatics.org, bridgedb.org
+  and r-odaf.nl are on Strato DNS, wikipathways.org on Cloudflare, nsdra.org and
+  psnpbind.org on Namecheap. Every routed name must resolve to tgx1 (the panel allows one
+  A record, so there is no automatic failover). Known exceptions, checked in their own
+  targets: toxtempassistant.vhp4safety.nl (still the old VHP-1 host) and rdf.wikipathways.org
+  (Cloudflare). Names whose own target already has a dns check are not repeated here; the
+  bigcat-bioinformatics.org delegation is checked in bigcat-domain-dns.
+checks:
+
+  - id: dns-aopsuite
+    kind: dns
+    every: 1h
+    describe: aopsuite.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: aopsuite.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-qsprpred
+    kind: dns
+    every: 1h
+    describe: qsprpred.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: qsprpred.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-cdkdepict
+    kind: dns
+    every: 1h
+    describe: cdkdepict.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: cdkdepict.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-cplogd
+    kind: dns
+    every: 1h
+    describe: cplogd.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: cplogd.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-sombie
+    kind: dns
+    every: 1h
+    describe: sombie.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: sombie.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-flame
+    kind: dns
+    every: 1h
+    describe: flame.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: flame.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-oppbk
+    kind: dns
+    every: 1h
+    describe: oppbk.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: oppbk.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-xploreaop
+    kind: dns
+    every: 1h
+    describe: xploreaop.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: xploreaop.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-llemy
+    kind: dns
+    every: 1h
+    describe: llemy.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: llemy.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-mct8-docking
+    kind: dns
+    every: 1h
+    describe: mct8-docking.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: mct8-docking.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-arrayanalysis
+    kind: dns
+    every: 1h
+    describe: arrayanalysis.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: arrayanalysis.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-biodatafuse
+    kind: dns
+    every: 1h
+    describe: biodatafuse.bigcat-bioinformatics.org resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: biodatafuse.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-r-odaf-www
+    kind: dns
+    every: 1h
+    describe: www.r-odaf.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: www.r-odaf.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-icinga
+    kind: dns
+    every: 1h
+    describe: icinga.cloud.vhp4safety.nl resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: icinga.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1]
+
+  - id: dns-ontoportal-data
+    kind: dns
+    every: 1h
+    describe: data.ontoportal.biohackeu.bigcat-bioinformatics.org resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: data.ontoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1, dns-ontoportal-pair]
+
+  - id: dns-ontoportal-sparql
+    kind: dns
+    every: 1h
+    describe: sparql.ontoportal.biohackeu.bigcat-bioinformatics.org resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: sparql.ontoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true, warn: true}
+    inv_ids: [dns-a-to-tgx1, dns-ontoportal-pair]
+
+  - id: dns-wildcard-vhp4safety-nl
+    kind: dns
+    every: 1d
+    describe: "The wildcard under vhp4safety.nl is as recorded (present): GitHub Pages catches every unlisted name, so a new service without its own record silently fails its certificate."
+    request: {name: vhp4safety.nl, resolvers: [1.1.1.1], wildcard_probe: vhp4safety.nl}
+    assert:
+      - {that: wildcard, eq: true}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-cloud-vhp4safety-nl
+    kind: dns
+    every: 1d
+    describe: "The wildcard under cloud.vhp4safety.nl is as recorded (absent): no wildcard: every cloud.vhp4safety.nl service needs its own record."
+    request: {name: cloud.vhp4safety.nl, resolvers: [1.1.1.1], wildcard_probe: cloud.vhp4safety.nl}
+    assert:
+      - {that: wildcard, eq: false}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-bigcat-bioinformatics-org
+    kind: dns
+    every: 1d
+    describe: "The wildcard under bigcat-bioinformatics.org is as recorded (present): every unlisted name reaches the cluster."
+    request: {name: bigcat-bioinformatics.org, resolvers: [1.1.1.1], wildcard_probe: bigcat-bioinformatics.org}
+    assert:
+      - {that: wildcard, eq: true}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-rdf-bigcat-bioinformatics-org
+    kind: dns
+    every: 1d
+    describe: "The wildcard under rdf.bigcat-bioinformatics.org is as recorded (absent): no wildcard under rdf.."
+    request: {name: rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1], wildcard_probe: rdf.bigcat-bioinformatics.org}
+    assert:
+      - {that: wildcard, eq: false}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-r-odaf-nl
+    kind: dns
+    every: 1d
+    describe: "The wildcard under r-odaf.nl is as recorded (present): every unlisted name reaches the cluster."
+    request: {name: r-odaf.nl, resolvers: [1.1.1.1], wildcard_probe: r-odaf.nl}
+    assert:
+      - {that: wildcard, eq: true}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-bridgedb-org
+    kind: dns
+    every: 1d
+    describe: "The wildcard under bridgedb.org is as recorded (present): GitHub Pages catches every unlisted name."
+    request: {name: bridgedb.org, resolvers: [1.1.1.1], wildcard_probe: bridgedb.org}
+    assert:
+      - {that: wildcard, eq: true}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-wikipathways-org
+    kind: dns
+    every: 1d
+    describe: "The wildcard under wikipathways.org is as recorded (present): Cloudflare catches every unlisted name."
+    request: {name: wikipathways.org, resolvers: [1.1.1.1], wildcard_probe: wikipathways.org}
+    assert:
+      - {that: wildcard, eq: true}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-nsdra-org
+    kind: dns
+    every: 1d
+    describe: "The wildcard under nsdra.org is as recorded (absent): no wildcard."
+    request: {name: nsdra.org, resolvers: [1.1.1.1], wildcard_probe: nsdra.org}
+    assert:
+      - {that: wildcard, eq: false}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-psnpbind-org
+    kind: dns
+    every: 1d
+    describe: "The wildcard under psnpbind.org is as recorded (absent): no wildcard."
+    request: {name: psnpbind.org, resolvers: [1.1.1.1], wildcard_probe: psnpbind.org}
+    assert:
+      - {that: wildcard, eq: false}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-wildcard-bigcat-to-tgx1
+    kind: dns
+    every: 1d
+    describe: The bigcat-bioinformatics.org wildcard still points at tgx1, so names that rely on it reach the cluster.
+    request: {name: bigcat-bioinformatics.org, resolvers: [1.1.1.1], wildcard_probe: bigcat-bioinformatics.org}
+    assert:
+      - {that: wildcard_answers, has: 81.169.246.233}
+    inv_ids: [dns-wildcards]
+
+  - id: dns-ns-vhp4safety-nl
+    kind: dns
+    every: 1d
+    describe: vhp4safety.nl is still delegated to its Strato nameservers.
+    request: {name: vhp4safety.nl, type: NS, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: answers, eq: [ns3.stratoserver.net, ns4.stratoserver.net]}
+    inv_ids: [dns-ns-delegation]
+
+  - id: dns-ns-bridgedb-org
+    kind: dns
+    every: 1d
+    describe: bridgedb.org is still delegated to its Strato nameservers.
+    request: {name: bridgedb.org, type: NS, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: answers, eq: [ns3.stratoserver.net, ns4.stratoserver.net]}
+    inv_ids: [dns-ns-delegation]
+
+  - id: dns-ns-r-odaf-nl
+    kind: dns
+    every: 1d
+    describe: r-odaf.nl is still delegated to its Strato nameservers.
+    request: {name: r-odaf.nl, type: NS, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: answers, eq: [ns3.stratoserver.net, ns4.stratoserver.net]}
+    inv_ids: [dns-ns-delegation]
+
+  - id: dns-ns-wikipathways-org
+    kind: dns
+    every: 1d
+    describe: wikipathways.org is still delegated to its Cloudflare nameservers.
+    request: {name: wikipathways.org, type: NS, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: answers, eq: [jose.ns.cloudflare.com, melody.ns.cloudflare.com]}
+    inv_ids: [dns-ns-delegation]
+
+  - id: dns-ns-nsdra-org
+    kind: dns
+    every: 1d
+    describe: nsdra.org is still delegated to its Namecheap nameservers.
+    request: {name: nsdra.org, type: NS, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: answers, eq: [dns1.registrar-servers.com, dns2.registrar-servers.com]}
+    inv_ids: [dns-ns-delegation]
+
+  - id: dns-ns-psnpbind-org
+    kind: dns
+    every: 1d
+    describe: psnpbind.org is still delegated to its Namecheap nameservers.
+    request: {name: psnpbind.org, type: NS, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: answers, eq: [dns1.registrar-servers.com, dns2.registrar-servers.com]}
+    inv_ids: [dns-ns-delegation]
+
+  - id: dns-dnssec-vhp4safety-nl
+    kind: dns
+    every: 6h
+    describe: The signed zone vhp4safety.nl validates (expired signatures would make every name in it fail to resolve).
+    request: {name: vhp4safety.nl, resolvers: [1.1.1.1]}
+    assert:
+      - {that: ad, eq: true}
+      - {that: nxdomain, eq: false}
+    inv_ids: [dns-dnssec]
+
+  - id: dns-dnssec-r-odaf-nl
+    kind: dns
+    every: 6h
+    describe: The signed zone r-odaf.nl validates (expired signatures would make every name in it fail to resolve).
+    request: {name: r-odaf.nl, resolvers: [1.1.1.1]}
+    assert:
+      - {that: ad, eq: true}
+      - {that: nxdomain, eq: false}
+    inv_ids: [dns-dnssec]

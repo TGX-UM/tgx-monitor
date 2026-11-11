@@ -1,0 +1,65 @@
+id: estate-audit
+name: Weekly estate audit
+group: Cluster
+class: infra
+criticality: low
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+public: false
+public_summary: A weekly look for leftovers on the cluster that nobody owns.
+links: []
+notes: >-
+  Information only, never pages: it shows what should be cleaned up. Service data
+  directories with no running service and no owner (found 2026-11-10), and names that
+  point at the cluster without any route behind them. The other unrouted bigcat names
+  (doi, the old grlc API, the apex) are tracked in bigcat-unrouted-names. The directory
+  checks need a read-only mount of the service data root under the alias gluster-docker;
+  until it exists they are unknown.
+checks:
+  - id: audit-orphan-dir-nes-smiles
+    # Disabled: needs a read-only bind of the whole service data root, which would
+    # let core read other services' files. Checked by hand instead (RUNBOOK).
+    enabled: false
+    kind: file_age
+    every: 7d
+    via: [core]
+    severity: low
+    describe: The nes-smiles data directory, left without a service, has been cleaned up.
+    request: {mount: gluster-docker, glob: nes-smiles, type: dir}
+    assert:
+      - {that: count, eq: 0, warn: true, label: "directory removed or given an owner"}
+
+  - id: audit-orphan-dir-portainer
+    # Disabled: needs a read-only bind of the whole service data root, which would
+    # let core read other services' files. Checked by hand instead (RUNBOOK).
+    enabled: false
+    kind: file_age
+    every: 7d
+    via: [core]
+    severity: low
+    describe: The portainer data directory, left without a service, has been cleaned up.
+    request: {mount: gluster-docker, glob: portainer, type: dir}
+    assert:
+      - {that: count, eq: 0, warn: true, label: "directory removed or given an owner"}
+
+  - id: audit-orphan-dir-doi
+    # Disabled: needs a read-only bind of the whole service data root, which would
+    # let core read other services' files. Checked by hand instead (RUNBOOK).
+    enabled: false
+    kind: file_age
+    every: 7d
+    via: [core]
+    severity: low
+    describe: The doi data directory, left without a service, has been cleaned up or given its service.
+    request: {mount: gluster-docker, glob: doi, type: dir}
+    assert:
+      - {that: count, eq: 0, warn: true, label: "directory removed or given an owner"}
+
+  - id: audit-unrouted-www-bigcat
+    kind: http
+    every: 7d
+    severity: low
+    describe: www.bigcat-bioinformatics.org points at the cluster; this shows whether a site or redirect has been set up behind it.
+    request: {url: "https://www.bigcat-bioinformatics.org/", follow: false, verify: false}
+    assert:
+      - {that: status, ne: 404, warn: true, label: "a route exists for the name (404 means the proxy has none)"}

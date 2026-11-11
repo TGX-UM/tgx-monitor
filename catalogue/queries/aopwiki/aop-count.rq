@@ -1,0 +1,5 @@
+# AOP-Wiki RDF: number of AOPs in the data graph.
+PREFIX aopo: <http://aopkb.org/aop_ontology#>
+SELECT (COUNT(DISTINCT ?a) AS ?n)
+FROM <http://aopwiki.org/>
+WHERE { ?a a aopo:AdverseOutcomePathway }

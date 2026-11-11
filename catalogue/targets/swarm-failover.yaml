@@ -1,0 +1,75 @@
+id: swarm-failover
+name: Failover readiness of the swarm services
+group: Cluster
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+maintenance: [docker-prune]
+public: false
+public_summary: Services can move to the other node when one node fails.
+links: []
+notes: >-
+  A service pinned to one node, or whose image exists on one node only and cannot be
+  pulled from a registry, cannot fail over. Known on 2026-11-11: robot and xploreaop are
+  pinned to tgx1 with tgx1-only images; the biodatafuse images exist only on tgx2 (those
+  are watched in their own targets). The monthly prune (1st, 03:00) deletes images of
+  tasks that are down at that moment, so the image checks run after it too.
+checks:
+  - id: swarm-pins
+    kind: swarm
+    every: 1h
+    via: [core]
+    describe: Only the two known services are pinned to one node, and no pinned service sits on a node that is down.
+    request: {check: placement}
+    assert:
+      - {that: pinned_services, eq: [robot, xploreaop], label: "pinned services are exactly robot and xploreaop"}
+      - {that: pinned_on_unavailable_node, len_eq: 0}
+    inv_ids: [pl-hostname-pins]
+
+  - id: swarm-local-images
+    kind: swarm
+    every: 1h
+    via: [core]
+    describe: No service without a target of its own runs a locally built image that exists on one node only, and no running image has gone missing.
+    request:
+      check: local_images
+      ignore: ["biodatafuse_*", robot, xploreaop, toxtempass_minio_init]
+    assert:
+      - {that: local_only_count, eq: 0, label: "no other local-only builds"}
+      - {that: missing_count, eq: 0, label: "every service image is on at least one node"}
+    inv_ids: [pl-local-image-availability, prune-image-loss]
+
+  - id: swarm-image-traefik
+    kind: registry
+    every: 1h
+    describe: The proxy image can be pulled from Docker Hub, so the proxy can start on either node.
+    request: {image: "traefik:v3"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: digest, exists: true}
+      - {that: missing_on_nodes, len_eq: 0, warn: true, label: "present on both nodes (only known inside the cluster)"}
+    inv_ids: [pl-registry-resolvable]
+
+  - id: swarm-image-cronjob
+    kind: registry
+    every: 6h
+    describe: The cron scheduler image can be pulled from Docker Hub.
+    request: {image: "crazymax/swarm-cronjob:1.16.0"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: digest, eq: "sha256:cc2b298e766f5600f9d9af741fb09438e089e4a092421ed594bf0e091d599be1", warn: true, label: "the registry still serves the digest the scheduler runs"}
+    inv_ids: [pl-registry-resolvable]
+
+  - id: swarm-digest-drift
+    kind: digest_drift
+    every: 1h
+    via: [core]
+    severity: low
+    describe: Shows services whose running image changed while their tag stayed the same (a moving tag pulled new code).
+    request:
+      ignore: ["ontoportal_*", vhp-platform-pseudo, wikipathways_wikipathways-snorql]
+    assert:
+      - {that: changed_count, eq: 0, warn: true}
+      - {that: node_mismatch, len_eq: 0, warn: true, label: "no service runs different images on the two nodes"}
+    inv_ids: [pl-unpinned-latest]

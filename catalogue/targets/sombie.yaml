@@ -1,0 +1,89 @@
+id: sombie
+name: SOMbie (SMARTCyp site-of-metabolism API)
+group: VHP4Safety tools
+class: service
+criticality: low
+owners: [ext-01, marcvdijk, marvinm2]
+depends_on: [edge-tgx1]
+public: true
+public_summary: Predicts cytochrome P450 sites of metabolism (SMARTCyp) and offers ligand docking through a REST API.
+links: [https://sombie.cloud.vhp4safety.nl/ui/]
+checks:
+  - id: sombie-root
+    kind: http
+    every: 15m
+    describe: The API answers at its root without a server error (a 404 there is normal, the API has no root page).
+    request: {url: "https://sombie.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, lt: 500}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [sombie-root-404-normal]
+
+  - id: sombie-ui
+    kind: http
+    every: 15m
+    describe: The interactive API documentation loads.
+    request: {url: "https://sombie.cloud.vhp4safety.nl/ui/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>Swagger UI"}
+    inv_ids: [sombie-ui]
+
+  - id: sombie-swagger
+    kind: http
+    every: 1d
+    describe: The API description still lists its nine operations, including SMARTCyp and the site-of-metabolism prediction.
+    request: {url: "https://sombie.cloud.vhp4safety.nl/swagger.json", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.paths, len_eq: 9}
+      - {that: json.paths./smartcyp, exists: true}
+      - {that: json.paths./smartcyp_info, exists: true}
+      - {that: json.paths./som_prediction, exists: true}
+    inv_ids: [sombie-swagger-shape]
+
+  - id: sombie-smartcyp-info
+    kind: http
+    every: 1h
+    describe: SMARTCyp is version 2.4.2 with its three CYP models.
+    request: {url: "https://sombie.cloud.vhp4safety.nl/smartcyp_info", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.version, eq: "2.4.2"}
+      - {that: json.models, eq: [CYP3A4, CYP2C9, CYP2D6]}
+    inv_ids: [sombie-smartcyp-info]
+
+  - id: sombie-smartcyp-ethanol
+    kind: http
+    every: 1h
+    timeout: 30s
+    describe: SMARTCyp ranks the known site of metabolism of ethanol first, with its known scores, within ten seconds.
+    request:
+      url: "https://sombie.cloud.vhp4safety.nl/smartcyp"
+      method: POST
+      data: {smiles: CCO, output_format: json}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, matches: '"Atom": "C\.1",'}
+      - {that: body, matches: '"Atom": "C\.2",[^}]*"Ranking": 1\.0,[^}]*"Score": 56\.5,', label: "C.2 ranks first with score 56.5"}
+      - {that: body, matches: '"Atom": "O\.3",[^}]*"Score": 988\.66,', label: "O.3 score 988.66"}
+      - {that: latency_ms, lt: 10000}
+    inv_ids: [sombie-smartcyp-ethanol]
+
+  - id: sombie-docking-info
+    kind: roundtrip
+    every: 1d
+    describe: The docking and ligand preparation tools report their citation and default settings (nothing is docked).
+    request:
+      base: https://sombie.cloud.vhp4safety.nl
+      steps:
+        - {url: /plants_docking_info}
+        - {url: /spores_info}
+    assert:
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.body, contains: '"citation"'}
+      - {that: steps.0.body, contains: '"default_settings"'}
+      - {that: steps.1.status, eq: 200}
+      - {that: last.json.citation, exists: true}
+      - {that: last.json.default_settings, exists: true}
+    inv_ids: [sombie-docking-info]

@@ -1,0 +1,165 @@
+id: bridgedb-served-databases
+name: BridgeDb mapping databases as served
+group: BridgeDb
+class: data
+criticality: medium
+owners: [egonw, danidi, tabbassidaloii, DeniseSl22, marvinm2]
+depends_on: [bridgedb-webservice]
+public_summary: The per-organism gene and metabolite mapping databases that the BridgeDb webservice loads, their build dates, and whether the newest published releases are served.
+links:
+  - https://webservice.bridgedb.org/contents
+  - https://webservice.bridgedb.org/Human/properties
+  - https://data.bridgedb.org/gene.json
+notes: >-
+  The databases are baked into the image, so data changes only with an image rebuild and
+  a service update. The served organism set is gene.json's WS-tested species minus
+  Fusarium graminearum, which is published but cannot be parsed at runtime (allowlisted).
+checks:
+  - id: bridgedb-db-served-vs-catalogue
+    kind: invariant
+    every: 1d
+    describe: The organisms the webservice serves are exactly the webservice-tested species in the data.bridgedb.org catalogue (Fusarium graminearum allowlisted as unparseable).
+    request:
+      left: {http_list: {url: "https://webservice.bridgedb.org/contents", re: '^[^\t\n]*\t([^\t\r\n]+)', pick: all}}
+      right: {http_list: {url: "https://data.bridgedb.org/gene.json", re: '"species":\s*"(?!Fusarium graminearum")([^"]+)"[^}]*"WS"', pick: all}}
+    assert:
+      - {that: equal, eq: true, label: "served organisms == WS-tested catalogue species"}
+      - {that: left, len_gte: 33}
+      - {that: left, has: Homo sapiens}
+    inv_ids: [bridgedb-served-contents-vs-catalogue]
+  - id: bridgedb-db-build-dates
+    kind: roundtrip
+    every: 1d
+    timeout: 3m
+    describe: Every served organism has a gene database with a readable build date, none older than three years (Bacillus subtilis allowlisted at its 2018 build).
+    request:
+      base: https://webservice.bridgedb.org
+      steps:
+        - {url: "/Anopheles%20gambiae/properties", capture: {anopheles_gambiae: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Arabidopsis%20thaliana/properties", capture: {arabidopsis_thaliana: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Aspergillus%20niger/properties", capture: {aspergillus_niger: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Bacillus%20subtilis/properties", capture: {bacillus_subtilis: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Bos%20taurus/properties", capture: {bos_taurus: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Caenorhabditis%20elegans/properties", capture: {caenorhabditis_elegans: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Canis%20familiaris/properties", capture: {canis_familiaris: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Ciona%20intestinalis/properties", capture: {ciona_intestinalis: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Danio%20rerio/properties", capture: {danio_rerio: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Daphnia%20magna/properties", capture: {daphnia_magna: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Daphnia%20pulex/properties", capture: {daphnia_pulex: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Drosophila%20melanogaster/properties", capture: {drosophila_melanogaster: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Equus%20caballus/properties", capture: {equus_caballus: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Gallus%20gallus/properties", capture: {gallus_gallus: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Glycine%20max/properties", capture: {glycine_max: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Homo%20sapiens/properties", capture: {homo_sapiens: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Hordeum%20vulgare/properties", capture: {hordeum_vulgare: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Macaca%20mulatta/properties", capture: {macaca_mulatta: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Mus%20musculus/properties", capture: {mus_musculus: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Ornithorhynchus%20anatinus/properties", capture: {ornithorhynchus_anatinus: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Oryza%20indica/properties", capture: {oryza_indica: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Oryza%20japonica/properties", capture: {oryza_japonica: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Ovis%20aries/properties", capture: {ovis_aries: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Pan%20troglodytes/properties", capture: {pan_troglodytes: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Populus%20trichocarpa/properties", capture: {populus_trichocarpa: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Rattus%20norvegicus/properties", capture: {rattus_norvegicus: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Saccharomyces%20cerevisiae/properties", capture: {saccharomyces_cerevisiae: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Solanum%20lycopersicum/properties", capture: {solanum_lycopersicum: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Solanum%20tuberosum/properties", capture: {solanum_tuberosum: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Sus%20scrofa/properties", capture: {sus_scrofa: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Vitis%20vinifera/properties", capture: {vitis_vinifera: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Xenopus%20tropicalis/properties", capture: {xenopus_tropicalis: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+        - {url: "/Zea%20mays/properties", capture: {zea_mays: {regex: 'DATASOURCENAME\tEnsembl\w*\s+BUILDDATE\t(\d{8})'}}}
+    assert:
+      - {that: captures.anopheles_gambiae, max_age: {warn: 1095d, crit: 3650d}, label: "Anopheles gambiae: gene database loaded, built within 3 years"}
+      - {that: captures.arabidopsis_thaliana, max_age: {warn: 1095d, crit: 3650d}, label: "Arabidopsis thaliana: gene database loaded, built within 3 years"}
+      - {that: captures.aspergillus_niger, max_age: {warn: 1095d, crit: 3650d}, label: "Aspergillus niger: gene database loaded, built within 3 years"}
+      - {that: captures.bacillus_subtilis, max_age: {crit: 3650d}, label: "Bacillus subtilis: gene database loaded (2018 Ensembl 91 build, allowlisted as old)"}
+      - {that: captures.bos_taurus, max_age: {warn: 1095d, crit: 3650d}, label: "Bos taurus: gene database loaded, built within 3 years"}
+      - {that: captures.caenorhabditis_elegans, max_age: {warn: 1095d, crit: 3650d}, label: "Caenorhabditis elegans: gene database loaded, built within 3 years"}
+      - {that: captures.canis_familiaris, max_age: {warn: 1095d, crit: 3650d}, label: "Canis familiaris: gene database loaded, built within 3 years"}
+      - {that: captures.ciona_intestinalis, max_age: {warn: 1095d, crit: 3650d}, label: "Ciona intestinalis: gene database loaded, built within 3 years"}
+      - {that: captures.danio_rerio, max_age: {warn: 1095d, crit: 3650d}, label: "Danio rerio: gene database loaded, built within 3 years"}
+      - {that: captures.daphnia_magna, max_age: {warn: 1095d, crit: 3650d}, label: "Daphnia magna: gene database loaded, built within 3 years"}
+      - {that: captures.daphnia_pulex, max_age: {warn: 1095d, crit: 3650d}, label: "Daphnia pulex: gene database loaded, built within 3 years"}
+      - {that: captures.drosophila_melanogaster, max_age: {warn: 1095d, crit: 3650d}, label: "Drosophila melanogaster: gene database loaded, built within 3 years"}
+      - {that: captures.equus_caballus, max_age: {warn: 1095d, crit: 3650d}, label: "Equus caballus: gene database loaded, built within 3 years"}
+      - {that: captures.gallus_gallus, max_age: {warn: 1095d, crit: 3650d}, label: "Gallus gallus: gene database loaded, built within 3 years"}
+      - {that: captures.glycine_max, max_age: {warn: 1095d, crit: 3650d}, label: "Glycine max: gene database loaded, built within 3 years"}
+      - {that: captures.homo_sapiens, max_age: {warn: 1095d, crit: 3650d}, label: "Homo sapiens: gene database loaded, built within 3 years"}
+      - {that: captures.hordeum_vulgare, max_age: {warn: 1095d, crit: 3650d}, label: "Hordeum vulgare: gene database loaded, built within 3 years"}
+      - {that: captures.macaca_mulatta, max_age: {warn: 1095d, crit: 3650d}, label: "Macaca mulatta: gene database loaded, built within 3 years"}
+      - {that: captures.mus_musculus, max_age: {warn: 1095d, crit: 3650d}, label: "Mus musculus: gene database loaded, built within 3 years"}
+      - {that: captures.ornithorhynchus_anatinus, max_age: {warn: 1095d, crit: 3650d}, label: "Ornithorhynchus anatinus: gene database loaded, built within 3 years"}
+      - {that: captures.oryza_indica, max_age: {warn: 1095d, crit: 3650d}, label: "Oryza indica: gene database loaded, built within 3 years"}
+      - {that: captures.oryza_japonica, max_age: {warn: 1095d, crit: 3650d}, label: "Oryza japonica: gene database loaded, built within 3 years"}
+      - {that: captures.ovis_aries, max_age: {warn: 1095d, crit: 3650d}, label: "Ovis aries: gene database loaded, built within 3 years"}
+      - {that: captures.pan_troglodytes, max_age: {warn: 1095d, crit: 3650d}, label: "Pan troglodytes: gene database loaded, built within 3 years"}
+      - {that: captures.populus_trichocarpa, max_age: {warn: 1095d, crit: 3650d}, label: "Populus trichocarpa: gene database loaded, built within 3 years"}
+      - {that: captures.rattus_norvegicus, max_age: {warn: 1095d, crit: 3650d}, label: "Rattus norvegicus: gene database loaded, built within 3 years"}
+      - {that: captures.saccharomyces_cerevisiae, max_age: {warn: 1095d, crit: 3650d}, label: "Saccharomyces cerevisiae: gene database loaded, built within 3 years"}
+      - {that: captures.solanum_lycopersicum, max_age: {warn: 1095d, crit: 3650d}, label: "Solanum lycopersicum: gene database loaded, built within 3 years"}
+      - {that: captures.solanum_tuberosum, max_age: {warn: 1095d, crit: 3650d}, label: "Solanum tuberosum: gene database loaded, built within 3 years"}
+      - {that: captures.sus_scrofa, max_age: {warn: 1095d, crit: 3650d}, label: "Sus scrofa: gene database loaded, built within 3 years"}
+      - {that: captures.vitis_vinifera, max_age: {warn: 1095d, crit: 3650d}, label: "Vitis vinifera: gene database loaded, built within 3 years"}
+      - {that: captures.xenopus_tropicalis, max_age: {warn: 1095d, crit: 3650d}, label: "Xenopus tropicalis: gene database loaded, built within 3 years"}
+      - {that: captures.zea_mays, max_age: {warn: 1095d, crit: 3650d}, label: "Zea mays: gene database loaded, built within 3 years"}
+    inv_ids: [bridgedb-served-build-dates]
+  - id: bridgedb-db-human-properties
+    kind: http
+    every: 1d
+    describe: The human organism loads all eight databases (Ensembl genes, corona, complexes, Wikidata genes, interactions, metabolites, pathways, publications); the AOP-Wiki RDF records this in its metadata.
+    request: {url: "https://webservice.bridgedb.org/Human/properties"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, matches: '(?s)(?:DATASOURCENAME.*?){8}', label: "≥ 8 database blocks"}
+      - {that: body, matches: "^DATASOURCENAME\tEnsembl\nBUILDDATE\t\\d{8}\nSERIES\tHomo sapiens genes and proteins$", label: "Ensembl human genes"}
+      - {that: body, matches: "^DATASOURCENAME\tWikidata\nBUILDDATE\t\\d{8}\nSERIES\tHomo sapiens genes and proteins$", label: "Wikidata human genes"}
+      - {that: body, matches: "^SERIES\thumancorona$"}
+      - {that: body, matches: "^SERIES\tComplexes$"}
+      - {that: body, matches: "^SERIES\tstandard-interaction$"}
+      - {that: body, matches: "^DATASOURCENAME\tHMDB-CHEBI-WIKIDATA$", label: "metabolites"}
+      - {that: body, matches: "^SERIES\tpathways$"}
+      - {that: body, matches: "^SERIES\tpublications$"}
+      - {that: body, matches: "^DATASOURCEVERSION\t111$", warn: true, label: "Ensembl 111 still served (re-baseline when 115 is promoted)"}
+    inv_ids: [bridgedb-served-human-properties]
+  - id: bridgedb-db-metabolite-freshness
+    kind: roundtrip
+    every: 1d
+    severity: low
+    alert_after: 21d
+    describe: The served metabolite database is the newest one published on figshare, allowing three weeks for a new release to be deployed, and is under a year old.
+    request:
+      steps:
+        - {url: "https://webservice.bridgedb.org/Human/properties", capture: {served: {regex: 'HMDB-CHEBI-WIKIDATA\s+BUILDDATE\t(\d{8})'}}}
+        - method: POST
+          url: "https://api.figshare.com/v2/articles/search"
+          json: {search_for: "Metabolite BridgeDb ID Mapping Database", page_size: 5, order: published_date, order_direction: desc}
+          capture: {published: {regex: 'Metabolite BridgeDb ID Mapping Database \((\d{8})\)'}}
+    assert:
+      - {that: captures.served, eq_path: captures.published, label: "served metabolite build == newest figshare release"}
+      - {that: captures.served, max_age: {warn: 365d}}
+    inv_ids: [bridgedb-served-metabolite-freshness]
+  - id: bridgedb-db-gene-freshness
+    kind: compare
+    every: 1d
+    describe: The served human Ensembl release is not behind any Zenodo gene-database deposit older than 45 days (the reload window); a newer, younger deposit shows amber.
+    request:
+      left: {http_regex: {url: "https://webservice.bridgedb.org/Human/properties", re: "DATASOURCENAME\tEnsembl\\s+BUILDDATE\t\\d+\\s+SERIES\tHomo sapiens genes and proteins\\s+DATATYPE\t\\S+\\s+DATASOURCEVERSION\t(\\d+)"}}
+      right:
+        http_list:
+          url: "https://zenodo.org/api/records"
+          params: {q: 'title:"Gene/Protein BridgeDb ID Mapping Database" AND NOT title:(Plants OR Metazoa OR Fungi) AND created:[* TO now-45d]', sort: mostrecent, size: "25"}
+          re: '"version":\s*"(?:Version )?(\d+)"'
+          pick: newest
+        on_error: unknown
+      sources:
+        upstream:
+          http_list:
+            url: "https://zenodo.org/api/records"
+            params: {q: 'title:"Gene/Protein BridgeDb ID Mapping Database" AND NOT title:(Plants OR Metazoa OR Fungi)', sort: mostrecent, size: "25"}
+            re: '"version":\s*"(?:Version )?(\d+)"'
+            pick: newest
+          on_error: unknown
+    assert:
+      - {that: relation, in: [equal, left_newer], label: "served Ensembl ≥ every deposit older than 45 days"}
+      - {that: left, eq_path: upstream, warn: true, label: "the newest Ensembl deposit is served"}
+    inv_ids: [bridgedb-served-gene-freshness]

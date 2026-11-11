@@ -1,0 +1,108 @@
+id: molaop-analyser
+name: molAOP Analyser
+group: Molecular AOP
+class: service
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, molaop-builder, aopwiki-sparql]
+maintenance: [molaop-apply-corpus]
+public: true
+public_summary: Key Event enrichment of differential expression data against the molecular AOPs curated in the molAOP Builder.
+links: [https://molaop-analyser.vhp4safety.nl/]
+notes: >-
+  The AOP picker falls back through four tiers; the last one (SPARQL and Builder both down)
+  serves at most 5 hardcoded AOPs, which is what ma-aop-picker catches. The known-answer
+  enrichment (ma-enrichment-known-answer) needs a no-persist self-test endpoint first, because
+  /analyze writes uploads and experiment rows.
+checks:
+  - id: ma-home
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The Analyser home page loads through public DNS and on each node.
+    request: {url: "https://molaop-analyser.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "molAOP Analyser"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [ma-presence-tls]
+  - id: ma-http-redirect
+    kind: http
+    every: 1h
+    describe: Plain http is redirected to https on the same name.
+    request: {url: "http://molaop-analyser.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, eq: "https://molaop-analyser.vhp4safety.nl/"}
+    inv_ids: [ma-presence-tls]
+  - id: ma-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    request: {host: molaop-analyser.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: molaop-analyser.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [ma-presence-tls]
+  - id: ma-health
+    kind: http
+    every: 5m
+    describe: The health endpoint reports the app healthy with a working database.
+    request: {url: "https://molaop-analyser.vhp4safety.nl/health", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: healthy}
+      - {that: json.database, eq: true}
+      - {that: json.version, matches: '^\d+\.\d+\.\d+$'}
+      - {that: json.build, matches: '^[0-9a-f]{7,40}$'}
+    inv_ids: [ma-health]
+  - id: ma-aop-picker
+    kind: http
+    every: 15m
+    timeout: 90s
+    describe: The AOP picker lists the full set of mapped AOPs, not the five-AOP emergency fallback.
+    request: {url: "https://molaop-analyser.vhp4safety.nl/api/aops", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: latency_ms, lt: 20000, warn: true}
+      - {that: latency_ms, lt: 60000}
+      - {that: json, len_gte: 45, label: "≥ 45 AOPs listed (the fallback has at most 5)"}
+      - {that: json.0.aop_id, matches: '^AOP:'}
+      - {that: json.0.mapped_ke_count, gt: 0}
+      - {that: json.0.mapped_ke_by_resource, exists: true}
+    inv_ids: [ma-aop-picker-not-fallback]
+  - id: ma-known-aops
+    kind: roundtrip
+    every: 1h
+    timeout: 120s
+    describe: AOP 60 and the demo AOP come back with their known Key Event counts and WikiPathways mappings.
+    request:
+      base: https://molaop-analyser.vhp4safety.nl
+      steps:
+        - {url: "/api/aops?q=aop:60"}
+        - {url: "/api/aops?ids=AOP:DEMO"}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.json.0.aop_id, eq: "AOP:60"}
+      - {that: steps.0.json.0.ke_count, eq: 12}
+      - {that: steps.0.json.0.mapped_ke_count, gte: 10}
+      - {that: steps.0.json.0.mapped_ke_by_resource.WikiPathways, gte: 8}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.json.0.aop_id, eq: "AOP:DEMO"}
+      - {that: steps.1.json.0.ke_count, eq: 12}
+    inv_ids: [ma-known-aop-canary]
+  - id: ma-demos
+    kind: http
+    every: 1h
+    describe: The demo page offers both GSE90122 example data sets.
+    request: {url: "https://molaop-analyser.vhp4safety.nl/demos"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: GSE90122_TO90137.tsv}
+      - {that: body, contains: GSE90122_SR12813.tsv}
+    inv_ids: [ma-demos]

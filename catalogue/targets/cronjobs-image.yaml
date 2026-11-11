@@ -1,0 +1,21 @@
+id: cronjobs-image
+name: Cluster job image build (TGX-UM/cronjobs)
+group: Pipelines
+class: pipeline
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: []
+public: true
+public_summary: GitHub Actions build the container image that the cluster's reload jobs run in.
+# TGX-UM/cronjobs is a private repository: reading its runs needs a token with
+# actions:read on it (anonymous requests get 404).
+checks:
+  - id: cronjobs-image-ci
+    kind: gha
+    every: 1h
+    describe: The last build of the job image succeeded.
+    request: {repo: TGX-UM/cronjobs, workflow: docker-publish.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+    inv_ids: [cj-ci]

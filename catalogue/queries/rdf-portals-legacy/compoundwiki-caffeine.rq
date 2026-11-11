@@ -1,0 +1,4 @@
+# Known answer: caffeine (Q2026) has InChIKey (P10) and CAS number (P23).
+PREFIX wd: <https://compoundcloud.wikibase.cloud/entity/>
+PREFIX wdt: <https://compoundcloud.wikibase.cloud/prop/direct/>
+SELECT ?inchikey ?cas WHERE { wd:Q2026 wdt:P10 ?inchikey ; wdt:P23 ?cas } LIMIT 1

@@ -1,0 +1,55 @@
+id: xploreaop
+name: xploreAOP (Shiny AOP explorer)
+group: VHP4Safety tools
+class: service
+criticality: low
+owners: [Maddocent, ozancinar, egonw]
+depends_on: [edge-tgx1]
+public: true
+public_summary: An R Shiny app to explore AOP networks and their chemicals.
+links: [https://xploreaop.cloud.vhp4safety.nl/]
+checks:
+  - id: xploreaop-root
+    kind: http
+    every: 15m
+    describe: The explorer page loads.
+    request: {url: "https://xploreaop.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>xploreaop; A Shiny AOP Explorer"}
+    inv_ids: [xploreaop-root]
+
+  - id: xploreaop-session
+    kind: shiny
+    every: 30m
+    describe: A Shiny session opens over a websocket.
+    request: {url: "https://xploreaop.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: page_has_shiny, eq: true}
+      - {that: websocket, eq: true}
+      - {that: ws_open, eq: true}
+      - {that: ws_ms, lt: 10000, warn: true}
+    inv_ids: [xploreaop-sockjs]
+
+  - id: xploreaop-browser
+    kind: browser_artifact
+    every: 1h
+    via: [core]
+    describe: In a real browser the chemical network is drawn and every output fills without errors.
+    request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser/latest.json", page: xploreaop}
+    assert:
+      - {that: page_found, eq: true}
+      - {that: age_h, lt: 13}
+      - {that: page.ok, eq: true}
+    inv_ids: [xploreaop-network-render]
+
+  - id: xploreaop-pin
+    kind: swarm
+    every: 1d
+    via: [core]
+    public: false
+    describe: The locally built image is still on the node the service is pinned to.
+    request: {check: local_images, services: [xploreaop]}
+    assert:
+      - {that: by.xploreaop, has: tgx1}
+    inv_ids: [xploreaop-pin-risk]

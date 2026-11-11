@@ -1,0 +1,77 @@
+id: expoportal-api
+name: ExpoPortal REST API and O'FAIRe
+group: Ontology portals
+class: service
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, bigcat-domain-dns, expoportal-sparql]
+public: true
+public_summary: The ExpoPortal REST API and its O'FAIRe ontology FAIRness scores.
+links:
+  - https://data.expoportal.biohackeu.bigcat-bioinformatics.org/
+notes: >-
+  The API runs with security enabled: anonymous calls to protected resources get 401.
+  O'FAIRe for all ontologies is a 5.8 MB response, above the monitor's 4 MiB body cap,
+  so the check scores two reference ontologies instead.
+checks:
+  - id: expoportal-api-root
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The API catalogue record answers with JSON and lists all ontologies, through public DNS and on each node.
+    request: {url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.acronym, exists: true}
+      - {that: json.federated_portals, exists: true}
+      - {that: json.numberOfArtefacts, gte: 126, label: "at least 126 ontologies (133 today)"}
+      - {that: json.numberOfArtefacts, max_drop_pct: 5, window: 7d}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [expoportal-api-root]
+
+  - id: expoportal-api-auth
+    kind: security
+    every: 1h
+    describe: Protected API resources still refuse anonymous callers.
+    request:
+      url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/ontologies"
+      expect_status: [401]
+    assert:
+      - {that: reachable, eq: true}
+      - {that: exposed, eq: false}
+    inv_ids: [expoportal-api-security-canary]
+
+  - id: expoportal-ofaire
+    kind: http
+    every: 1h
+    timeout: 1m
+    public: false
+    describe: O'FAIRe computes FAIRness scores for two reference ontologies (AOPO and STY).
+    request: {url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/ofaire", params: {ontologies: "STY,AOPO"}, parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status.success, eq: true}
+      - {that: json.ontologies, len_eq: 2}
+      - {that: json.ontologies.STY.normalizedScore, gt: 0}
+      - {that: json.ontologies.AOPO.normalizedScore, gt: 0}
+      - {that: headers.content-type, contains: "UTF-8", warn: true, label: "served as UTF-8 (it is ISO-8859-1 today)"}
+    inv_ids: [expoportal-ofaire-shape]
+
+  - id: expoportal-api-alias
+    kind: http
+    every: 1h
+    describe: The API also answers on the old ontoportal name, which older submissions store in their dump links.
+    request: {url: "https://data.ontoportal.biohackeu.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+    inv_ids: [expoportal-api-alias]
+
+  - id: expoportal-api-dns
+    kind: dns
+    every: 1h
+    describe: The API name resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: data.expoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [expoportal-dns-pair]

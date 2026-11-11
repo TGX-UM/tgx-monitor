@@ -1,0 +1,155 @@
+id: aopwiki-multirdf
+name: AOP-Wiki multi-release SPARQL endpoint
+group: AOP-Wiki RDF
+class: data
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1]
+public: true
+public_summary: Every quarterly AOP-Wiki release since 2018 as its own named graph, for trend analysis.
+links:
+  - https://aopwiki-multirdf.vhp4safety.nl/sparql
+checks:
+  - id: aopwiki-multirdf-ask
+    kind: sparql
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The endpoint answers a trivial query within five seconds, through public DNS and on each node.
+    request: {endpoint: "https://aopwiki-multirdf.vhp4safety.nl/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+      - {that: latency_ms, lt: 2000, warn: true}
+      - {that: latency_ms, lt: 5000}
+    inv_ids: [multirdf-presence]
+
+  - id: aopwiki-multirdf-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the endpoint name, not close to expiry.
+    request: {host: aopwiki-multirdf.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: aopwiki-multirdf.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [multirdf-presence]
+
+  - id: aopwiki-multirdf-http-redirect
+    kind: http
+    every: 1d
+    describe: Plain http on the endpoint name redirects permanently to https.
+    request: {url: "http://aopwiki-multirdf.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, matches: '^https://aopwiki-multirdf\.vhp4safety\.nl/'}
+    inv_ids: [multirdf-presence]
+
+  - id: aopwiki-multirdf-release-graphs
+    kind: sparql
+    every: 1h
+    describe: All quarterly release graphs are still loaded; their number never goes down.
+    request: {endpoint: "https://aopwiki-multirdf.vhp4safety.nl/sparql", file: q/aopwiki/multirdf-release-graphs.rq}
+    assert:
+      - {that: first.n, gte: 35, label: "≥ 35 release graphs"}
+      - {that: first.n, monotonic: true}
+    inv_ids: [multirdf-release-graphs]
+
+  - id: aopwiki-multirdf-newest-release
+    kind: compare
+    every: 1d
+    alert_after: 21d
+    describe: The newest loaded release is the newest quarterly export on aopwiki.org (a new quarter has three weeks to be loaded).
+    request:
+      endpoint: "https://aopwiki-multirdf.vhp4safety.nl/sparql"
+      left: {sparql: {file: q/aopwiki/multirdf-newest-graph.rq, value: g}, extract: '(\d{4}-\d{2}-\d{2})$'}
+      right:
+        http_list: {url: "https://aopwiki.org/downloads", re: 'aop-wiki-xml-(\d{4}-\d{2}-\d{2})\.gz', pick: newest}
+        via: public
+        on_error: unknown
+    assert:
+      - {that: relation, in: [equal, left_newer], label: "newest graph ≥ newest aopwiki.org quarter"}
+    inv_ids: [multirdf-newest-release]
+
+  - id: aopwiki-multirdf-catalogue
+    kind: sparql
+    every: 1d
+    describe: The metadata catalogue describes the newest release graph with a matching version and a link to the previous quarter.
+    request: {endpoint: "https://aopwiki-multirdf.vhp4safety.nl/sparql", file: q/aopwiki/multirdf-catalogue.rq}
+    assert:
+      - {that: first.version_matches, eq: 1, label: "owl:versionInfo == newest graph date"}
+      - {that: first.prev_older, eq: 1, label: "dcat:previousVersion is an older release graph"}
+      - {that: first.n, gte: 600, label: "metadata graph ≥ 600 triples"}
+    inv_ids: [multirdf-catalogue-match]
+
+  - id: aopwiki-multirdf-newest-shape
+    kind: sparql
+    every: 1d
+    describe: The newest release graph holds AOPs, Key Events, KERs and stressors, each at least 98% of the previous quarter's.
+    request:
+      endpoint: "https://aopwiki-multirdf.vhp4safety.nl/sparql"
+      file: q/aopwiki/multirdf-newest-shape.rq
+      pivot: {key: t, value: n}
+    assert:
+      - {that: by.AdverseOutcomePathway, gte: 570}
+      - {that: by.KeyEvent, gte: 1520}
+      - {that: by.KeyEventRelationship, gte: 2260}
+      - {that: by.C54571, gte: 720, label: "stressors ≥ 720"}
+      - {that: by.AdverseOutcomePathway, max_drop_pct: 2, window: 7d}
+      - {that: by.KeyEvent, max_drop_pct: 2, window: 7d}
+      - {that: by.KeyEventRelationship, max_drop_pct: 2, window: 7d}
+      - {that: by.C54571, max_drop_pct: 2, window: 7d}
+    inv_ids: [multirdf-newest-shape]
+
+  - id: aopwiki-multirdf-newest-triples
+    kind: sparql
+    every: 1d
+    describe: The newest release graph holds at least 200,000 triples.
+    request: {endpoint: "https://aopwiki-multirdf.vhp4safety.nl/sparql", file: q/aopwiki/multirdf-newest-triples.rq}
+    assert:
+      - {that: first.n, gte: 200000}
+      - {that: first.n, max_drop_pct: 2, window: 7d}
+    inv_ids: [multirdf-newest-shape]
+
+  - id: aopwiki-multirdf-groupby
+    kind: sparql
+    every: 1d
+    describe: Counting AOPs per release gives exactly one row per release graph, and the historical counts have not changed.
+    request:
+      endpoint: "https://aopwiki-multirdf.vhp4safety.nl/sparql"
+      file: q/aopwiki/multirdf-groupby.rq
+      pivot: {key: graph, value: n}
+    assert:
+      - {that: count, eq_path: first.total, label: "one row per release graph"}
+      - {that: count, gte: 35}
+      - {that: by.2018-04-01, eq: 219, label: "2018-04-01 release has 219 AOPs"}
+      - {that: by.2026-10-01, eq: 599, label: "2026-10-01 release has 599 AOPs"}
+      - {that: truncated, eq: false}
+    inv_ids: [multirdf-groupby-canary]
+
+  - id: aopwiki-multirdf-sd-cors
+    kind: http
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Each node serves the SPARQL service description as Turtle with a single Access-Control-Allow-Origin "*" header.
+    request: {url: "https://aopwiki-multirdf.vhp4safety.nl/sparql", headers: {Accept: text/turtle}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/turtle}
+      - {that: size, gte: 4000}
+      - {that: headers.access-control-allow-origin, eq: "*", label: "exactly one allow-origin: *"}
+    inv_ids: [multirdf-edge-policy, infra-per-node-routing]
+
+  - id: aopwiki-multirdf-conductor-closed
+    kind: security
+    every: 1h
+    describe: The database admin interface is not reachable from the internet.
+    request:
+      url: "https://aopwiki-multirdf.vhp4safety.nl/conductor/"
+      expect_status: [403, 404]
+      absent_markers: ["Virtuoso Conductor"]
+    assert:
+      - {that: exposed, eq: false}
+    inv_ids: [multirdf-edge-policy]

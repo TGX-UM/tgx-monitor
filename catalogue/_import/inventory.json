@@ -1,0 +1,5 @@
+{
+ "about": "The live-verified inventory of 2026-11-10 that seeded this catalogue. Its ids and the reasons for checks left out are kept privately (they name internal hosts and open issues); this file lets CI confirm the private copy is the same inventory.",
+ "total": 566,
+ "sha256_sorted_ids": "295c9ca435da64fc7536cfda760b32cc31b9688e358075c0c6feb31058a07532"
+}

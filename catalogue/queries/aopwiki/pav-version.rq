@@ -1,0 +1,7 @@
+# AOP-Wiki RDF: the release loaded in the endpoint, from its VoID graph.
+PREFIX pav: <http://purl.org/pav/>
+SELECT ?v ?d
+FROM <http://aopwiki.org/void>
+WHERE {
+  <https://aopwiki.rdf.bigcat-bioinformatics.org/AOPWikiRDF> pav:version ?v ; pav:createdOn ?d .
+}

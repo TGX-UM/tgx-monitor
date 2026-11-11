@@ -1,0 +1,83 @@
+id: ingredient-smiles
+name: Ingredient-SMILES converter
+group: VHP4Safety tools
+class: service
+criticality: low
+owners: [marvinm2]
+depends_on: [edge-tgx1]
+public: true
+public_summary: Converts Dutch food-supplement ingredient names to the SMILES of their known constituents.
+links: [https://ingredient-smiles.cloud.vhp4safety.nl/]
+notes: >-
+  The lookup cache is built by a manual one-off pipeline run, so built_at and the ingredient
+  count change only on a deliberate rebuild. The service restart policy is on-failure: a task
+  that exits 0 is not restarted, which is what ism-replicas catches.
+checks:
+  - id: ism-home
+    kind: http
+    every: 15m
+    describe: The converter's search page loads.
+    request: {url: "https://ingredient-smiles.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: latency_ms, lt: 3000, warn: true}
+    inv_ids: [ism-presence-tls]
+  - id: ism-http-redirect
+    kind: http
+    every: 1h
+    describe: Plain http is redirected to https on the same name.
+    request: {url: "http://ingredient-smiles.cloud.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, eq: "https://ingredient-smiles.cloud.vhp4safety.nl/"}
+    inv_ids: [ism-presence-tls]
+  - id: ism-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    request: {host: ingredient-smiles.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: ingredient-smiles.cloud.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [ism-presence-tls]
+  - id: ism-healthz
+    kind: http
+    every: 15m
+    describe: The health endpoint reports the lookup cache loaded with its full set of ingredients.
+    request: {url: "https://ingredient-smiles.cloud.vhp4safety.nl/healthz", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: ok}
+      - {that: json.ingredient_count, gte: 412, label: "≥ 412 ingredients (434 at the last build)"}
+      - {that: json.built_at, matches: '^\d{4}-\d{2}-\d{2}T'}
+    inv_ids: [ism-healthz]
+  - id: ism-mariadistel
+    kind: roundtrip
+    every: 1h
+    timeout: 30s
+    describe: Looking up "mariadistel" returns the milk thistle constituents as CSV, each with a SMILES.
+    request:
+      steps: [{url: "https://ingredient-smiles.cloud.vhp4safety.nl/download.csv?q=mariadistel"}]
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.headers.content-type, contains: text/csv}
+      - {that: last.first_line, matches: '^﻿?Dutch name,Latin name,KNApSAcK ID,Wikidata QID,Src,SMILES\r?$'}
+      - {that: last.lines, gte: 51, label: "≥ 50 constituents plus the header"}
+      - {that: last.body, contains: Silybum marianum}
+      - {that: last.body, contains: C00000674}
+      - {that: last.body, not_matches: ',\r?$', label: "no row with an empty SMILES"}
+    inv_ids: [ism-mariadistel-known-answer]
+  - id: ism-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    describe: The swarm runs the converter's one replica.
+    request: {check: replicas, services: [ingredient-smiles]}
+    assert:
+      - {that: checked, eq: 1, label: "the service exists"}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [ism-container-health]

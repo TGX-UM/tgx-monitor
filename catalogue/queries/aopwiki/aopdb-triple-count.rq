@@ -1,0 +1,5 @@
+# AOP-DB RDF: total triples in its data graph. Static load, so the count is exact.
+# Same graph IRI as the AOP-Wiki data graph: only ever run this against the AOP-DB host.
+SELECT (COUNT(*) AS ?n)
+FROM <http://aopwiki.org/>
+WHERE { ?s ?p ?o }

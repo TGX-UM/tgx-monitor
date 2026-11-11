@@ -1,0 +1,49 @@
+id: wikipathways-loader-ci
+name: WikiPathwaysLoader workflows (GitHub Actions)
+group: Pipelines
+class: pipeline
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [wikipathways-sparql, data-wikipathways]
+public: true
+public_summary: GitHub Actions in WikiPathwaysLoader refresh the ontology files the monthly reload uses, collect counts, and check every three hours that the SPARQL endpoint serves the current release.
+links:
+  - https://github.com/wikipathways/WikiPathwaysLoader/actions
+# check-endpoint (every 3 h plus a daily release step) fails with "Upstream release:
+# none" when data.wikipathways.org/current/rdf/ is incomplete: that is an upstream
+# problem (data-wikipathways), so this target depends on it. The vocabulary files are
+# checked in job-wikipathways-reload-vocab.
+checks:
+  - id: loader-check-endpoint
+    kind: gha
+    every: 1h
+    describe: The three-hourly check that the endpoint answers and serves the current release passed on its last run.
+    request: {repo: wikipathways/WikiPathwaysLoader, workflow: check-endpoint.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_run_at, max_age: {crit: 1d}}
+    inv_ids: [loader-check-endpoint, wg-check-endpoint]
+
+  - id: loader-build-imports
+    kind: gha
+    every: 1h
+    describe: The monthly rebuild of the ontology import files (run on the 10th, before the reload) succeeded within the past five weeks.
+    request: {repo: wikipathways/WikiPathwaysLoader, workflow: build-imports.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 33d}}
+    inv_ids: [loader-build-imports, wg-build-imports]
+
+  - id: loader-collect-counts
+    kind: gha
+    every: 1h
+    severity: low
+    describe: The monthly collection of WikiPathways counts succeeded within the past five weeks.
+    request: {repo: wikipathways/WikiPathwaysLoader, workflow: collect-counts.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 35d}}
+    inv_ids: [loader-collect-counts]

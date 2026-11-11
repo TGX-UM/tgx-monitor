@@ -1,0 +1,49 @@
+id: expoportal-stack
+name: ExpoPortal swarm stack
+group: Ontology portals
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+public: false
+public_summary: The cluster services behind ExpoPortal (web UI, API, triple store, search, caches, MCP).
+links: []
+notes: >-
+  Twelve long-running services plus the fairness-cache job (0/0 between runs, which the
+  replica check leaves out). The API, UI and ncbo_cron images run the moving `master`
+  tag, so a recreated task can silently pull new code.
+checks:
+  - id: expoportal-stack-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    describe: Every long-running service of the ExpoPortal stack runs its desired replicas.
+    request: {check: replicas, services: ["ontoportal_*"]}
+    assert:
+      - {that: checked, gte: 12}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [ontoportal-replicas]
+
+  - id: expoportal-stack-master-drift
+    kind: digest_drift
+    every: 1h
+    via: [core]
+    severity: low
+    describe: The images behind the moving `master` tag have not changed under a running service.
+    request: {services: [ontoportal_api, ontoportal_ui, ontoportal_ncbo_cron]}
+    assert:
+      - {that: changed_count, eq: 0, warn: true, label: "no silent image change (re-run the branding and security canaries if there was)"}
+    inv_ids: [ontoportal-master-digest-drift]
+
+  - id: expoportal-stack-backup
+    kind: file_age
+    every: 1h
+    via: [core]
+    timeout: 2m
+    describe: A fresh, non-empty backup of the ExpoPortal database, repository and Redis data exists.
+    request: {mount: ontoportal-backups, glob: "*/*.gz", recursive: true, small_bytes: 1000}
+    assert:
+      - {that: count, gte: 1, label: a backup exists}
+      - {that: newest_age_h, lt: 26}
+      - {that: gzip_ok, eq: true}
+    inv_ids: [ontoportal-backup]

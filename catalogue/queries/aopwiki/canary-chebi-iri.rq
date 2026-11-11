@@ -1,0 +1,6 @@
+# AOP-Wiki RDF: every ChEBI cross-reference uses the identifiers.org CHEBI: IRI form
+# that WikiPathways federation expects (regression of 2026-10-07).
+SELECT (SUM(IF(STRSTARTS(STR(?c), "https://identifiers.org/chebi/CHEBI:"), 1, 0)) AS ?good)
+       (COUNT(DISTINCT ?c) AS ?all)
+FROM <http://aopwiki.org/>
+WHERE { ?c a <http://semanticscience.org/resource/CHEMINF_000407> }

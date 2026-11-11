@@ -1,0 +1,262 @@
+id: aopwiki-dashboard
+name: AOP-Wiki RDF Dashboard
+group: AOP-Wiki RDF
+class: service
+criticality: medium
+owners: [marvinm2]
+depends_on: [edge-tgx1, aopwiki-multirdf]
+maintenance: [dashboard-store-build]
+public: true
+public_summary: Interactive plots of how the AOP-Wiki has grown and changed across its quarterly releases.
+links:
+  - https://aopwiki-dashboard.vhp4safety.nl/
+checks:
+  - id: aopwiki-dashboard-health
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The dashboard reports itself healthy, with every startup plot loaded and its SPARQL endpoint up (a degraded dashboard still answers 200).
+    request: {url: "https://aopwiki-dashboard.vhp4safety.nl/health", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: healthy}
+      - {that: json.plots_loaded, matches: '^(\d+)/\1$', label: "all startup plots loaded (n/n)"}
+      - {that: json.sparql_endpoint, eq: up}
+      - {that: latency_ms, lt: 3000, warn: true}
+    inv_ids: [dash-health]
+
+  - id: aopwiki-dashboard-home
+    kind: http
+    every: 15m
+    describe: The dashboard home page loads with its title.
+    request: {url: "https://aopwiki-dashboard.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>AOP-Wiki RDF Dashboard</title>"}
+    inv_ids: [dash-home]
+
+  - id: aopwiki-dashboard-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the dashboard, not close to expiry.
+    request: {host: aopwiki-dashboard.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: aopwiki-dashboard.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [dash-home]
+
+  - id: aopwiki-dashboard-http-redirect
+    kind: http
+    every: 1d
+    describe: Plain http on the dashboard name redirects permanently to https.
+    request: {url: "http://aopwiki-dashboard.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, matches: '^https://aopwiki-dashboard\.vhp4safety\.nl/'}
+    inv_ids: [dash-home]
+
+  - id: aopwiki-dashboard-versions
+    kind: compare
+    every: 1h
+    describe: The dashboard, its plot store and the multi-release endpoint agree on the newest release, which is less than a quarter plus three weeks old.
+    request:
+      left: {http_json: {url: "https://aopwiki-dashboard.vhp4safety.nl/health", path: latest_version}}
+      right: {http_json: {url: "https://aopwiki-dashboard.vhp4safety.nl/api/v2/manifest", path: latest_version}}
+      sources:
+        endpoint: {sparql: {endpoint: "https://aopwiki-multirdf.vhp4safety.nl/sparql", file: q/aopwiki/multirdf-newest-graph.rq, value: g}, extract: '(\d{4}-\d{2}-\d{2})$'}
+        versions: {http_json: {url: "https://aopwiki-dashboard.vhp4safety.nl/api/v2/manifest", path: versions}}
+    assert:
+      - {that: left, eq_path: right, label: "/health latest_version == manifest latest_version"}
+      - {that: left, eq_path: endpoint, label: "dashboard latest_version == newest multi-release graph"}
+      - {that: left_age_days, lte: 113, label: "newest release ≤ 113 days old"}
+      - {that: versions, len_gte: 35, label: "≥ 35 versions in the manifest"}
+    inv_ids: [dash-version-consistency]
+
+  - id: aopwiki-dashboard-plot-renders
+    kind: roundtrip
+    every: 15m
+    describe: A trend plot and a latest-release snapshot plot both render with content.
+    request:
+      base: "https://aopwiki-dashboard.vhp4safety.nl"
+      steps:
+        - url: /health
+          capture: {v: {json_path: latest_version}}
+        - {url: /api/plot/aop_entity_counts_absolute}
+        - {url: /api/plot/latest_aop_completeness, params: {version: "{v}"}}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.json.success, eq: true, label: "trend plot renders"}
+      - {that: steps.1.json.html, len_gte: 1000, label: "trend plot html > 1 KB"}
+      - {that: last.status, eq: 200}
+      - {that: last.json.success, eq: true, label: "snapshot plot renders"}
+      - {that: last.json.html, len_gte: 1000, label: "snapshot plot html > 1 KB"}
+    inv_ids: [dash-plot-renders]
+
+  - id: aopwiki-dashboard-all-trends
+    kind: roundtrip
+    every: 6h
+    timeout: 3m
+    describe: Every plot on the trends page renders with data, not only the ones the health endpoint looks at.
+    request:
+      base: "https://aopwiki-dashboard.vhp4safety.nl"
+      steps:
+        - {url: /api/plot/aop_authors_absolute}
+        - {url: /api/plot/aop_authors_delta}
+        - {url: /api/plot/aop_completeness_boxplot}
+        - {url: /api/plot/aop_completeness_boxplot_all}
+        - {url: /api/plot/aop_creation_vs_modification_timeline}
+        - {url: /api/plot/aop_entity_counts_absolute}
+        - {url: /api/plot/aop_entity_counts_delta}
+        - {url: /api/plot/aop_network_density}
+        - {url: /api/plot/aop_property_heatmap}
+        - {url: /api/plot/aop_property_presence_absolute}
+        - {url: /api/plot/aop_property_presence_percentage}
+        - {url: /api/plot/aops_created_over_time}
+        - {url: /api/plot/aops_per_stressor_distribution_absolute}
+        - {url: /api/plot/aops_per_stressor_distribution_percentage}
+        - {url: /api/plot/average_components_per_aop_absolute}
+        - {url: /api/plot/average_components_per_aop_delta}
+        - {url: /api/plot/biological_object_annotations_absolute}
+        - {url: /api/plot/biological_object_annotations_delta}
+        - {url: /api/plot/biological_process_annotations_absolute}
+        - {url: /api/plot/biological_process_annotations_delta}
+        - {url: /api/plot/entity_birth_death}
+        - {url: /api/plot/entity_completeness_trends}
+        - {url: /api/plot/entity_cumulative_removed}
+        - {url: /api/plot/entity_survival}
+        - {url: /api/plot/ke_component_annotations_absolute}
+        - {url: /api/plot/ke_component_annotations_delta}
+        - {url: /api/plot/ke_components_percentage_absolute}
+        - {url: /api/plot/ke_components_percentage_delta}
+        - {url: /api/plot/ke_migration_map}
+        - {url: /api/plot/ke_mmo_coverage_absolute}
+        - {url: /api/plot/ke_mmo_coverage_percentage}
+        - {url: /api/plot/ke_property_heatmap}
+        - {url: /api/plot/ke_property_presence_absolute}
+        - {url: /api/plot/ke_property_presence_percentage}
+        - {url: /api/plot/ker_curation_calendar}
+        - {url: /api/plot/ker_property_heatmap}
+        - {url: /api/plot/ker_property_presence_absolute}
+        - {url: /api/plot/ker_property_presence_percentage}
+        - {url: /api/plot/kes_by_kec_count_absolute}
+        - {url: /api/plot/kes_by_kec_count_delta}
+        - {url: /api/plot/oecd_completeness_trend}
+        - {url: /api/plot/oecd_status_distribution_absolute}
+        - {url: /api/plot/oecd_status_distribution_percentage}
+        - {url: /api/plot/oecd_status_journey}
+        - {url: /api/plot/ontology_term_growth_absolute}
+        - {url: /api/plot/ontology_term_growth_delta}
+        - {url: /api/plot/organ_coverage_absolute}
+        - {url: /api/plot/organ_coverage_bump}
+        - {url: /api/plot/organ_coverage_percentage}
+        - {url: /api/plot/stressor_coverage_growth_absolute}
+        - {url: /api/plot/stressor_coverage_growth_delta}
+        - {url: /api/plot/stressor_property_heatmap}
+        - {url: /api/plot/stressor_property_presence_absolute}
+        - {url: /api/plot/stressor_property_presence_percentage}
+        - {url: /api/plot/unique_ke_components_absolute}
+        - {url: /api/plot/unique_ke_components_delta}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.json.success, eq: true, label: "aop_authors_absolute renders"}
+      - {that: steps.1.json.success, eq: true, label: "aop_authors_delta renders"}
+      - {that: steps.2.json.success, eq: true, label: "aop_completeness_boxplot renders"}
+      - {that: steps.3.json.success, eq: true, label: "aop_completeness_boxplot_all renders"}
+      - {that: steps.4.json.success, eq: true, label: "aop_creation_vs_modification_timeline renders"}
+      - {that: steps.5.json.success, eq: true, label: "aop_entity_counts_absolute renders"}
+      - {that: steps.6.json.success, eq: true, label: "aop_entity_counts_delta renders"}
+      - {that: steps.7.json.success, eq: true, label: "aop_network_density renders"}
+      - {that: steps.8.json.success, eq: true, label: "aop_property_heatmap renders"}
+      - {that: steps.9.json.success, eq: true, label: "aop_property_presence_absolute renders"}
+      - {that: steps.10.json.success, eq: true, label: "aop_property_presence_percentage renders"}
+      - {that: steps.11.json.success, eq: true, label: "aops_created_over_time renders"}
+      - {that: steps.12.json.success, eq: true, label: "aops_per_stressor_distribution_absolute renders"}
+      - {that: steps.13.json.success, eq: true, label: "aops_per_stressor_distribution_percentage renders"}
+      - {that: steps.14.json.success, eq: true, label: "average_components_per_aop_absolute renders"}
+      - {that: steps.15.json.success, eq: true, label: "average_components_per_aop_delta renders"}
+      - {that: steps.16.json.success, eq: true, label: "biological_object_annotations_absolute renders"}
+      - {that: steps.17.json.success, eq: true, label: "biological_object_annotations_delta renders"}
+      - {that: steps.18.json.success, eq: true, label: "biological_process_annotations_absolute renders"}
+      - {that: steps.19.json.success, eq: true, label: "biological_process_annotations_delta renders"}
+      - {that: steps.20.json.success, eq: true, label: "entity_birth_death renders"}
+      - {that: steps.21.json.success, eq: true, label: "entity_completeness_trends renders"}
+      - {that: steps.22.json.success, eq: true, label: "entity_cumulative_removed renders"}
+      - {that: steps.23.json.success, eq: true, label: "entity_survival renders"}
+      - {that: steps.24.json.success, eq: true, label: "ke_component_annotations_absolute renders"}
+      - {that: steps.25.json.success, eq: true, label: "ke_component_annotations_delta renders"}
+      - {that: steps.26.json.success, eq: true, label: "ke_components_percentage_absolute renders"}
+      - {that: steps.27.json.success, eq: true, label: "ke_components_percentage_delta renders"}
+      - {that: steps.28.json.success, eq: true, label: "ke_migration_map renders"}
+      - {that: steps.29.json.success, eq: true, label: "ke_mmo_coverage_absolute renders"}
+      - {that: steps.30.json.success, eq: true, label: "ke_mmo_coverage_percentage renders"}
+      - {that: steps.31.json.success, eq: true, label: "ke_property_heatmap renders"}
+      - {that: steps.32.json.success, eq: true, label: "ke_property_presence_absolute renders"}
+      - {that: steps.33.json.success, eq: true, label: "ke_property_presence_percentage renders"}
+      - {that: steps.34.json.success, eq: true, label: "ker_curation_calendar renders"}
+      - {that: steps.35.json.success, eq: true, label: "ker_property_heatmap renders"}
+      - {that: steps.36.json.success, eq: true, label: "ker_property_presence_absolute renders"}
+      - {that: steps.37.json.success, eq: true, label: "ker_property_presence_percentage renders"}
+      - {that: steps.38.json.success, eq: true, label: "kes_by_kec_count_absolute renders"}
+      - {that: steps.39.json.success, eq: true, label: "kes_by_kec_count_delta renders"}
+      - {that: steps.40.json.success, eq: true, label: "oecd_completeness_trend renders"}
+      - {that: steps.41.json.success, eq: true, label: "oecd_status_distribution_absolute renders"}
+      - {that: steps.42.json.success, eq: true, label: "oecd_status_distribution_percentage renders"}
+      - {that: steps.43.json.success, eq: true, label: "oecd_status_journey renders"}
+      - {that: steps.44.json.success, eq: true, label: "ontology_term_growth_absolute renders"}
+      - {that: steps.45.json.success, eq: true, label: "ontology_term_growth_delta renders"}
+      - {that: steps.46.json.success, eq: true, label: "organ_coverage_absolute renders"}
+      - {that: steps.47.json.success, eq: true, label: "organ_coverage_bump renders"}
+      - {that: steps.48.json.success, eq: true, label: "organ_coverage_percentage renders"}
+      - {that: steps.49.json.success, eq: true, label: "stressor_coverage_growth_absolute renders"}
+      - {that: steps.50.json.success, eq: true, label: "stressor_coverage_growth_delta renders"}
+      - {that: steps.51.json.success, eq: true, label: "stressor_property_heatmap renders"}
+      - {that: steps.52.json.success, eq: true, label: "stressor_property_presence_absolute renders"}
+      - {that: steps.53.json.success, eq: true, label: "stressor_property_presence_percentage renders"}
+      - {that: steps.54.json.success, eq: true, label: "unique_ke_components_absolute renders"}
+      - {that: steps.55.json.success, eq: true, label: "unique_ke_components_delta renders"}
+    inv_ids: [dash-all-trends]
+
+  - id: aopwiki-dashboard-data-shape
+    kind: http
+    every: 1h
+    describe: The entity-count data behind the main trend plot is complete, typed as documented, and covers every release.
+    request: {url: "https://aopwiki-dashboard.vhp4safety.nl/api/v2/data/aop_entity_counts_absolute", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.meta.complete, eq: true}
+      - {that: json.meta.columns.0.name, eq: version}
+      - {that: json.meta.columns.1.name, eq: Entity}
+      - {that: json.meta.columns.2.name, eq: Count}
+      - {that: json.meta.columns.2.type, eq: integer}
+      - {that: json.meta.rows, gte: 140, label: "≥ 140 rows (35 releases × 4 entities)"}
+      - {that: json.data.Count, len_gte: 140}
+      - {that: headers.etag, exists: true}
+    inv_ids: [dash-data-shape]
+
+  - id: aopwiki-dashboard-features
+    kind: roundtrip
+    every: 1h
+    describe: The AOP list, the network graph, an AOP detail page and a CSV download all work.
+    request:
+      base: "https://aopwiki-dashboard.vhp4safety.nl"
+      steps:
+        - {url: /api/aops}
+        - {url: /api/network/graph}
+        - {url: /aop, params: {aop: "1"}}
+        - {url: /download/trend/aop_entity_counts_absolute}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.json.aops, len_gte: 590, label: "≥ 590 AOPs listed"}
+      - {that: steps.0.json.aops.0.number, eq: 1}
+      - {that: steps.1.json.elements, len_gte: 3000, label: "network ≥ 3,000 elements"}
+      - {that: steps.1.json.version, exists: true}
+      - {that: steps.2.status, eq: 200, label: "AOP 1 page loads"}
+      - {that: last.status, eq: 200}
+      - {that: last.headers.content-type, contains: text/csv}
+      - {that: last.size, gte: 1000}
+    inv_ids: [dash-features]

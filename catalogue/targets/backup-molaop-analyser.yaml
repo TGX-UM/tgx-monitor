@@ -1,0 +1,70 @@
+id: backup-molaop-analyser
+name: molAOP Analyser database backup
+group: Jobs and backups
+class: backup
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+public: true
+public_summary: The experiments stored in the Molecular AOP Analyser are copied and integrity-checked every night at 03:30 UTC, with a week of copies kept.
+links:
+  - https://molaop-analyser.vhp4safety.nl
+# cronjobs_molaop-analyser-backup (30 3 * * *) runs the Analyser's own
+# scripts/backup_db.py, which logs the row count of each table it checks. Batches
+# expire after 14 days, so the batch count may fall; experiments only grow.
+checks:
+  - id: bk-molaop-analyser-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The nightly backup ran at its slot and logged an integrity-checked copy that kept every experiment.
+    request:
+      service: cronjobs_molaop-analyser-backup
+      grace: 30m
+      marker_re: '\[BACKUP OK\] \S+molAOP_analyser_\d{8}_\d{6}\.db .* integrity ok, (\d+) experiments'
+    assert:
+      - {that: schedule, eq: "30 3 * * *", label: "scheduled daily 03:30 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true, label: "log has '[BACKUP OK] … integrity ok'"}
+      - {that: marker, gte: 164, label: "≥ 164 experiments in the copy"}
+      - {that: marker, monotonic: true}
+    inv_ids: [mab-task-state, mab-job-log, bma-shape]
+
+  - id: bk-molaop-analyser-files
+    kind: file_age
+    every: 1h
+    via: [core]
+    timeout: 2m
+    describe: A backup copy less than 26 hours old exists, about as large as the previous one, with a week of daily copies and no empty files.
+    request: {mount: backups-molaop-analyser, glob: "molAOP_analyser_*.db", small_bytes: 65536}
+    assert:
+      - {that: count, gte: 6, label: "≥ 6 daily copies kept"}
+      - {that: newest_age_h, lt: 26}
+      - {that: newest_size, gt: 120000000, label: "newest copy > 120 MB"}
+      - {that: size_change_pct, gte: -10, label: "not 10% smaller than the previous copy"}
+      - {that: small_count, eq: 0, label: "no empty or truncated copies"}
+    inv_ids: [mab-newest-file, bma-fresh]
+
+  - id: bk-molaop-analyser-integrity
+    kind: sqlite_backup
+    every: 1d
+    via: [core]
+    timeout: 5m
+    describe: The newest backup copy opens as a sound SQLite database with its experiments and batches tables.
+    request: {mount: backups-molaop-analyser, glob: "molAOP_analyser_*.db", tables: [experiments, batches]}
+    assert:
+      - {that: integrity, eq: ok}
+      - {that: tables.experiments, gte: 164}
+      - {that: tables.batches, gte: 1, warn: true, label: "at least one batch (they expire after 14 days)"}
+    inv_ids: [mab-newest-file, mab-job-log]
+
+  - id: bk-molaop-analyser-cache-no-wal
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: The Analyser's reference cache is not in write-ahead-log mode, which is unsafe on the shared cluster file system.
+    request: {mount: molaop-analyser-data, glob: "molaop_cache/*/*.db-[sw][ha][ml]", verify_gzip: false}
+    assert:
+      - {that: count, eq: 0, label: "no -wal or -shm file in the cache shards"}
+    inv_ids: [mab-cache-no-wal]

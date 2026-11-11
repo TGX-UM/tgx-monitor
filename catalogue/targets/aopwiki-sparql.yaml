@@ -1,0 +1,190 @@
+id: aopwiki-sparql
+name: AOP-Wiki RDF SPARQL endpoint
+group: AOP-Wiki RDF
+class: data
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1]
+maintenance: [aopwiki-reload]
+public: true
+public_summary: The AOP-Wiki as queryable RDF in one graph, reloaded every Sunday from the weekly release.
+links:
+  - https://aopwiki.rdf.bigcat-bioinformatics.org/sparql
+  - https://aopwiki-rdf.vhp4safety.nl/sparql
+# Load budget on this Virtuoso (all aopwiki-area checks together): about 55 requests an hour.
+checks:
+  - id: aopwiki-sparql-ask
+    kind: sparql
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The endpoint answers a trivial query within five seconds, through public DNS and on each node.
+    request: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+      - {that: latency_ms, lt: 2000, warn: true}
+      - {that: latency_ms, lt: 5000}
+    inv_ids: [aopwiki-sparql-ask]
+
+  - id: aopwiki-sparql-alias-ask
+    kind: sparql
+    every: 15m
+    describe: The same endpoint also answers under its VHP4Safety name.
+    request: {endpoint: "https://aopwiki-rdf.vhp4safety.nl/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+    inv_ids: [aopwiki-sparql-ask]
+
+  - id: aopwiki-sparql-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the endpoint name that covers both of its names and is not close to expiry.
+    request: {host: aopwiki.rdf.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: aopwiki.rdf.bigcat-bioinformatics.org}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [aopwiki-sparql-tls-redirect]
+
+  - id: aopwiki-rdf-vhp-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the VHP4Safety name of the endpoint, not close to expiry.
+    request: {host: aopwiki-rdf.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: aopwiki-rdf.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [aopwiki-sparql-tls-redirect]
+
+  - id: aopwiki-sparql-http-redirect
+    kind: http
+    every: 1d
+    describe: Plain http on the endpoint name redirects permanently to https.
+    request: {url: "http://aopwiki.rdf.bigcat-bioinformatics.org/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, matches: '^https://aopwiki\.rdf\.bigcat-bioinformatics\.org/'}
+    inv_ids: [aopwiki-sparql-tls-redirect]
+
+  - id: aopwiki-graph-sizes
+    kind: sparql
+    every: 1h
+    describe: The data, VoID and service-description graphs all hold triples, and the data graph did not shrink (an empty store answers 200 too).
+    request:
+      endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/aopwiki/graph-sizes.rq
+      pivot: {key: k, value: n}
+    assert:
+      - {that: by.data, gte: 320000, label: "data graph ≥ 320,000 triples"}
+      - {that: by.data, max_drop_pct: 5, window: 7d}
+      - {that: by.void, gte: 2400, label: "VoID graph ≥ 2,400 triples"}
+      - {that: by.sd, gte: 30, label: "service-description graph ≥ 30 triples"}
+    inv_ids: [aopwiki-sparql-graph-sizes]
+
+  - id: aopwiki-version-master
+    kind: compare
+    every: 1h
+    alert_after: 24h
+    describe: The release loaded in the endpoint is the one on the generator's master branch, and it and the served service description are less than eight days old.
+    request:
+      endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+      left: {sparql: {file: q/aopwiki/pav-version.rq, value: v}}
+      right:
+        http_regex: {url: "https://raw.githubusercontent.com/marvinm2/AOPWikiRDF/master/data/AOPWikiRDF-Void.ttl", re: 'pav:version\s+"([^"]+)"'}
+        via: public
+        on_error: unknown
+      sources:
+        sd_modified:
+          http_regex: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", re: 'dcterms:modified\s+"([^"]+)"', headers: {Accept: text/turtle}}
+    assert:
+      - {that: left, eq_path: right, label: "endpoint pav:version == master pav:version"}
+      - {that: left_date, max_age: {warn: 8d, crit: 15d}}
+      - {that: sd_modified_date, max_age: {warn: 8d, crit: 15d}}
+    inv_ids: [aopwiki-sparql-version-fresh, sd-served]
+
+  - id: aopwiki-load-integrity
+    kind: invariant
+    every: 6h
+    timeout: 60s
+    describe: Every subject the generator described in VoID was loaded, so no load was partial.
+    request:
+      endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+      left: q/aopwiki/distinct-subjects.rq
+      right: {sparql: {file: q/aopwiki/void-distinct-subjects.rq, value: n}}
+    assert:
+      - {that: equal, eq: true, label: "distinct subjects == VoID void:distinctSubjects"}
+      - {that: left, gte: 33000}
+    inv_ids: [aopwiki-sparql-load-integrity]
+
+  - id: aopwiki-entity-counts
+    kind: sparql
+    every: 1h
+    describe: AOPs, Key Events, KERs, stressors and chemicals are all present and did not shrink.
+    request:
+      endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/aopwiki/entity-counts.rq
+      pivot: {key: t, value: n}
+    assert:
+      - {that: by.AdverseOutcomePathway, gte: 590}
+      - {that: by.KeyEvent, gte: 1580}
+      - {that: by.KeyEventRelationship, gte: 2350}
+      - {that: by.C54571, gte: 740, label: "stressors ≥ 740"}
+      - {that: by.CHEMINF_000000, gte: 420, label: "chemicals ≥ 420"}
+      - {that: by.AdverseOutcomePathway, max_drop_pct: 2, window: 7d}
+      - {that: by.KeyEvent, max_drop_pct: 2, window: 7d}
+      - {that: by.KeyEventRelationship, max_drop_pct: 2, window: 7d}
+    inv_ids: [aopwiki-sparql-entity-counts]
+
+  - id: aopwiki-canary-aop1-title
+    kind: sparql
+    every: 1h
+    describe: AOP 1 still carries its known title, a fixed answer.
+    request: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/aopwiki/canary-aop1-title.rq}
+    assert:
+      - {that: boolean, eq: true}
+    inv_ids: [aopwiki-sparql-canaries]
+
+  - id: aopwiki-canary-chebi-iri
+    kind: sparql
+    every: 1h
+    describe: Every ChEBI cross-reference uses the identifiers.org form that WikiPathways federation relies on.
+    request: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/aopwiki/canary-chebi-iri.rq}
+    assert:
+      - {that: first.good, eq_path: first.all, label: "all ChEBI IRIs in identifiers.org CHEBI: form"}
+      - {that: first.all, gte: 420}
+    inv_ids: [aopwiki-sparql-canaries]
+
+  - id: aopwiki-bridgedb-xrefs
+    kind: sparql
+    every: 6h
+    describe: Gene cross-references written through BridgeDb (HGNC, Ensembl, UniProt, NCBI Gene) are all there in normal numbers.
+    request:
+      endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/aopwiki/bridgedb-xrefs.rq
+      pivot: {key: t, value: n}
+    assert:
+      - {that: by.data_2298, gte: 2600, label: "HGNC ≥ 2,600"}
+      - {that: by.data_1033, within_pct_of_path: {path: by.data_2298, pct: 10}, label: "Ensembl within 10% of HGNC"}
+      - {that: by.data_2291, gte: 13000, label: "UniProt ≥ 13,000"}
+      - {that: by.data_1027, gte: 2600, label: "NCBI Gene ≥ 2,600"}
+    inv_ids: [aopwiki-sparql-bridgedb-xrefs]
+
+  - id: aopwiki-conductor-closed
+    kind: security
+    every: 1h
+    describe: The database admin interface is not reachable from the internet under either name.
+    request:
+      url: "https://aopwiki.rdf.bigcat-bioinformatics.org/conductor/"
+      expect_status: [403, 404]
+      absent_markers: ["Virtuoso Conductor"]
+    assert:
+      - {that: exposed, eq: false}
+    inv_ids: []

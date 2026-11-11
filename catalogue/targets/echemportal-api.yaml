@@ -1,0 +1,33 @@
+id: echemportal-api
+name: eChemPortal substance search API
+group: External upstreams
+class: service
+criticality: low
+owners: [marvinm2]
+depends_on: []
+public: true
+public_summary: The OECD eChemPortal substance search, an undocumented API used for chemical name resolution in a Galaxy workflow.
+links:
+  - https://www.echemportal.org/
+notes: >-
+  Third-party and undocumented: a failure is a dependency break to look into, never an
+  outage of ours.
+checks:
+  - id: echemportal-contract
+    kind: http
+    every: 1h
+    describe: A substance search for benzene still returns JSON results in the shape the workflow expects.
+    request:
+      url: "https://www.echemportal.org/echemportal/api/substance-search"
+      params: {query_term: benzene}
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: application/json}
+      - {that: json.page_info, exists: true}
+      - {that: json.results, len_gte: 1}
+      - {that: json.results.0.name, exists: true}
+      - {that: json.results.0.number, exists: true}
+      - {that: json.results.0.number_type, exists: true}
+      - {that: json.results.0.participant_acronym, exists: true}
+    inv_ids: [echemportal-contract]

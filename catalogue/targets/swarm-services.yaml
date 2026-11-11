@@ -1,0 +1,115 @@
+id: swarm-services
+name: Swarm services without a target of their own
+group: Cluster
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+public: false
+public_summary: Every service on the cluster runs all its replicas and none of them keeps crashing.
+links: []
+notes: >-
+  The cluster-wide catch-all. Services that already have replica and crash-loop checks in
+  their own target are ignored here, so one failure raises one incident. A new service
+  appears here automatically until someone gives it a target. toxtempass_minio_init is a
+  one-shot init with restart condition any that completes every few seconds; it is
+  ignored everywhere.
+checks:
+  - id: swarm-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    alert_after: 5m
+    describe: Every long-running service that has no target of its own runs all its replicas.
+    request:
+      check: replicas
+      ignore: &covered
+        - toxtempass_*
+        - traefik
+        - cronjobs_scheduler
+        - "icinga_*"
+        - "aopwiki-snorql_*"
+        - "aopwiki-dashboard_*"
+        - "aopdb_*"
+        - bridgedb
+        - "psnpbind_*"
+        - "biodatafuse_*"
+        - "nanolinks_*"
+        - "nanosafety_*"
+        - "nsdra_*"
+        - "chembl_*"
+        - "sbd4nano_*"
+        - "rdfied_*"
+        - "ontoportal_*"
+        - aopsuite
+        - qsprpred
+        - cdkdepict
+        - cplogd
+        - sombie
+        - flame
+        - mct8-docking
+        - oppbk
+        - xploreaop
+        - robot
+        - llemy
+        - arrayanalysis
+        - r-odaf
+        - ingredient-smiles
+    assert:
+      - {that: not_converged_count, eq: 0}
+      - {that: checked, gte: 8, label: "the uncovered services were found (the Docker API answered in full)"}
+    inv_ids: [svc-replicas-match]
+
+  - id: swarm-crash-loops
+    kind: swarm
+    every: 5m
+    via: [core]
+    describe: No service without a target of its own failed three or more times in the last hour.
+    request:
+      check: crash_loops
+      window: 1h
+      threshold: 3
+      ignore: *covered
+    assert:
+      - {that: crash_looping_count, eq: 0}
+    inv_ids: [svc-restart-loop]
+
+  - id: swarm-killed-tasks
+    kind: swarm
+    every: 1h
+    via: [core]
+    severity: low
+    describe: Shows any task on the whole cluster killed by the kernel (out of memory) or by a segfault in the last day.
+    request: {check: crash_loops, window: 24h, threshold: 3, ignore: [toxtempass_minio_init]}
+    assert:
+      - {that: killed_count, eq: 0, warn: true, label: "no exit 137 or 139 in 24 h"}
+      - {that: crash_looping_count, eq: 0, warn: true, label: "no service failed three times in 24 h"}
+    inv_ids: [svc-crash-oom, svc-unhealthy]
+
+  - id: swarm-restart-policy
+    kind: swarm
+    every: 1d
+    via: [core]
+    severity: low
+    describe: The number of long-running services that stay down after a clean exit (restart only on failure) does not grow.
+    request: {check: restart_policy, ignore: [toxtempass_minio_init]}
+    assert:
+      - {that: not_any_count, lte: 48, warn: true, label: "no more than the 2026-11-10 count (about 45) restart only on failure"}
+    inv_ids: [svc-restart-policy-audit]
+
+  - id: swarm-docs-drift
+    kind: docs_drift
+    every: 7d
+    via: [core]
+    severity: low
+    describe: The cluster's service registry and the services' owner labels agree with what actually runs.
+    request:
+      mount: docs
+      aliases: {toxtempassistant: toxtempass}
+      ignore: [cronjobs, "tgx-monitor*"]
+    assert:
+      - {that: missing_live_count, eq: 0, warn: true, label: "every documented service runs"}
+      - {that: missing_in_docs_count, eq: 0, warn: true, label: "every running service is documented"}
+      - {that: image_mismatch_count, eq: 0, warn: true}
+      - {that: unknown_owner_count, eq: 0, warn: true, label: "every tgx.service.owner label names a handle in owners.yaml"}
+    inv_ids: [svc-owner-label]

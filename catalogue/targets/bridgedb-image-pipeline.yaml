@@ -1,0 +1,60 @@
+id: bridgedb-image-pipeline
+name: BridgeDb image release pipeline
+group: Pipelines
+class: pipeline
+criticality: medium
+owners: [marvinm2, egonw, jmillanacosta]
+depends_on: []
+public: true
+public_summary: A BridgeDb webservice release is built into a tested Docker image on Docker Hub (bigcatum/bridgedb), which the cluster then deploys by hand.
+links:
+  - https://hub.docker.com/r/bigcatum/bridgedb
+  - https://github.com/bridgedb/docker/actions
+  - https://github.com/bridgedb/BridgeDbWebservice/releases
+# A BridgeDbWebservice release should dispatch "Docker build" in bridgedb/docker, which
+# tags <bridgedb>-<webservice> and moves :latest after test-and-promote. Production
+# stays digest-pinned until updated by hand.
+checks:
+  - id: bridgedb-image-latest-is-newest
+    kind: invariant
+    every: 6h
+    describe: The latest tag on Docker Hub is the newest versioned image, so latest points at a tested release.
+    request:
+      left: {http_json: {url: "https://hub.docker.com/v2/repositories/bigcatum/bridgedb/tags/latest", path: digest}, on_error: unknown}
+      right: {http_json: {url: "https://hub.docker.com/v2/repositories/bigcatum/bridgedb/tags?page_size=1&ordering=last_updated&name=-", path: results.0.digest}, on_error: unknown}
+    assert:
+      - {that: equal, eq: true, label: "latest digest == newest version tag digest"}
+    inv_ids: [bridgedb-pipeline-hub-latest-vs-deployed]
+
+  - id: bridgedb-image-release-has-tag
+    kind: compare
+    every: 6h
+    alert_after: 48h
+    describe: The newest webservice release has a Docker image, published within two days of the release.
+    request:
+      left: {http_json: {url: "https://api.github.com/repos/bridgedb/BridgeDbWebservice/releases/latest", path: tag_name}, on_error: unknown}
+      right: {http_json: {url: "https://hub.docker.com/v2/repositories/bigcatum/bridgedb/tags?page_size=1&ordering=last_updated&name=-", path: results.0.name}, extract: '-([0-9][0-9.]*)$', on_error: unknown}
+    assert:
+      - {that: equal, eq: true, label: "newest release == webservice part of the newest image tag"}
+    inv_ids: [bridgedb-pipeline-release-has-image]
+
+  - id: bridgedb-image-verify-workflow
+    kind: gha
+    every: 1h
+    describe: The weekly check of the published image is enabled and passed within the past eight days.
+    request: {repo: bridgedb/docker, workflow: verify-published-image.yml}
+    assert:
+      - {that: state, eq: active, label: "not disabled (GitHub turns schedules off after 60 quiet days)"}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 8d}}
+    inv_ids: [bridgedb-pipeline-verify-workflow-alive]
+
+  - id: bridgedb-image-build
+    kind: gha
+    every: 1h
+    describe: The last image build on the main branch succeeded, so the next release can ship an image.
+    request: {repo: bridgedb/docker, workflow: buildandpush.yml, branch: main}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+    inv_ids: [bridgedb-pipeline-docker-build-last]

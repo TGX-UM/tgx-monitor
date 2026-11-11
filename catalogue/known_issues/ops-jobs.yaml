@@ -1,0 +1,42 @@
+# ops-jobs area: problems we know about (live on 2026-11-11). Each shows on the page
+# without alerting until `until`, then alerts again.
+- target: job-molaop-corpora
+  check: corpora-reactome-current
+  reason: The Reactome corpus is still on v97 while Reactome released v98 on 2026-09-18; the 2026-11-02
+    rebuild failed on a Reactome server error and the 2026-11-09 run found Reactome unavailable.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: job-molaop-corpora
+  check: corpora-go-current
+  reason: The GO corpus is built from the 2026-06-15 release while GO published 2026-07-26; the refresh
+    job compares GO against its own local copy and never sees the drift.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: job-molaop-corpora
+  check: corpora-ker-adjacency-age
+  reason: The precomputed KER adjacency snapshot dates from 2026-03-10 and no job refreshes it.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: job-molaop-corpora
+  check: corpora-ke-aop-membership-age
+  reason: The precomputed Key Event to AOP membership snapshot dates from 2026-07-21 and no job refreshes
+    it.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: job-molaop-corpora
+  check: corpora-oecd-status-age
+  reason: The precomputed OECD status snapshot dates from 2026-05-18 and no job refreshes it.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: bridgedb-image-pipeline
+  check: bridgedb-image-verify-workflow
+  reason: GitHub disabled the weekly published-image check after 60 days without repository activity;
+    it needs to be re-enabled (and kept alive).
+  owner: marvinm2
+  until: '2026-12-31'
+- target: job-wikipathways-switch
+  check: job-wikipathways-switch-layout
+  reason: The new named-graph layout goes live with the first scheduled cutover on 2026-11-12; until then
+    the endpoint serves the old single-graph layout.
+  owner: marvinm2
+  until: '2026-11-14'

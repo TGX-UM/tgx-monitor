@@ -1,0 +1,19 @@
+# AOP-Wiki multi-release: the metadata catalogue describes the newest release graph.
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX dcat: <http://www.w3.org/ns/dcat#>
+SELECT (STR(?ng) AS ?newest) ?version (STR(?pv) AS ?prev) ?n
+       (STR(?version) = STRAFTER(STR(?ng), "/graph/") AS ?version_matches)
+       (STRSTARTS(STR(?pv), "http://aopwiki.org/graph/") && STR(?pv) < STR(?ng) AS ?prev_older)
+WHERE {
+  { SELECT (IRI(MAX(STR(?g))) AS ?ng)
+    WHERE { GRAPH ?g { ?a a <http://aopkb.org/aop_ontology#AdverseOutcomePathway> }
+            FILTER(STRSTARTS(STR(?g), "http://aopwiki.org/graph/")) } }
+  { SELECT (COUNT(*) AS ?n)
+    WHERE { GRAPH <http://aopwiki-multirdf.vhp4safety.nl/metadata> { ?s ?p ?o } } }
+  OPTIONAL {
+    GRAPH <http://aopwiki-multirdf.vhp4safety.nl/metadata> {
+      ?ng owl:versionInfo ?version .
+      OPTIONAL { ?ng dcat:previousVersion ?pv }
+    }
+  }
+}

@@ -1,0 +1,85 @@
+id: toxtempassistant
+name: ToxTempAssistant
+group: VHP4Safety tools
+class: service
+criticality: high
+owners: [johannehouweling, mmarras, egonw, marvinm2]
+# Public DNS still points at the legacy host, not at the swarm, so this target does not
+# depend on edge-tgx1. The swarm copy is the separate target toxtempassistant-swarm.
+depends_on: []
+public: true
+public_summary: An LLM-assisted tool for drafting ToxTemp (OECD GD211) test method descriptions.
+links: [https://toxtempassistant.vhp4safety.nl/]
+checks:
+  - id: toxtemp-root
+    kind: http
+    every: 5m
+    describe: The ToxTempAssistant front page loads with its release number.
+    request: {url: "https://toxtempassistant.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>ToxTempAssistant | LLM-assisted ToxTemp (OECD GD211) drafting"}
+      - {that: body, matches: 'v\d+\.\d+\.\d+', label: shows a release number}
+      - {that: size, gt: 30000}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [toxtemp-public-root]
+
+  - id: toxtemp-pages
+    kind: roundtrip
+    every: 1h
+    describe: The about page, sitemap, robots file and the ToxTemp question list (read from the database) are all served.
+    request:
+      base: https://toxtempassistant.vhp4safety.nl
+      steps:
+        - {url: /about/}
+        - {url: /sitemap.xml}
+        - {url: /robots.txt}
+        - {url: /toxtemp/}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.content_type, contains: xml}
+      - {that: steps.2.status, eq: 200}
+      - {that: steps.3.status, eq: 200}
+      - {that: last.size, gt: 50000, label: the question list renders from the database}
+    inv_ids: [toxtemp-public-pages]
+
+  - id: toxtemp-auth-gate
+
+    public: false  # a security property: its regression is not for the public page
+    kind: http
+    every: 1h
+    describe: Protected pages send an anonymous visitor to the sign-in page.
+    request: {url: "https://toxtempassistant.vhp4safety.nl/stats/", follow: false}
+    assert:
+      - {that: status, eq: 302}
+      - {that: headers.location, contains: "/login/?next=/stats/"}
+    inv_ids: [toxtemp-auth-gate]
+
+  - id: toxtemp-release
+    kind: compare
+    every: 6h
+    alert_after: 24h
+    describe: The public site runs the latest GitHub release within a day of its publication.
+    request:
+      left: {http_regex: {url: "https://toxtempassistant.vhp4safety.nl/", re: '(v\d+\.\d+\.\d+)'}}
+      right:
+        http_json: {url: "https://api.github.com/repos/johannehouweling/ToxTempAssistant/releases/latest", path: tag_name}
+        on_error: unknown
+    assert:
+      - {that: left, eq_path: right}
+    inv_ids: [toxtemp-version-parity]
+
+  - id: toxtemp-tls
+    kind: tls
+    every: 1d
+    via: [public]
+    describe: The public site serves a trusted certificate with time to spare.
+    request: {host: toxtempassistant.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [toxtemp-tls]

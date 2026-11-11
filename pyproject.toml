@@ -1,0 +1,52 @@
+[project]
+name = "tgx-monitor"
+version = "0.1.0"
+description = "Monitoring and alerting for the TGX (Maastricht University) web estate: presence, features, data shapes, reloads, backups."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+  "httpx==0.28.1",
+  "pydantic==2.12.5",
+  "PyYAML==6.0.3",
+  "dnspython==2.8.0",
+  "Jinja2==3.1.6",
+  "starlette==0.50.0",
+  "uvicorn==0.38.0",
+  "itsdangerous==2.2.0",
+  "argon2-cffi==25.1.0",
+  "aiosmtplib==5.0.0",
+  "websockets==15.0.1",
+  "python-multipart==0.0.20",
+  "PyJWT[crypto]==2.10.1",
+  "cryptography==50.0.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.4.2", "pytest-asyncio==1.2.0", "ruff==0.14.4"]
+
+[project.scripts]
+tgx-monitor = "tgx_monitor.cli:main"
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tgx_monitor = ["web/templates/*.html", "web/static/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["live: hits the network (deselected by default)"]
+addopts = "-m 'not live'"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]

@@ -1,0 +1,54 @@
+id: bridgedb-db-release
+name: BridgeDb mapping-database release chain
+group: Pipelines
+class: pipeline
+criticality: medium
+owners: [danidi, DeniseSl22, egonw, marvinm2]
+depends_on: [bridgedb-webservice]
+public: true
+public_summary: New BridgeDb gene mapping databases go from a Zenodo deposit to the data.bridgedb.org catalogue and on to the public webservice.
+links:
+  - https://data.bridgedb.org/gene.json
+  - https://github.com/bridgedb/create-bridgedb-genedb
+# Stages: (1) Zenodo deposit, (2) data.bridgedb.org gene.json, (3) Docker Hub image,
+# (4) what webservice.bridgedb.org serves. Stage 1 to 4 is bridgedb-db-gene-freshness
+# and the metabolite chain is bridgedb-db-metabolite-freshness (area bridgedb).
+checks:
+  - id: bridgedb-release-deposit-listed
+    kind: compare
+    every: 6h
+    describe: Every human Ensembl gene database deposited on Zenodo more than 30 days ago is listed in the data.bridgedb.org catalogue.
+    request:
+      left:
+        http_list:
+          url: https://zenodo.org/api/records
+          params: {q: 'title:"BridgeDb ID Mapping Database" AND created:[* TO now-30d]', sort: mostrecent, size: 25}
+          re: 'Hs_Derby_Ensembl_(\d+)\.bridge'
+          pick: newest
+        on_error: unknown
+      right: {http_list: {url: "https://data.bridgedb.org/gene.json", re: 'Hs_Derby_Ensembl_(\d+)\.bridge', pick: newest}}
+    assert:
+      - {that: relation, in: [equal, right_newer], label: "catalogue lists the newest deposit older than 30 days"}
+    inv_ids: [bridgedb-reload-deposit-vs-catalogue]
+
+  - id: bridgedb-release-catalogue-served
+    kind: compare
+    every: 6h
+    alert_after: 30d
+    describe: The webservice serves the human Ensembl database the catalogue lists, allowing 30 days for a new one to be deployed.
+    request:
+      left: {http_list: {url: "https://data.bridgedb.org/gene.json", re: 'Hs_Derby_Ensembl_(\d+)\.bridge', pick: newest}}
+      right: {http_regex: {url: "https://webservice.bridgedb.org/Human/properties", re: 'DATASOURCEVERSION\t(\d+)'}}
+    assert:
+      - {that: relation, eq: equal, label: "catalogue Ensembl release == served Ensembl release"}
+    inv_ids: [bridgedb-reload-catalogue-vs-served]
+
+  - id: bridgedb-release-genedb-ci
+    kind: gha
+    every: 1h
+    severity: low
+    describe: The build of the gene-database creator passed on its last run; information for the database builders.
+    request: {repo: bridgedb/create-bridgedb-genedb, workflow: maven.yml}
+    assert:
+      - {that: completed_conclusion, eq: success, warn: true}
+    inv_ids: [bridgedb-reload-builder-ci]

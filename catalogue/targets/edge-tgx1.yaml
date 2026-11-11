@@ -1,0 +1,50 @@
+id: edge-tgx1
+name: Web proxy on tgx1
+group: Cluster
+class: infra
+criticality: high
+owners: [egonw, marvinm2]
+depends_on: []
+public: true
+public_summary: The web proxy on the first node, where every public name points, answers HTTPS and redirects plain HTTP.
+links: []
+notes: >-
+  Parent of every routed service: public DNS sends all traffic to tgx1, so when this
+  proxy does not answer, every site is down for the same reason and only this target
+  alerts. The HTTPS probe passes on any answer from the proxy; a dead backend behind the
+  probe host only turns it amber, so one service cannot block all the others.
+checks:
+  - id: edge-tgx1-https
+    kind: http
+    every: 5m
+    via: [tgx1]
+    describe: The proxy on tgx1 answers HTTPS for a routed name within a few seconds.
+    request: {url: "https://platform.vhp4safety.nl/", follow: false, verify: false}
+    assert:
+      - {that: status, exists: true, label: "the proxy answered"}
+      - {that: status, ne: 404, warn: true, label: "the route is loaded (404 means the proxy lost its routers)"}
+      - {that: status, eq: 200, warn: true}
+      - {that: latency_ms, lt: 3000, warn: true}
+      - {that: latency_ms, lt: 15000}
+    inv_ids: [tr-per-node-parity]
+
+  - id: edge-tgx1-http-redirect
+    kind: http
+    every: 15m
+    via: [tgx1]
+    describe: Plain HTTP on tgx1 is redirected permanently to HTTPS on the same name.
+    request: {url: "http://platform.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, matches: '^https://platform\.vhp4safety\.nl/'}
+    inv_ids: [tr-http-redirect]
+
+  - id: edge-tgx1-dashboard-auth
+    kind: security
+    every: 1h
+    via: [tgx1]
+    describe: The proxy's admin dashboard on tgx1 asks for a password and shows nothing without one.
+    timeout: 10s
+    request: {url: "http://{node_ip}:8080/dashboard/", expect_status: [401]}
+    assert:
+      - {that: exposed, eq: false}

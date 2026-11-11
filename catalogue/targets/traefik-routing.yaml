@@ -1,0 +1,74 @@
+id: traefik-routing
+name: Web proxy routing on both nodes
+group: Cluster
+class: infra
+criticality: high
+owners: [egonw, marvinm2]
+depends_on: [edge-tgx1, edge-tgx2]
+maintenance: [wp-switch]
+public: false
+public_summary: Both nodes' web proxies run and route every name to the same data.
+links: []
+notes: >-
+  The proxy runs in global mode, one replica per node. Routes from the dynamic files on
+  Gluster are not reloaded on the other node by an edit (no inotify over GlusterFS), so
+  tgx2 has more than once kept serving an old route (July, 2026-08-12). The parity checks
+  compare what each node serves for the routes that come from those files. The proxy's
+  API needs the admin password and metrics are off, so routes and error rates are not
+  read from the proxy itself.
+checks:
+  - id: traefik-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    describe: The proxy runs on both nodes.
+    request: {check: replicas, services: [traefik]}
+    assert:
+      - {that: by.traefik.running, eq: 2, label: "two proxy tasks running"}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [tr-global]
+
+  - id: traefik-parity-wp-release
+    kind: compare
+    every: 15m
+    describe: Both nodes route the WikiPathways endpoint to a store serving the same release.
+    request:
+      endpoint: "https://sparql.wikipathways.org/sparql"
+      left: {sparql: {file: q/ops-infra/wp-release-dataset.rq, value: d}, via: tgx1, extract: '(\d{8})'}
+      right: {sparql: {file: q/ops-infra/wp-release-dataset.rq, value: d}, via: tgx2, extract: '(\d{8})'}
+    assert:
+      - {that: equal, eq: true, label: "same release on tgx1 and tgx2"}
+      - {that: left, matches: '^\d{8}$', label: "a release date was read"}
+    inv_ids: [tr-file-provider-parity]
+
+  - id: traefik-parity-wp-void
+    kind: compare
+    every: 1h
+    describe: Both nodes serve the same WikiPathways VoID description (same modification date and size).
+    request:
+      left: {http_regex: {url: "https://sparql.wikipathways.org/.well-known/void", re: 'dcterms:modified\s+"([^"]+)"'}, via: tgx1}
+      right: {http_regex: {url: "https://sparql.wikipathways.org/.well-known/void", re: 'dcterms:modified\s+"([^"]+)"'}, via: tgx2}
+      sources:
+        size_tgx1: {http_header: {url: "https://sparql.wikipathways.org/.well-known/void", header: content-length, method: GET}, via: tgx1}
+        size_tgx2: {http_header: {url: "https://sparql.wikipathways.org/.well-known/void", header: content-length, method: GET}, via: tgx2}
+    assert:
+      - {that: equal, eq: true, label: "same dcterms:modified on both nodes"}
+      - {that: size_tgx1, eq_path: size_tgx2, label: "same size on both nodes"}
+      - {that: size_tgx1, gte: 15000, label: "the VoID file is not truncated (18,206 bytes on 2026-11-10)"}
+    inv_ids: [tr-file-provider-parity]
+
+  - id: traefik-parity-aopwiki-sd
+    kind: compare
+    every: 1h
+    describe: Both nodes serve the same AOP-Wiki RDF service description (same modification date and size).
+    request:
+      left: {http_regex: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", re: 'dcterms:modified\s+"([^"]+)"', headers: {Accept: text/turtle}}, via: tgx1}
+      right: {http_regex: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", re: 'dcterms:modified\s+"([^"]+)"', headers: {Accept: text/turtle}}, via: tgx2}
+      sources:
+        size_tgx1: {http_header: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", header: content-length, method: GET, headers: {Accept: text/turtle}}, via: tgx1}
+        size_tgx2: {http_header: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", header: content-length, method: GET, headers: {Accept: text/turtle}}, via: tgx2}
+    assert:
+      - {that: equal, eq: true, label: "same dcterms:modified on both nodes"}
+      - {that: size_tgx1, eq_path: size_tgx2, label: "same size on both nodes"}
+      - {that: size_tgx1, gte: 1000, label: "the service description is not empty (1,734 bytes on 2026-11-10)"}
+    inv_ids: [tr-file-provider-parity]

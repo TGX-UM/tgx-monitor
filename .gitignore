@@ -1,0 +1,16 @@
+# Anchored on purpose: an unanchored `site/` once hid src/<pkg>/site/ from git and ruff.
+/.venv/
+/data/
+/public-out/
+/catalogue/_import/private/
+/secrets/
+/*.db
+/*.db-journal
+__pycache__/
+*.pyc
+/.pytest_cache/
+/.ruff_cache/
+/build/
+/dist/
+*.egg-info/
+/report*.json

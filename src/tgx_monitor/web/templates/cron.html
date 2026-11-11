@@ -1,0 +1,23 @@
+{% extends "private.html" %}
+{% from "_macros.html" import ts %}
+{% macro run_glyph(r) -%}
+{% set k = "operational" if r.state == "complete" and (r.exit_code in (0, none)) else ("down" if r.state in ("failed", "rejected", "missed", "shutdown") or (r.exit_code not in (0, none)) else "unknown") %}<span class="st st--{{ k }} st--sm" title="{{ r.state }} {{ r.started_at or r.scheduled_at }}"><span aria-hidden="true">{{ STATES[k].glyph }}</span><span class="vh"> {{ r.state }}</span></span>
+{%- endmacro %}
+{% block main %}
+<p>Runs of the swarm cron jobs over the last 14 days, from the Docker API and from the jobs' own pushes. Newest first.</p>
+{% for job, runs in jobs.items() %}
+<h2>{{ job }}</h2>
+<p class="runs">{% for r in runs[:60] %}{{ run_glyph(r) }}{% endfor %}</p>
+<details><summary>{{ runs|length }} runs</summary>
+<div class="tbl"><table>
+<thead><tr><th>Scheduled</th><th>Started</th><th>Finished</th><th>Node</th><th>State</th><th>Exit</th><th>Markers</th><th>Source</th></tr></thead>
+<tbody>
+{% for r in runs %}
+<tr><td>{{ ts(r.scheduled_at) }}</td><td>{{ ts(r.started_at) }}</td><td>{{ ts(r.finished_at) }}</td><td>{{ r.node or "" }}</td><td>{{ run_glyph(r) }} {{ r.state or "" }}</td><td>{{ r.exit_code if r.exit_code is not none else "" }}</td><td class="wrapcell">{{ r.markers or "" }}</td><td>{{ r.source or "" }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+</details>
+{% else %}
+<p class="muted">No job runs recorded in the last 14 days.</p>
+{% endfor %}
+{% endblock %}

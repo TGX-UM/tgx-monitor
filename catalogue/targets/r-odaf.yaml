@@ -1,0 +1,124 @@
+id: r-odaf
+name: R-ODAF
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [saadlodhi0916, ext-02, marvinm2]
+depends_on: [edge-tgx1]
+public: true
+public_summary: The R-ODAF RNA-seq differential expression pipeline (DESeq2) as a Shiny web app.
+links: [https://r-odaf.nl/]
+notes: >-
+  The page shell is 1.4 MB, so the frequent probe uses HEAD; a cold start after idling can take
+  about 10 s. Each Shiny session costs the server an R process, so the session check runs every
+  30 minutes and closes the socket as soon as it opens. The service has a 6 GiB memory limit.
+checks:
+  - id: rodaf-head
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    timeout: 30s
+    describe: The app answers through public DNS and on each node.
+    request: {url: "https://r-odaf.nl/", method: HEAD}
+    assert:
+      - {that: status, eq: 200}
+      - {that: latency_ms, lt: 15000, warn: true}
+    inv_ids: [rodaf-presence-both-hosts]
+  - id: rodaf-www-page
+    kind: http
+    every: 1h
+    timeout: 30s
+    describe: The www name serves the R-ODAF app page.
+    request: {url: "https://www.r-odaf.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, matches: '<title>[^<]*R-ODAF[^<]*</title>'}
+    inv_ids: [rodaf-presence-both-hosts]
+  - id: rodaf-http-redirect
+    kind: http
+    every: 1h
+    describe: Plain http is redirected to https on the bare name.
+    request: {url: "http://r-odaf.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, eq: "https://r-odaf.nl/"}
+    inv_ids: [rodaf-presence-both-hosts]
+  - id: rodaf-www-http-redirect
+    kind: http
+    every: 1h
+    describe: Plain http is redirected to https on the www name.
+    request: {url: "http://www.r-odaf.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, eq: "https://www.r-odaf.nl/"}
+    inv_ids: [rodaf-presence-both-hosts]
+  - id: rodaf-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve one trusted certificate covering the bare and www names, with time to spare.
+    request: {host: r-odaf.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: r-odaf.nl}
+      - {that: san, has: www.r-odaf.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [rodaf-presence-both-hosts]
+  - id: rodaf-sockjs-info
+    kind: http
+    every: 15m
+    describe: Shiny Server's SockJS endpoint is up and offers websockets.
+    request: {url: "https://r-odaf.nl/__sockjs__/info", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.websocket, eq: true}
+    inv_ids: [rodaf-sockjs-info]
+  - id: rodaf-session
+    kind: shiny
+    every: 30m
+    timeout: 45s
+    describe: A Shiny session opens over a websocket, so the R side of the app is alive.
+    request: {url: "https://r-odaf.nl/", robust: true, ws_wait: 20}
+    assert:
+      - {that: page_status, eq: 200}
+      - {that: page_has_shiny, eq: true}
+      - {that: websocket, eq: true}
+      - {that: ws_open, eq: true}
+      - {that: ws_ms, lt: 10000, warn: true}
+    inv_ids: [rodaf-shiny-session]
+  - id: rodaf-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    describe: The swarm runs the app's one replica.
+    request: {check: replicas, services: [r-odaf]}
+    assert:
+      - {that: checked, eq: 1, label: "the service exists"}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [rodaf-container-health-oom]
+  - id: rodaf-killed
+    kind: swarm
+    every: 15m
+    via: [core]
+    describe: No app container was killed (out of memory or crashed) in the last day.
+    request: {check: crash_loops, services: [r-odaf], window: 24h, threshold: 3}
+    assert:
+      - {that: killed_count, eq: 0, label: "no exit 137/139 in 24 h (an out-of-memory kill on a large upload)"}
+      - {that: crash_looping_count, eq: 0}
+    inv_ids: [rodaf-container-health-oom]
+  - id: rodaf-upstream-drift
+    kind: compare
+    every: 7d
+    severity: low
+    describe: Shows when the R-ODAF repository has commits that are not in the deployed release tag.
+    request:
+      left: {http_json: {url: "https://api.github.com/repos/TGX-UM/R-ODAF-Shiny/compare/v1.0.0...main", path: ahead_by}, on_error: unknown}
+      right: {const: 0}
+      sources:
+        newest_tag: {http_list: {url: "https://api.github.com/repos/TGX-UM/R-ODAF-Shiny/tags", re: '"name":\s*"(v\d+\.\d+\.\d+)"', pick: newest}, on_error: unknown}
+    assert:
+      - {that: newest_tag, eq: "v1.0.0", warn: true, label: "the deployed tag v1.0.0 is the newest release"}
+      - {that: equal, eq: true, warn: true, label: "main has no commits after the deployed tag"}
+    inv_ids: [rodaf-upstream-drift]

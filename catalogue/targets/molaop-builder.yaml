@@ -1,0 +1,163 @@
+id: molaop-builder
+name: molAOP Builder
+group: Molecular AOP
+class: service
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, wikipathways-sparql, aopwiki-sparql]
+maintenance: [molaop-apply-corpus]
+public: true
+public_summary: The curation app and public API that link AOP Key Events to WikiPathways, Gene Ontology and Reactome.
+links:
+  - https://molaop-builder.vhp4safety.nl/
+  - https://molaop-builder.vhp4safety.nl/api/v1/mappings
+notes: >-
+  /api/v1 is limited to 100 requests per hour per client address and the Analyser shares that
+  bucket, so the v1 checks here make at most 4 calls an hour plus 2 a day. The /health
+  top-level status ignores the nested service flags (#209), so they are asserted one by one.
+checks:
+  - id: mb-home
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The Builder home page loads through public DNS and on each node.
+    request: {url: "https://molaop-builder.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "Molecular AOP Builder"}
+      - {that: latency_ms, lt: 3000, warn: true}
+    inv_ids: [mb-presence-tls]
+  - id: mb-http-redirect
+    kind: http
+    every: 1h
+    describe: Plain http is redirected to https on the same name.
+    request: {url: "http://molaop-builder.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, eq: "https://molaop-builder.vhp4safety.nl/"}
+    inv_ids: [mb-presence-tls]
+  - id: mb-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    request: {host: molaop-builder.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: molaop-builder.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [mb-presence-tls]
+  - id: mb-health
+    kind: http
+    every: 5m
+    describe: The health endpoint reports the database, embeddings, login and every suggestion service as working.
+    request: {url: "https://molaop-builder.vhp4safety.nl/health", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: healthy}
+      - {that: json.services.database, eq: true}
+      - {that: json.services.embeddings_ok, eq: true}
+      - {that: json.services.oauth, eq: true}
+      - {that: json.services.services.mapping_model, eq: true}
+      - {that: json.services.services.proposal_model, eq: true}
+      - {that: json.services.services.pathway_suggestion_service, eq: true}
+      - {that: json.services.services.go_suggestion_service, eq: true}
+      - {that: json.services.services.degraded_embedding_artifacts, len_eq: 0}
+      - {that: json.services.services.ke_snapshot.missing_from_snapshot, not_matches: "KE (?!1419\\b)\\d+",
+         label: "no Key Event missing from the snapshot except the allowlisted KE 1419"}
+      - {that: json.version, matches: '^\d+\.\d+\.\d+$'}
+      - {that: json.build, matches: '^[0-9a-f]{7,40}$'}
+    inv_ids: [mb-health-deep]
+  - id: mb-api-v1-totals
+    kind: roundtrip
+    every: 1h
+    timeout: 45s
+    describe: The public API lists the WikiPathways, GO and Reactome mappings and the mapped AOPs, and none of the totals shrank.
+    request:
+      base: https://molaop-builder.vhp4safety.nl
+      steps:
+        - {url: "/api/v1/mappings?per_page=1"}
+        - {url: "/api/v1/go-mappings?per_page=1"}
+        - {url: "/api/v1/reactome-mappings?per_page=1"}
+        - {url: "/api/v1/aops?mapped_only=true&per_page=1"}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.2.status, eq: 200}
+      - {that: steps.3.status, eq: 200}
+      - {that: steps.0.json.pagination.total, gte: 425, label: "WikiPathways mappings ≥ 425"}
+      - {that: steps.1.json.pagination.total, gte: 340, label: "GO mappings ≥ 340"}
+      - {that: steps.2.json.pagination.total, gte: 12, label: "Reactome mappings ≥ 12"}
+      - {that: steps.3.json.pagination.total, gte: 352, label: "mapped AOPs ≥ 352"}
+      - {that: steps.0.json.pagination.total, max_drop_pct: 3, window: 7d}
+      - {that: steps.1.json.pagination.total, max_drop_pct: 3, window: 7d}
+      - {that: steps.3.json.pagination.total, max_drop_pct: 3, window: 7d}
+      - {that: steps.0.json.data.0.uuid, exists: true}
+      - {that: steps.0.json.data.0.pathway_id, matches: '^WP\d+$'}
+      - {that: steps.0.json.data.0.confidence_level, in: [low, medium, high]}
+      - {that: steps.1.json.data.0.go_term_id, matches: '^GO:\d{7}$'}
+      - {that: steps.2.json.data.0.reactome_id, matches: '^R-HSA-\d+$'}
+    inv_ids: [mb-api-v1-shape]
+  - id: mb-gmt-ke-wp
+    kind: roundtrip
+    every: 6h
+    timeout: 60s
+    describe: The KE-WikiPathways GMT export has its provenance header only at the top and well-formed gene sets.
+    request:
+      steps: [{url: "https://molaop-builder.vhp4safety.nl/exports/gmt/ke-wp"}]
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.first_line, matches: '^# molAOP Builder GMT export'}
+      - {that: last.body, not_matches: '^[^#\n].*\n#', label: "no # line after the first gene set"}
+      - {that: last.body, not_matches: '^[^#\t\n][^\t\n]*(\t[^\t\n]*)?$', label: "every gene set has a name, a description and genes"}
+      - {that: last.lines, gte: 432, label: "≥ 425 gene sets plus the header"}
+      - {that: last.lines, max_drop_pct: 3, window: 7d}
+    inv_ids: [mb-gmt-export-shape]
+  - id: mb-gmt-ke-go
+    kind: roundtrip
+    every: 6h
+    timeout: 60s
+    describe: The KE-GO GMT export has its provenance header only at the top and well-formed gene sets.
+    request:
+      steps: [{url: "https://molaop-builder.vhp4safety.nl/exports/gmt/ke-go"}]
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.first_line, matches: '^# molAOP Builder GMT export'}
+      - {that: last.body, not_matches: '^[^#\n].*\n#', label: "no # line after the first gene set"}
+      - {that: last.body, not_matches: '^[^#\t\n][^\t\n]*(\t[^\t\n]*)?$', label: "every gene set has a name, a description and genes"}
+      - {that: last.lines, gte: 336, label: "≥ 329 gene sets plus the header"}
+      - {that: last.lines, max_drop_pct: 3, window: 7d}
+    inv_ids: [mb-gmt-export-shape]
+  - id: mb-gmt-ke-reactome
+    kind: roundtrip
+    every: 6h
+    timeout: 60s
+    describe: The KE-Reactome GMT export has its provenance header only at the top and well-formed gene sets.
+    request:
+      steps: [{url: "https://molaop-builder.vhp4safety.nl/exports/gmt/ke-reactome"}]
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.first_line, matches: '^# molAOP Builder GMT export'}
+      - {that: last.body, not_matches: '^[^#\n].*\n#', label: "no # line after the first gene set"}
+      - {that: last.body, not_matches: '^[^#\t\n][^\t\n]*(\t[^\t\n]*)?$', label: "every gene set has a name, a description and genes"}
+      - {that: last.lines, gte: 19, label: "≥ 12 gene sets plus the header"}
+    inv_ids: [mb-gmt-export-shape]
+  - id: mb-aop-membership
+    kind: compare
+    every: 1d
+    alert_after: 2d
+    timeout: 60s
+    describe: The Builder knows the same AOPs as AOP-Wiki (within 3), and a known AOP has the same number of Key Events in both.
+    request:
+      left: {http_json: {url: "https://molaop-builder.vhp4safety.nl/api/v1/aops?per_page=1", path: pagination.total}}
+      right: {sparql: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/marvin-apps/aopwiki-aops-with-kes.rq}}
+      sources:
+        builder_aop625: {http_json: {url: "https://molaop-builder.vhp4safety.nl/api/v1/aops?q=AOP%20625", path: data.0.ke_count}}
+        aopwiki_aop625: {sparql: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/marvin-apps/aopwiki-aop625-ke-count.rq}}
+    assert:
+      - {that: left, within_pct_of_path: {path: right, pct: 0.55}, label: "Builder AOP count within 3 of AOP-Wiki AOPs with Key Events"}
+      - {that: builder_aop625, eq_path: aopwiki_aop625, label: "AOP 625 has as many Key Events in the Builder as in AOP-Wiki"}
+    inv_ids: [mb-aop-membership-vs-aopwiki]

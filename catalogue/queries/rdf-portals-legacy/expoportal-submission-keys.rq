@@ -1,0 +1,7 @@
+# Submission metadata values that embed an apikey= parameter (e.g. imported pullLocation
+# URLs). Must stay 0.
+SELECT (COUNT(*) AS ?n) WHERE {
+  GRAPH <http://data.bioontology.org/metadata/OntologySubmission> {
+    ?s ?p ?o FILTER(CONTAINS(STR(?o), "apikey="))
+  }
+}

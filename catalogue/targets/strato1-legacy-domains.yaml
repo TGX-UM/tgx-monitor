@@ -1,0 +1,76 @@
+id: strato1-legacy-domains
+name: Legacy domains on strato-1 (enanomapper.org, dbnp.org, wikipathways.com)
+group: Legacy hosts
+class: infra
+criticality: muted
+owners: [egonw]
+depends_on: []
+public: false
+public_summary: Older department domains hosted on a legacy server, tracked so their registrations are not lost.
+links: []
+notes: >-
+  The web server on the legacy host is down; the sites are tracked, not alerted on.
+  The registrations do alert (low), because enanomapper.org carries the ontology PURLs.
+checks:
+  - id: enanomapper-org-web
+    kind: security
+    every: 1d
+    describe: Records whether https://enanomapper.org/ answers again (known state is that nothing answers).
+    request: {url: "https://enanomapper.org/", expect_status: [200, 301, 302]}
+    assert:
+      - {that: reachable, eq: false, label: "known state: the legacy web server is down"}
+    inv_ids: [strato1-domains-http]
+
+  - id: dbnp-org-web
+    kind: security
+    every: 1d
+    describe: Records whether https://dbnp.org/ answers again (known state is that nothing answers).
+    request: {url: "https://dbnp.org/", expect_status: [200, 301, 302]}
+    assert:
+      - {that: reachable, eq: false, label: "known state: the legacy web server is down"}
+    inv_ids: [strato1-domains-http]
+
+  - id: wikipathways-com-web
+    kind: security
+    every: 1d
+    describe: Records whether https://wikipathways.com/ answers again (known state is that nothing answers).
+    request: {url: "https://wikipathways.com/", expect_status: [200, 301, 302]}
+    assert:
+      - {that: reachable, eq: false, label: "known state: the legacy web server is down"}
+    inv_ids: [strato1-domains-http]
+
+  - id: enanomapper-org-expiry
+    kind: compare
+    every: 1d
+    severity: low
+    describe: The enanomapper.org registration does not run out within the next two months.
+    request:
+      left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/enanomapper.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
+      right: {const: "registration"}
+    assert:
+      - {that: left_age_days, lt: -60}
+    inv_ids: [strato1-domains-expiry]
+
+  - id: dbnp-org-expiry
+    kind: compare
+    every: 1d
+    severity: low
+    describe: The dbnp.org registration does not run out within the next two months.
+    request:
+      left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/dbnp.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
+      right: {const: "registration"}
+    assert:
+      - {that: left_age_days, lt: -60}
+    inv_ids: [strato1-domains-expiry]
+
+  - id: wikipathways-com-expiry
+    kind: compare
+    every: 1d
+    severity: low
+    describe: The wikipathways.com registration does not run out within the next two months.
+    request:
+      left: {http_regex: {url: "https://rdap.verisign.com/com/v1/domain/wikipathways.com", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
+      right: {const: "registration"}
+    assert:
+      - {that: left_age_days, lt: -60}
+    inv_ids: [strato1-domains-expiry]

@@ -1,0 +1,113 @@
+id: biodatafuse
+name: BioDataFuse UI
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [tabbassidaloii, jmillanacosta, youphendriks, egonw]
+depends_on: [edge-tgx1]
+public: true
+public_summary: A web interface for building knowledge graphs from integrated biological data sources.
+links: [https://biodatafuse.bigcat-bioinformatics.org/]
+checks:
+  - id: bdf-root
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The BioDataFuse page loads, through public DNS and on each node.
+    request: {url: "https://biodatafuse.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>BioDataFuse"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [bdf-root]
+
+  - id: bdf-frontend
+    kind: roundtrip
+    every: 15m
+    describe: The front end's application scripts are served.
+    request:
+      base: https://biodatafuse.bigcat-bioinformatics.org
+      steps:
+        - {url: /src/main.js}
+        - {url: /@vite/client}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.content_type, contains: javascript}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.content_type, contains: javascript}
+    inv_ids: [bdf-frontend-modules]
+
+  - id: bdf-backend
+    kind: http
+    every: 15m
+    describe: The backend answers through the front end and asks an anonymous visitor to sign in (a server error would mean it is down).
+    request: {url: "https://biodatafuse.bigcat-bioinformatics.org/api/datasources", parse_json: true}
+    assert:
+      - {that: status, eq: 401}
+      - {that: json.detail, eq: Not authenticated}
+    inv_ids: [bdf-backend-via-proxy]
+
+  - id: bdf-openapi
+    kind: roundtrip
+    every: 1d
+    severity: low
+    describe: The interactive API documentation and the API description it needs are both served.
+    request:
+      base: https://biodatafuse.bigcat-bioinformatics.org
+      steps:
+        - {url: /docs}
+        - {url: /openapi.json}
+    assert:
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.1.status, eq: 200}
+    inv_ids: [bdf-openapi]
+
+  - id: bdf-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    alert_after: 5m
+    public: false
+    describe: Both services of the stack, front end and backend, have their replica running.
+    request: {check: replicas, services: ["biodatafuse_*"]}
+    assert:
+      - {that: not_converged_count, eq: 0}
+      - {that: checked, eq: 2}
+    inv_ids: [bdf-container-health]
+
+  - id: bdf-failover
+    kind: swarm
+    every: 1d
+    via: [core]
+    public: false
+    describe: Both images exist on every node the services may be scheduled to, so a reschedule cannot end in a missing image.
+    request: {check: local_images, services: ["biodatafuse_*"]}
+    assert:
+      - {that: by.biodatafuse_biodatafuse-backend, len_eq: 2}
+      - {that: by.biodatafuse_biodatafuse-vue, len_eq: 2}
+    inv_ids: [bdf-failover-risk]
+
+  - id: bdf-db
+    kind: file_age
+    every: 1d
+    via: [core]
+    public: false
+    describe: The application database is in place and not truncated.
+    request: {mount: biodatafuse-data, glob: biodatafuse.db}
+    assert:
+      - {that: count, eq: 1}
+      - {that: newest_size, gte: 65000}
+    inv_ids: [bdf-db]
+
+  - id: bdf-backup
+    kind: file_age
+    every: 1h
+    via: [core]
+    public: false
+    describe: A copy of the application database less than 26 hours old exists.
+    request: {mount: biodatafuse-backups, glob: "*biodatafuse*"}
+    assert:
+      - {that: count, gte: 1, label: a backup exists}
+      - {that: newest_age_h, lt: 26}
+    inv_ids: [bdf-db]

@@ -1,0 +1,153 @@
+id: nanolinks-kg
+name: NanoLinks knowledge graph (SPARQL endpoint and Snorql UI)
+group: Nanosafety and RDF
+class: data
+criticality: medium
+owners: [egonw, marvinm2, ammar257ammar]
+depends_on: [edge-tgx1, bigcat-domain-dns]
+public: true
+public_summary: The NanoLinks knowledge graph of nanosafety datasets, queryable over SPARQL with a Snorql UI.
+links:
+  - https://nanolinks.rdf.bigcat-bioinformatics.org/
+  - https://nanolinks.rdf.bigcat-bioinformatics.org/sparql
+notes: >-
+  Loaded once; the store on the swarm is the only copy (the import dumps were not
+  migrated). Integrity signal: the in-store VoID void:triples equals the live count.
+  Ammar Ammar (original author) is listed for information only.
+checks:
+  - id: nanolinks-ui
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The Snorql query page loads, through public DNS and on each node.
+    request: {url: "https://nanolinks.rdf.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>SNORQL: A SPARQL Explorer for the NanoLinks Knowledge Graph</title>"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [nanolinks-ui-presence]
+
+  - id: nanolinks-https-redirect
+    kind: http
+    every: 1h
+    describe: Plain HTTP is redirected permanently to HTTPS.
+    request: {url: "http://nanolinks.rdf.bigcat-bioinformatics.org/", follow: false}
+    assert:
+      - {that: status, eq: 301}
+      - {that: headers.location, eq: "https://nanolinks.rdf.bigcat-bioinformatics.org/"}
+    inv_ids: [nanolinks-ui-presence]
+
+  - id: nanolinks-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    request: {host: nanolinks.rdf.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [nanolinks-ui-presence]
+
+  - id: nanolinks-dns
+    kind: dns
+    every: 1h
+    describe: The name resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: nanolinks.rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [bigcat-explicit-records]
+
+  - id: nanolinks-ui-wiring
+    kind: http
+    every: 1h
+    describe: The query UI is wired to the public endpoint and the NanoLinks example queries.
+    request: {url: "https://nanolinks.rdf.bigcat-bioinformatics.org/assets/js/snorql.js"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: 'var _endpoint = "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"'}
+    inv_ids: [nanolinks-ui-wiring]
+
+  - id: nanolinks-sd
+    kind: http
+    every: 1d
+    describe: The endpoint publishes a SPARQL service description that names its public HTTPS address.
+    request:
+      url: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
+      headers: {Accept: text/turtle}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "sd:Service"}
+      - {that: body, matches: '(?s)@prefix (ns\d+):\s*<https://nanolinks\.rdf\.bigcat-bioinformatics\.org/>.*sd:endpoint\s+\1:sparql', label: "sd:endpoint is the public HTTPS URL"}
+    inv_ids: [nanolinks-sd]
+
+  - id: nanolinks-void-vs-live
+    kind: invariant
+    every: 1h
+    describe: The live size of the NanoLinks graph equals the size its own VoID description declares.
+    request:
+      endpoint: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
+      left: q/rdf-portals-legacy/nanolinks-triples.rq
+      right: q/rdf-portals-legacy/nanolinks-void-triples.rq
+    assert:
+      - {that: equal, eq: true, label: "live triples == VoID void:triples"}
+      - {that: left, eq: 6513303, label: "graph size of the one-off load"}
+    inv_ids: [nanolinks-void-vs-live]
+
+  - id: nanolinks-void-endpoint
+    kind: sparql
+    every: 1d
+    public: false
+    describe: The VoID description advertises the public HTTPS endpoint, not the old host.
+    request:
+      endpoint: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/nanolinks-void-endpoint.rq
+    assert:
+      - {that: first.e, eq: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql", warn: true, label: "void:sparqlEndpoint is the public URL"}
+    inv_ids: [nanolinks-void-vs-live]
+
+  - id: nanolinks-graphs
+    kind: sparql
+    every: 1h
+    describe: The four named graphs (NanoLinks, BAO, eNanoMapper, NPO) hold the triples of the one-off load.
+    request:
+      endpoint: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/nanolinks-graphs.rq
+      pivot: {key: k, value: n}
+    assert:
+      - {that: by.nanolinks, eq: 6513303}
+      - {that: by.bao, eq: 111193}
+      - {that: by.enm, eq: 111193}
+      - {that: by.npo, eq: 38714}
+    inv_ids: [nanolinks-graph-shape]
+
+  - id: nanolinks-materials-canary
+    kind: sparql
+    every: 1h
+    describe: The published "materials per dataset" statistics query returns its known answer for all five datasets.
+    request:
+      endpoint: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/nanolinks-materials.rq
+      pivot: {key: datasetLabel, value: materialCount}
+    assert:
+      - {that: count, eq: 5}
+      - {that: by.Dataset 1, eq: 41}
+      - {that: by.Dataset 2, eq: 28}
+      - {that: by.Dataset 3, eq: 170}
+      - {that: by.Dataset 4, eq: 69}
+      - {that: by.Dataset 5, eq: 238}
+    inv_ids: [nanolinks-canary-materials]
+
+  - id: nanolinks-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    public: false
+    describe: The Virtuoso and Snorql services both run their one replica (a completed task is never rescheduled under restart on-failure).
+    request: {check: replicas, services: ["nanolinks_*"]}
+    assert:
+      - {that: checked, eq: 2}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [nanolinks-swarm-replicas]

@@ -1,0 +1,105 @@
+id: backup-toxtempassistant
+name: ToxTempAssistant nightly backup
+group: Jobs and backups
+class: backup
+criticality: high
+owners: [johannehouweling, mmarras, marvinm2, egonw]
+depends_on: [swarm]
+public: true
+public_summary: The ToxTempAssistant database and uploaded files are backed up every night at 02:00, with a month of nightly copies kept.
+links:
+  - https://github.com/johannehouweling/ToxTempAssistant
+# Long-running sidecar toxtempass_backup writes one <YYYY-MM-DD_HHMMSS>/ directory a
+# night (postgres_toxtempass.sql.gz, minio/, manifest.txt, files.txt), retention 31 days,
+# mount backups-toxtempassistant. Never glob into minio/: its folder names are user
+# e-mail addresses.
+checks:
+  - id: bk-toxtemp-sidecar
+    kind: swarm
+    every: 15m
+    via: [core]
+    describe: The backup sidecar service is running its one replica.
+    request: {check: replicas, services: [toxtempass_backup]}
+    assert:
+      - {that: by.toxtempass_backup.running, eq: 1}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [btt-sidecar-running]
+
+  - id: bk-toxtemp-dump
+    kind: file_age
+    every: 1h
+    via: [core]
+    timeout: 2m
+    describe: Last night's database dump exists, is a complete gzip of normal size and holds the full schema up to pg_dump's closing line.
+    request:
+      mount: backups-toxtempassistant
+      glob: "*/postgres_toxtempass.sql.gz"
+      small_bytes: 1000
+      scan: {grep: '^CREATE TABLE', tail: 3}
+    assert:
+      - {that: newest_age_h, lt: 26}
+      - {that: newest_size, gt: 1000000, label: "dump > 1 MB (an empty dump is 20 bytes)"}
+      - {that: size_change_pct, gte: -30, label: "not 30% smaller than the night before"}
+      - {that: gzip_ok, eq: true}
+      - {that: grep_count, gte: 44, label: "≥ 44 CREATE TABLE statements"}
+      - {that: tail, contains: unrestrict, label: "ends with pg_dump's closing line"}
+    inv_ids: [ttbk-latest-age, ttbk-dump-size, ttbk-dump-integrity, btt-fresh, btt-shape]
+
+  - id: bk-toxtemp-history
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: None of the kept nightly dumps is empty, so no night in the past month failed silently.
+    request: {mount: backups-toxtempassistant, glob: "*/postgres_toxtempass.sql.gz", small_bytes: 1000, verify_gzip: false}
+    assert:
+      - {that: small_count, eq: 0, label: "no empty dump among the kept nights"}
+    inv_ids: [ttbk-history-canary]
+
+  - id: bk-toxtemp-retention
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: About a month of nightly backup directories is kept, and the newest has its uploaded-files copy.
+    request: {mount: backups-toxtempassistant, glob: "20??-??-??_??????", type: dir}
+    assert:
+      - {that: count, gte: 28, label: "≥ 28 nights kept"}
+      - {that: count, lte: 33, label: "≤ 33 nights kept (retention 31 days)"}
+      - {that: newest_age_h, lt: 26}
+    inv_ids: [ttbk-retention]
+
+  - id: bk-toxtemp-files-copy
+    kind: file_age
+    every: 1h
+    via: [core]
+    describe: Last night's backup includes the copy of the uploaded files.
+    request: {mount: backups-toxtempassistant, glob: "*/minio", type: dir}
+    assert:
+      - {that: newest_age_h, lt: 26}
+    inv_ids: [ttbk-minio]
+
+  - id: bk-toxtemp-manifest
+    kind: restore_marker
+    every: 1h
+    via: [core]
+    public: false
+    describe: Last night's backup manifest names the right database and its own timestamp.
+    request: {mount: backups-toxtempassistant, file: "*/manifest.txt", format: kv}
+    assert:
+      - {that: exists, eq: true}
+      - {that: mtime_age_h, lt: 26}
+      - {that: postgres_db, eq: toxtempass}
+      - {that: timestamp, matches: '^\d{4}-\d{2}-\d{2}_\d{6}$'}
+      - {that: retention_days, eq: 31}
+    inv_ids: [ttbk-minio, btt-shape]
+
+  - id: bk-toxtemp-offsite
+    kind: file_age
+    every: 1h
+    via: [core]
+    public: false
+    describe: A copy of the backup less than eight days old exists outside the cluster file system.
+    request: {mount: hidrive, glob: "toxtempassistant/*", verify_gzip: false}
+    assert:
+      - {that: count, gte: 1, label: "an off-cluster copy exists"}
+      - {that: newest_age_h, lt: 192, label: "≤ 8 days old"}
+    inv_ids: [ttbk-offsite]

@@ -1,0 +1,4 @@
+# Ontologies registered in the portal (one named graph only: cross-graph aggregates are slow here).
+SELECT (COUNT(?o) AS ?n) WHERE {
+  GRAPH <http://data.bioontology.org/metadata/Ontology> { ?o a <http://data.bioontology.org/metadata/Ontology> }
+}

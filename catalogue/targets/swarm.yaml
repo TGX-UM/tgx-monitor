@@ -1,0 +1,55 @@
+id: swarm
+name: Docker Swarm control plane
+group: Cluster
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: []
+public: true
+public_summary: The two-node cluster that runs the department services has a leader and both nodes are ready.
+links: []
+notes: >-
+  Two managers and no third: when either node's Docker dies the swarm has no leader and
+  nothing can be rescheduled (2026-10-22 on tgx2, 2026-11-02 on tgx1). The per-node agents
+  cross-check each other, and their healthchecks pings are the dead-man switch that keeps
+  alerting when the monitor core itself is gone.
+checks:
+  - id: swarm-nodes
+    kind: swarm
+    every: 5m
+    via: [core]
+    describe: The swarm has exactly one leader, two reachable managers and both nodes ready.
+    request: {check: nodes}
+    assert:
+      - {that: leader_count, eq: 1, label: "exactly one leader (a 503 'no leader' fails the check)"}
+      - {that: node_count, eq: 2}
+      - {that: manager_count, eq: 2}
+      - {that: not_ready, len_eq: 0, label: "every node ready and active"}
+      - {that: unreachable_managers, len_eq: 0}
+      - {that: leader, eq: tgx1, warn: true, label: "the leader is tgx1, where public DNS points"}
+    inv_ids: [ctl-leader, ctl-info]
+
+  - id: swarm-peer-ports
+    kind: host
+    every: 5m
+    via: ["agent:tgx1", "agent:tgx2"]
+    describe: Each node reaches the other on the swarm, gossip, Gluster and HTTPS ports.
+    request: {signal: peer}
+    assert:
+      - {that: peer.all_ok, eq: true, label: "peer ports 2377, 7946, 24007 and 443 all connect"}
+      - {that: peer.ports.2377.ok, eq: true, label: "swarm raft port 2377"}
+      - {that: peer.ports.443.ok, eq: true, label: "the peer's proxy answers on 443"}
+    inv_ids: [ctl-peer-ports, gl-processes-ports]
+
+  - id: swarm-agents
+    kind: host
+    every: 5m
+    via: ["agent:tgx1", "agent:tgx2"]
+    describe: The monitoring agent on each node answers with fresh data and sees the monitor core's heartbeat.
+    request: {signal: agent}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: snapshot_age_s, lt: 180}
+      - {that: heartbeats.core, lt: 300, label: "core heartbeat younger than 5 minutes"}
+      - {that: error_count, eq: 0, warn: true}
+    inv_ids: [ctl-node-agent-heartbeat, ctl-external-deadman]

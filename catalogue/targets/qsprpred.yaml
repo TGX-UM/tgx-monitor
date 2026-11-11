@@ -1,0 +1,88 @@
+id: qsprpred
+name: QSPRpred QSAR prediction service
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [marvinm2, GJPvWesten, LindeSchoenmaker, ozancinar]
+depends_on: [edge-tgx1]
+public: true
+public_summary: QSAR models that predict bioactivity for molecular initiating events, with a web page and a JSON API.
+links: [https://qsprpred.cloud.vhp4safety.nl/]
+checks:
+  - id: qsprpred-root
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The prediction page loads, through public DNS and on each node.
+    request: {url: "https://qsprpred.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/html}
+      - {that: size, gt: 10000}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [qsprpred-root]
+
+  - id: qsprpred-models
+    kind: http
+    every: 1h
+    describe: The model list holds at least nine models, including the thyroid receptor and mGluR models, so the model tiles are not empty.
+    request: {url: "https://qsprpred.cloud.vhp4safety.nl/get_models", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json, len_gte: 9}
+      - {that: json.0.name, exists: true}
+      - {that: json.0.algorithm, exists: true}
+      - {that: json.0.case_study, exists: true}
+      - {that: json.0.target_property_task, exists: true}
+      - {that: json.0.has_qmrf, exists: true}
+      - {that: body, contains: '"TRalpha"'}
+      - {that: body, contains: '"TRbeta"'}
+      - {that: body, contains: '"4or2_final"'}
+      - {that: body, contains: '"8t6j_b_final"'}
+      - {that: body, contains: '"P31644_RF_Model"'}
+    inv_ids: [qsprpred-models-shape]
+
+  - id: qsprpred-predict-tralpha
+    kind: http
+    every: 1h
+    timeout: 1m
+    describe: The thyroid receptor alpha model gives its known prediction for phenol, inside the applicability domain.
+    request:
+      url: "https://qsprpred.cloud.vhp4safety.nl/api"
+      method: POST
+      json: {smiles: ["c1ccccc1O"], models: [TRalpha], format: json}
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: "json.0.prediction (TRalpha)", gte: 6.5311}
+      - {that: "json.0.prediction (TRalpha)", lte: 6.5331}
+      - {that: "json.0.within_applicability_domain (TRalpha)", eq: true}
+      - {that: latency_ms, lt: 15000, warn: true}
+    inv_ids: [qsprpred-predict-tralpha]
+
+  - id: qsprpred-predict-p31644
+    kind: http
+    every: 6h
+    timeout: 1m
+    describe: A second model (P31644 random forest) gives its known prediction for phenol.
+    request:
+      url: "https://qsprpred.cloud.vhp4safety.nl/api"
+      method: POST
+      json: {smiles: ["c1ccccc1O"], models: [P31644_RF_Model], format: json}
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: "json.0.prediction (P31644_RF_Model)", gte: 6.9231}
+      - {that: "json.0.prediction (P31644_RF_Model)", lte: 6.9251}
+    inv_ids: [qsprpred-predict-p31644]
+
+  - id: qsprpred-image
+    kind: registry
+    every: 1d
+    via: [core]
+    describe: The published container image can be pulled, and both nodes hold a copy for a fast reschedule.
+    request: {image: "ghcr.io/vhp4safety/qsprpred-docker:latest"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: missing_on_nodes, len_eq: 0, warn: true}
+    inv_ids: [qsprpred-image-drift, registry-pullability]

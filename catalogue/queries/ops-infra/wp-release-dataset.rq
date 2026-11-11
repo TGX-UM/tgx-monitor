@@ -1,0 +1,10 @@
+# The WikiPathways release the endpoint serves: the VoID dataset IRI carries its date.
+# Used to compare what each node's proxy routes to (the dynamic-file route on tgx2 once
+# kept serving an older backend). One row, cheap.
+PREFIX void: <http://rdfs.org/ns/void#>
+SELECT ?d WHERE {
+  ?d a void:Dataset .
+  FILTER(REGEX(STR(?d), "^https://data.wikipathways.org/[0-9]{8}/rdf/$"))
+}
+ORDER BY DESC(?d)
+LIMIT 1

@@ -1,0 +1,10 @@
+# Sizes of the four named graphs in the NanoLinks store.
+SELECT ?k (COUNT(*) AS ?n) WHERE {
+  VALUES (?g ?k) {
+    (<https://w3id.org/nanolinks/> "nanolinks")
+    (<http://www.bioassayontology.org/bao> "bao")
+    (<http://purl.enanomapper.org/onto/> "enm")
+    (<http://purl.bioontology.org/ontology/npo> "npo")
+  }
+  GRAPH ?g { ?s ?p ?o }
+} GROUP BY ?k

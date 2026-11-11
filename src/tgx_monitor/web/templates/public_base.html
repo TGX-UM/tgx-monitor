@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block banner %}
+<p class="strip {{ 'strip--amber' if m.stale else 'strip--fresh' }}" role="status">
+Data as of <time datetime="{{ m.now.isoformat(timespec='seconds') }}">{{ m.now.strftime("%Y-%m-%d %H:%M") }} UTC</time>.
+{% if m.tick %}Checks last ran <time datetime="{{ m.tick.isoformat(timespec='seconds') }}">{{ m.tick.strftime("%Y-%m-%d %H:%M") }} UTC</time>.{% else %}No check cycle recorded yet.{% endif %}
+{% if m.stale %} <strong>The monitor itself has not run recently; states below may be out of date.</strong>{% endif %}
+</p>
+{% endblock %}
+{% block footer %}Department of Translational Genomics, Maastricht University. This page is regenerated every minute; <a href="{{ root }}status.json">status.json</a> has the same data.{% endblock %}

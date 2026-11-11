@@ -1,0 +1,156 @@
+id: psnpbind
+name: PSnpBind (web app, REST API and docking files)
+group: Nanosafety and RDF
+class: service
+criticality: medium
+owners: [egonw, marvinm2, ammar257ammar]
+depends_on: [edge-tgx1, bigcat-domain-dns]
+public: true
+public_summary: PSnpBind, a database of how pocket SNPs change protein-ligand binding affinity, with a web app, REST API and docking files.
+links:
+  - https://psnpbind.bigcat-bioinformatics.org/
+  - https://psnpbind.org/
+notes: >-
+  The database re-seeds from its image on every start, so its row counts are constants.
+  Known upstream bug, not monitored: /proteinLigands returns 500. psnpbind.org is
+  registered outside the department; a renewal or transfer has to be arranged.
+checks:
+  - id: psnpbind-ui
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The PSnpBind home page loads on the department name, through public DNS and on each node.
+    request: {url: "https://psnpbind.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>PSnpBind - Pocket SNPs effect on protein-ligand binding affinity</title>"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [psnpbind-presence]
+
+  - id: psnpbind-apex
+    kind: http
+    every: 15m
+    describe: The same page loads on its own domain, psnpbind.org.
+    request: {url: "https://psnpbind.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>PSnpBind - Pocket SNPs effect on protein-ligand binding affinity</title>"}
+    inv_ids: [psnpbind-presence]
+
+  - id: psnpbind-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the department name, with time to spare.
+    request: {host: psnpbind.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [psnpbind-presence]
+
+  - id: psnpbind-apex-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for psnpbind.org, with time to spare.
+    request: {host: psnpbind.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [psnpbind-presence]
+
+  - id: psnpbind-dns
+    kind: dns
+    every: 1h
+    describe: The department name resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: psnpbind.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [bigcat-explicit-records]
+
+  - id: psnpbind-api-counts
+    kind: roundtrip
+    every: 1h
+    timeout: 1m
+    describe: The REST API reports the full number of proteins, ligands, mutated proteins and their ligand pairs.
+    request:
+      base: "https://psnpbind.bigcat-bioinformatics.org"
+      steps:
+        - {url: /proteins}
+        - {url: /ligands, params: {size: "1"}}
+        - {url: /mutatedProteins, params: {size: "1"}}
+        - {url: /mutatedProteinLigands, params: {size: "1"}}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.json.page.totalElements, eq: 26}
+      - {that: steps.1.json.page.totalElements, eq: 27048}
+      - {that: steps.2.json.page.totalElements, eq: 731}
+      - {that: steps.3.json.page.totalElements, eq: 563384}
+    inv_ids: [psnpbind-api-shape]
+
+  - id: psnpbind-protein-canary
+    kind: roundtrip
+    every: 15m
+    describe: A known protein (1OWH, urokinase) comes back from the API and its web page renders.
+    request:
+      base: "https://psnpbind.bigcat-bioinformatics.org"
+      steps:
+        - {url: /proteins/1owh}
+        - {url: /protein/1owh}
+    assert:
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.json.uniprotId, eq: P00749}
+      - {that: steps.0.json.proteinName, matches: '^Urokinase-type plasminogen activator'}
+      - {that: steps.1.status, eq: 200}
+    inv_ids: [psnpbind-canary-protein]
+
+  - id: psnpbind-docking-file
+    kind: http
+    every: 1h
+    describe: A known docking result file is served whole, so the docking-files volume is mounted.
+    request: {url: "https://psnpbind.bigcat-bioinformatics.org/files/1owh/proteins/1owh_protein_Repair_20/vina/1c5z_ligand_similar_11/1c5z_ligand_similar_11_min_docking.pdbqt"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: size, eq: 6039}
+    inv_ids: [psnpbind-docking-file]
+
+  - id: psnpbind-www
+    kind: tls
+    every: 1d
+    describe: www.psnpbind.org serves a trusted certificate for its name, not the proxy's default one.
+    request: {host: www.psnpbind.org}
+    assert:
+      - {that: is_traefik_default, eq: false}
+      - {that: verified, eq: true}
+    inv_ids: [psnpbind-www-host]
+
+  - id: psnpbind-domain-expiry
+    kind: compare
+    every: 1d
+    describe: The psnpbind.org registration does not run out within the next two months.
+    request:
+      left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/psnpbind.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
+      right: {const: "registration"}
+    assert:
+      - {that: left_age_days, lt: -90, warn: true, label: "more than 90 days to expiry"}
+      - {that: left_age_days, lt: -60, label: "more than 60 days to expiry"}
+    inv_ids: [psnpbind-domain-expiry]
+
+  - id: psnpbind-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    public: false
+    describe: The web app and its database both run their one replica.
+    request: {check: replicas, services: ["psnpbind_*"]}
+    assert:
+      - {that: checked, eq: 2}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [psnpbind-swarm-replicas]

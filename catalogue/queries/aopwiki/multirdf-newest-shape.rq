@@ -1,0 +1,12 @@
+# AOP-Wiki multi-release: class counts in the newest release graph.
+PREFIX aopo: <http://aopkb.org/aop_ontology#>
+SELECT ?t (COUNT(DISTINCT ?s) AS ?n)
+WHERE {
+  { SELECT (IRI(MAX(STR(?g))) AS ?ng)
+    WHERE { GRAPH ?g { ?a a aopo:AdverseOutcomePathway }
+            FILTER(STRSTARTS(STR(?g), "http://aopwiki.org/graph/")) } }
+  VALUES ?t { aopo:AdverseOutcomePathway aopo:KeyEvent aopo:KeyEventRelationship
+              <http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C54571> }
+  GRAPH ?ng { ?s a ?t }
+}
+GROUP BY ?t

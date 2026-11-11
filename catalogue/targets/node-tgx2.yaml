@@ -1,0 +1,91 @@
+id: node-tgx2
+name: Host tgx2
+group: Cluster
+class: infra
+criticality: high
+owners: [egonw, marvinm2]
+depends_on: []
+public: false
+public_summary: The tgx2 server's disks, memory and load are healthy.
+links: []
+notes: >-
+  Xeon E3-1230 v6, 8 threads, 32 GB, SATA RAID1; the failover node. RAID, memory, load and boot time come from /proc through the unprivileged
+  agent on the node. NTP, pending reboots, daemon state and disk health need root and
+  come from the status file that a root cron writes every 5 minutes (host/README.md);
+  until Egon installs that cron the root-status check fails on "present".
+checks:
+  - id: node-tgx2-raid
+    kind: host
+    every: 5m
+    via: ["agent:tgx2"]
+    describe: Every software RAID array on tgx2 has all its disks.
+    request: {signal: mdstat}
+    assert:
+      - {that: degraded_count, eq: 0, label: "no degraded md array"}
+      - {that: array_count, gte: 3, label: "all three arrays seen"}
+    inv_ids: [host-raid]
+
+  - id: node-tgx2-disk
+    kind: host
+    every: 5m
+    via: ["agent:tgx2"]
+    describe: The root filesystem and the Gluster brick on tgx2 have space and inodes to spare.
+    request: {signal: disk}
+    assert:
+      - {that: disk.rootfs.used_pct, lt: 80, warn: true}
+      - {that: disk.rootfs.used_pct, lt: 90}
+      - {that: disk.brick.used_pct, lt: 80, warn: true}
+      - {that: disk.brick.used_pct, lt: 90}
+      - {that: disk.rootfs.inodes_used_pct, lt: 80}
+      - {that: disk.brick.inodes_used_pct, lt: 80}
+    inv_ids: [host-disk, gl-usage]
+
+  - id: node-tgx2-memory
+    kind: host
+    every: 5m
+    via: ["agent:tgx2"]
+    describe: "tgx2 has at least 4 GB of memory available and swap is not exhausted."
+    request: {signal: memory}
+    assert:
+      - {that: mem.available_gb, gte: 4}
+      - {that: mem.swap_free_pct, gte: 25, warn: true}
+      - {that: mem.swap_free_pct, gte: 10}
+    inv_ids: [host-memory-swap]
+
+  - id: node-tgx2-load
+    kind: host
+    every: 5m
+    via: ["agent:tgx2"]
+    describe: The 15-minute load on tgx2 stays within what its CPUs can carry.
+    request: {signal: load}
+    assert:
+      - {that: load.per_cpu15, lt: 1.5, warn: true}
+      - {that: load.per_cpu15, lt: 3}
+    inv_ids: [host-load]
+
+  - id: node-tgx2-boot
+    kind: host
+    every: 5m
+    via: ["agent:tgx2"]
+    describe: "tgx2 has not rebooted in the last hour."
+    request: {signal: boot}
+    assert:
+      - {that: boot.uptime_h, gt: 1, label: "up for more than an hour (an unexpected reboot stays red for an hour)"}
+    inv_ids: [host-unexpected-reboot]
+
+  - id: node-tgx2-root-status
+    kind: host
+    every: 5m
+    via: ["agent:tgx2"]
+    describe: The root status file for tgx2 is fresh and shows the clock in sync, Docker running and systemd responsive.
+    request: {signal: root_status}
+    assert:
+      - {that: present, eq: true, label: "the root cron writes its status file"}
+      - {that: age_h, lt: 0.25}
+      - {that: dockerd, eq: active}
+      - {that: systemd.responsive, eq: true, label: "systemd answers (it hung on 2026-11-02)"}
+      - {that: ntp.synchronized, eq: true}
+      - {that: md_degraded, len_eq: 0}
+      - {that: reboot_required, eq: false, warn: true, label: "no kernel reboot pending"}
+      - {that: errors, len_eq: 0, warn: true}
+    inv_ids: [host-ntp, host-reboot-required]

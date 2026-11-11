@@ -1,0 +1,71 @@
+id: vhp-platform-pseudo
+name: VHP4Safety platform test instance
+group: VHP4Safety platform
+class: service
+criticality: low
+owners: [ozancinar, johannehouweling, marvinm2]
+depends_on: [edge-tgx1, github-raw]
+public: true
+public_summary: The test instance of the VHP4Safety platform, which runs the newest published release.
+links: [https://pseudo.platform.vhp4safety.nl/]
+notes: >-
+  Runs the :latest tag with no digest in the service spec, so any new task (crash, node
+  restart, reschedule) silently pulls whatever :latest is. Its certificate renews on a
+  separate cycle from the other hosts.
+checks:
+  - id: pseudo-home
+    kind: http
+    every: 15m
+    describe: The test instance home page loads.
+    request: {url: "https://pseudo.platform.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "Virtual Human Platform"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [pseudo-presence-tls]
+  - id: pseudo-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    request: {host: pseudo.platform.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: pseudo.platform.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [pseudo-presence-tls]
+  - id: pseudo-catalogue-rendered
+    kind: compare
+    every: 1d
+    timeout: 30s
+    describe: Every tool in the VHP4Safety cloud catalogue appears on the test instance's tools page, and no other.
+    request:
+      left: {http_list: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", re: '"id":\s*"([^"]+)"', pick: all}, on_error: unknown}
+      right: {http_list: {url: "https://pseudo.platform.vhp4safety.nl/tools", re: "location\\.href='/tools/([^']+)'", pick: all}}
+    assert:
+      - {that: equal, eq: true, label: "tools page lists exactly the catalogue's tools"}
+    inv_ids: [pseudo-catalogue]
+  - id: pseudo-image-latest
+    kind: registry
+    every: 1d
+    via: [core]
+    severity: low
+    describe: Shows when the test instance no longer runs the image that Docker Hub's latest tag points to.
+    request: {image: "vhp4safety/virtual-human-platform:latest"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: node_digest_match, not_contains: "False", warn: true,
+         label: "every node holding :latest holds the registry's digest"}
+    inv_ids: [pseudo-vs-latest-and-main]
+  - id: pseudo-digest-drift
+    kind: digest_drift
+    every: 1h
+    via: [core]
+    severity: low
+    describe: Shows when the test instance starts running a different build without a deploy.
+    request: {services: [vhp-platform-pseudo]}
+    assert:
+      - {that: changed_count, eq: 0, warn: true}
+    inv_ids: [pseudo-vs-latest-and-main]

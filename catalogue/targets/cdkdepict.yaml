@@ -1,0 +1,86 @@
+id: cdkdepict
+name: CDK Depict
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [egonw, johnmay, marvinm2]
+depends_on: [edge-tgx1]
+public: true
+public_summary: Draws chemical structure images from SMILES, as SVG or PNG, for people and for other tools.
+links: [https://cdkdepict.cloud.vhp4safety.nl/depict.html]
+checks:
+  - id: cdkdepict-root
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The front page ends on the depiction form over HTTPS, through public DNS and on each node.
+    request: {url: "https://cdkdepict.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/html}
+      - {that: body, contains: depict}
+      - {that: final_url, eq: "https://cdkdepict.cloud.vhp4safety.nl/depict.html"}
+      - {that: redirect_count, lte: 2}
+      - {that: redirects.0, not_matches: '^http://', warn: true, label: "the first redirect does not drop to plain http (it does today)"}
+    inv_ids: [cdkdepict-root-redirect]
+
+  - id: cdkdepict-svg
+    kind: http
+    every: 15m
+    describe: Ethanol is drawn as a small, well-formed SVG image within three seconds.
+    request:
+      url: "https://cdkdepict.cloud.vhp4safety.nl/depict/bow/svg"
+      params: {smi: CCO, abbr: "on", hdisp: bridgehead, showtitle: "false", zoom: "1.6"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: image/svg+xml}
+      - {that: body, matches: '\A<\?xml'}
+      - {that: body, contains: "<svg"}
+      - {that: body, contains: viewBox}
+      - {that: size, gt: 500}
+      - {that: size, lt: 10000}
+      - {that: latency_ms, lt: 3000, warn: true}
+    inv_ids: [cdkdepict-svg]
+
+  - id: cdkdepict-png
+    kind: http
+    every: 1h
+    describe: Phenol is drawn as a PNG image.
+    request:
+      url: "https://cdkdepict.cloud.vhp4safety.nl/depict/bow/png"
+      params: {smi: c1ccccc1O}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: image/png}
+      - {that: body, matches: '\A.PNG', label: PNG signature}
+      - {that: size, gt: 1000}
+    inv_ids: [cdkdepict-png]
+
+  - id: cdkdepict-invalid-smiles
+    kind: http
+    every: 1h
+    describe: A broken SMILES gets the parser's own error message, so the parser is alive and not hidden behind a generic error page.
+    request:
+      url: "https://cdkdepict.cloud.vhp4safety.nl/depict/bow/svg"
+      params: {smi: C1CC}
+    assert:
+      - {that: status, eq: 400}
+      - {that: body, contains: Invalid SMILES}
+    inv_ids: [cdkdepict-invalid-smiles]
+
+  - id: cdkdepict-version
+    kind: compare
+    every: 7d
+    severity: low
+    describe: The deployed CDK version is the one recorded here, and an upstream image push is flagged for review.
+    request:
+      left: {http_regex: {url: "https://cdkdepict.cloud.vhp4safety.nl/depict.html", re: 'CDK (v\d+(?:\.\d+)+)'}}
+      right: {const: v2.12}
+      sources:
+        upstream:
+          http_json: {url: "https://hub.docker.com/v2/repositories/simolecule/cdkdepict/tags?page_size=1&ordering=last_updated", path: results.0.last_updated}
+          on_error: unknown
+    assert:
+      - {that: equal, eq: true, label: "deployed CDK is v2.12 (update this check after a redeploy)"}
+      - {that: upstream_age_days, gt: 30, warn: true, label: "upstream pushed a new image in the last 30 days: review the pinned digest"}
+    inv_ids: [cdkdepict-version-drift]

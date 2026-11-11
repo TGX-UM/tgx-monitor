@@ -1,0 +1,77 @@
+id: aopdb-sparql
+name: AOP-DB RDF SPARQL endpoint
+group: AOP-Wiki RDF
+class: data
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1]
+public: true
+public_summary: The US EPA AOP-DB as queryable RDF, a static load that does not change between reloads.
+links:
+  - https://aopdb.rdf.bigcat-bioinformatics.org/sparql
+# AOP-DB reuses the graph IRI http://aopwiki.org/ of the AOP-Wiki data graph, so every
+# query here is pinned to the aopdb host and expects AOP-DB's own numbers.
+checks:
+  - id: aopdb-presence
+    kind: roundtrip
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The endpoint's home page and its query form both load, through public DNS and on each node.
+    request:
+      base: "https://aopdb.rdf.bigcat-bioinformatics.org"
+      steps:
+        - {url: /}
+        - {url: /sparql}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200, label: "home page answers 200"}
+      - {that: last.status, eq: 200}
+      - {that: last.body, contains: "Default Data"}
+    inv_ids: [aopdb-presence]
+
+  - id: aopdb-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the endpoint name, not close to expiry.
+    request: {host: aopdb.rdf.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: aopdb.rdf.bigcat-bioinformatics.org}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [aopdb-presence]
+
+  - id: aopdb-http-redirect
+    kind: http
+    every: 1d
+    describe: Plain http on the endpoint name redirects permanently to https.
+    request: {url: "http://aopdb.rdf.bigcat-bioinformatics.org/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, matches: '^https://aopdb\.rdf\.bigcat-bioinformatics\.org/'}
+    inv_ids: [aopdb-presence]
+
+  - id: aopdb-triple-count
+    kind: sparql
+    every: 1h
+    describe: The store holds exactly the triples of the AOP-DB load, so nothing was lost or half-loaded.
+    request: {endpoint: "https://aopdb.rdf.bigcat-bioinformatics.org/sparql", file: q/aopwiki/aopdb-triple-count.rq}
+    assert:
+      - {that: status, eq: 200}
+      - {that: first.n, eq: 12702192, label: "exactly 12,702,192 triples"}
+    inv_ids: [aopdb-triple-count]
+
+  - id: aopdb-class-canary
+    kind: sparql
+    every: 1d
+    describe: Two class sizes in the static load (Key Events and protein interactions) have their known values.
+    request:
+      endpoint: "https://aopdb.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/aopwiki/aopdb-class-canary.rq
+      pivot: {key: t, value: n}
+    assert:
+      - {that: by.KeyEvent, eq: 157}
+      - {that: by.MI_1047, eq: 763446, label: "protein interactions (MI_1047) == 763,446"}
+    inv_ids: [aopdb-class-canary]

@@ -1,0 +1,45 @@
+# Who is alerted about what. Public: GitHub handles and names only.
+# E-mail addresses live in the tgxmon_contacts Docker secret, keyed by these handles.
+#
+# notify: false means the person is shown as owner but receives nothing until they
+# have agreed to (an onboarding issue asks them). Marvin and Egon are on from day one.
+# Owners without a GitHub account get an opaque alias (ext-NN) and e-mail only.
+admins: [marvinm2, egonw]
+fallback: [marvinm2]
+infra_cc: [egonw]
+people:
+  marvinm2: {name: Marvin Martens, notify: true}
+  egonw: {name: Egon Willighagen, notify: true}
+  ozancinar: {name: Ozan Cinar, notify: false}
+  ammar257ammar: {name: Ammar Ammar, notify: false}
+  jmillanacosta: {name: Javier Millan Acosta, notify: false}
+  johannehouweling: {name: Jente Houweling, notify: false}
+  mmarras: {name: Matthias Arras, notify: false}
+  mkutmon: {name: Martina Kutmon, notify: false}
+  AlexanderPico: {name: Alexander Pico, notify: false}
+  khanspers: {name: Kristina Hanspers, notify: false}
+  youphendriks: {name: Youp Hendriks, notify: false}
+  danidi: {name: Daniela Digles, notify: false}
+  tabbassidaloii: {name: Tooba Abbassi-Daloii, notify: false}
+  DeniseSl22: {name: Denise Slenter, notify: false}
+  Maddocent: {name: Marc Teunis, notify: false}
+  abhishek-chattopadhyay: {name: Abhishek Chattopadhyay, notify: false}
+  SidraAdil: {name: Sidra Adil, notify: false}
+  saadlodhi0916: {name: Saad Lodhi, notify: false}
+  fehrhart: {name: Friederike Ehrhart, notify: false}
+  jarnokoetsier: {name: Jarno Koetsier, notify: false}
+  ditilliof: {name: Francesco Di Tillio, notify: false}
+  GJPvWesten: {name: Gerard van Westen, notify: false}
+  LindeSchoenmaker: {name: Linde Schoenmaker, notify: false}
+  johnmay: {name: John Mayfield, notify: false}
+  olas: {name: Ola Spjuth, notify: false}
+  StaffanArvidsson: {name: Staffan Arvidsson McShane, notify: false}
+  marcvdijk: {name: Marc van Dijk, notify: false}
+  manuelpastor: {name: Manuel Pastor, notify: false}
+  TmoerWUR: {name: Thijs Moerenhout, notify: false}
+  ext-01: {name: David Poole, notify: false, github: false}
+  ext-02: {name: Danyel Jennen, notify: false, github: false}
+  ext-03: {name: MarieCo (Hogeschool Utrecht), notify: false, github: false}
+  ext-04: {name: LO-TGX (local IT support), notify: false, github: false}
+  Finterly: {name: Finterly, notify: false}
+  YuanyuanDuan1: {name: Yuanyuan Duan, notify: false}

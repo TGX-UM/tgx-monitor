@@ -1,0 +1,117 @@
+id: robot
+name: ROBOT (PBPK/qAOP RO-Crate metadata builder)
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [abhishek-chattopadhyay, marvinm2, egonw]
+depends_on: [edge-tgx1]
+public: true
+public_summary: Builds FAIR RO-Crate metadata for PBPK and qAOP models, with ORCID sign-in.
+links: [https://robot.vhp4safety.nl/ui]
+checks:
+  - id: robot-ui
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The ROBOT web interface loads, through public DNS and on each node.
+    request: {url: "https://robot.vhp4safety.nl/ui"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>ROBOT"}
+      - {that: size, gt: 20000}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [robot-ui]
+
+  - id: robot-openapi
+    kind: http
+    every: 1d
+    describe: The API description is the PBPK FAIR Platform API with at least 45 paths.
+    request: {url: "https://robot.vhp4safety.nl/openapi.json", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.info.title, eq: PBPK FAIR Platform API (v1)}
+      - {that: json.paths, len_gte: 45}
+    inv_ids: [robot-openapi]
+
+  - id: robot-auth-config
+
+    public: false  # a security property: its regression is not for the public page
+    kind: http
+    every: 1h
+    describe: Sign-in uses production ORCID with the right callback address and secure cookies.
+    request: {url: "https://robot.vhp4safety.nl/v1/auth/config", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.orcid_use_sandbox, eq: false}
+      - {that: json.orcid_base_url, eq: "https://orcid.org"}
+      - {that: json.redirect_uri, eq: "https://robot.vhp4safety.nl/v1/auth/orcid/callback"}
+      - {that: json.cookie_secure, eq: true}
+    inv_ids: [robot-auth-config]
+
+  - id: robot-auth-gate
+
+    public: false  # a security property: its regression is not for the public page
+    kind: roundtrip
+    every: 15m
+    describe: The backend answers an anonymous visitor as signed out and asks for sign-in on protected forms.
+    request:
+      base: https://robot.vhp4safety.nl
+      steps:
+        - {url: /v1/auth/me}
+        - {url: /v1/form-spec/pbpk}
+    assert:
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.json.authenticated, eq: false}
+      - {that: steps.1.status, eq: 401}
+      - {that: last.json.login_url, eq: /v1/auth/login}
+    inv_ids: [robot-auth-gate]
+
+  - id: robot-data
+    kind: file_age
+    every: 1d
+    via: [core]
+    public: false
+    describe: The user database is in place and not truncated.
+    request: {mount: robot-data, glob: pbpk.db, verify_gzip: false}
+    assert:
+      - {that: count, eq: 1}
+      - {that: newest_size, gte: 100000}
+    inv_ids: [robot-data-presence]
+
+  - id: robot-backup
+    kind: file_age
+    every: 1h
+    via: [core]
+    public: false
+    describe: A copy of the user database less than 26 hours old exists.
+    request: {mount: robot-backups, glob: "*pbpk*"}
+    assert:
+      - {that: count, gte: 1, label: a backup exists}
+      - {that: newest_age_h, lt: 26}
+      - {that: small_count, eq: 0}
+    inv_ids: [robot-data-presence]
+
+  - id: robot-pin
+    kind: swarm
+    every: 1d
+    via: [core]
+    public: false
+    describe: The locally built image is still on the node the service is pinned to.
+    request: {check: local_images, services: [robot]}
+    assert:
+      - {that: by.robot, has: tgx1}
+    inv_ids: [robot-pin-risk]
+
+  - id: robot-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the name, with time to spare.
+    request: {host: robot.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [robot-tls]

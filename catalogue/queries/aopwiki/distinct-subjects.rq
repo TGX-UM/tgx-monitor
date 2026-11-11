@@ -1,0 +1,4 @@
+# AOP-Wiki RDF: distinct subjects actually loaded in the data graph.
+SELECT (COUNT(DISTINCT ?s) AS ?n)
+FROM <http://aopwiki.org/>
+WHERE { ?s ?p ?o }

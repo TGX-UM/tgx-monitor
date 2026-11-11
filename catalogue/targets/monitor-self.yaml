@@ -1,0 +1,76 @@
+id: monitor-self
+name: The monitor itself
+group: Cluster
+class: infra
+criticality: high
+owners: [marvinm2]
+depends_on: []
+public: true
+public_summary: The monitor runs its checks on schedule and can reach the internet, so what this page shows is current.
+links: []
+notes: >-
+  The alert engine's vantage rule reads the self checks: when many unrelated targets fail
+  at once and a self check fails too, one "monitor vantage degraded" alert is sent
+  instead of fifty. Outside watchdogs (the agents' healthchecks pings and the delivery
+  watchdog) cover the case where this process is gone and cannot check itself.
+checks:
+  - id: self-vantage
+    kind: self
+    every: 5m
+    via: [core]
+    describe: The monitor reaches a public DNS resolver and GitHub, so its own network path is fine.
+    request: {signal: vantage}
+    assert:
+      - {that: vantage_ok, eq: true}
+      - {that: dns_tcp_ok, eq: true}
+      - {that: github_ok, eq: true}
+    inv_ids: [al-push-endpoints]
+
+  - id: self-tick
+    kind: self
+    every: 5m
+    via: [core]
+    describe: The scheduler ticked within the last two minutes.
+    request: {signal: tick}
+    assert:
+      - {that: tick_age_s, lt: 120}
+
+  - id: self-outbox
+    kind: self
+    every: 5m
+    via: [core]
+    describe: Alerts leave the outbox within half an hour.
+    request: {signal: outbox}
+    assert:
+      - {that: oldest_pending_age_min, lt: 30}
+
+  - id: monitor-selftest
+    kind: self
+    every: 5m
+    via: [core]
+    describe: The deliberate test failure is switched off (test-incident --break turns this red to exercise the whole alert chain).
+    request: {signal: selftest}
+    assert:
+      - {that: broken, eq: false}
+
+  - id: self-gh-token-expiry
+    kind: self
+    every: 1d
+    via: [core]
+    describe: The monitor's GitHub token is valid for at least another month.
+    request: {signal: token, secret: tgxmon_gh_token}
+    assert:
+      - {that: valid, eq: true}
+      - {that: days_left, gte: 30, warn: true}
+      - {that: days_left, gte: 7}
+
+  - id: self-ghcr-pat-expiry
+    kind: self
+    every: 1d
+    via: [core]
+    describe: The read-only registry token used for private images is valid for at least another month.
+    request: {signal: token, secret: tgxmon_ghcr_read_pat}
+    assert:
+      - {that: valid, eq: true}
+      - {that: days_left, gte: 30, warn: true}
+      - {that: days_left, gte: 7}

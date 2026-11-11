@@ -1,0 +1,76 @@
+id: compoundwiki
+name: VHP4Safety CompoundWiki
+group: VHP4Safety tools
+class: data
+criticality: medium
+owners: [egonw]
+depends_on: []
+public: true
+public_summary: The VHP4Safety compound wiki on wikibase.cloud, with chemical identifiers and a SPARQL query service.
+links:
+  - https://compoundcloud.wikibase.cloud/wiki/Main_Page
+  - https://compoundcloud.wikibase.cloud/query/sparql
+notes: >-
+  Hosted externally on wikibase.cloud, not on the cluster. Content changes through
+  community and bot edits.
+checks:
+  - id: compoundwiki-home
+    kind: http
+    every: 15m
+    timeout: 30s
+    describe: The wiki's main page loads.
+    request: {url: "https://compoundcloud.wikibase.cloud/wiki/Main_Page"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: latency_ms, lt: 10000, warn: true}
+    inv_ids: [compoundwiki-presence]
+
+  - id: compoundwiki-search
+    kind: http
+    every: 1h
+    describe: The wiki's entity search finds caffeine as its known item.
+    request:
+      url: "https://compoundcloud.wikibase.cloud/w/api.php"
+      params: {action: wbsearchentities, search: caffeine, language: en, format: json, limit: "3"}
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.search.0.id, eq: Q2026}
+      - {that: json.search.0.display.label.value, eq: Caffeine}
+    inv_ids: [compoundwiki-search]
+
+  - id: compoundwiki-caffeine-canary
+    kind: sparql
+    every: 1h
+    describe: The query service returns caffeine's known InChIKey and CAS number.
+    request:
+      endpoint: "https://compoundcloud.wikibase.cloud/query/sparql"
+      file: q/rdf-portals-legacy/compoundwiki-caffeine.rq
+    assert:
+      - {that: status, eq: 200}
+      - {that: first.inchikey, eq: RYYVLZVUVIJVGH-UHFFFAOYSA-N}
+      - {that: first.cas, eq: 58-08-2}
+    inv_ids: [compoundwiki-canary-caffeine]
+
+  - id: compoundwiki-size
+    kind: sparql
+    every: 6h
+    describe: The number of items with an English label has not dropped.
+    request:
+      endpoint: "https://compoundcloud.wikibase.cloud/query/sparql"
+      file: q/rdf-portals-legacy/compoundwiki-labels.rq
+    assert:
+      - {that: first.n, gte: 5480, label: "at least 5480 labelled items (5775 today)"}
+      - {that: first.n, max_drop_pct: 5, window: 7d}
+    inv_ids: [compoundwiki-shape]
+
+  - id: compoundwiki-freshness
+    kind: sparql
+    every: 6h
+    describe: The query service reflects edits; amber when nothing has changed for half a year.
+    request:
+      endpoint: "https://compoundcloud.wikibase.cloud/query/sparql"
+      file: q/rdf-portals-legacy/compoundwiki-last-modified.rq
+    assert:
+      - {that: first.last, max_age: {warn: 180d}}
+    inv_ids: [compoundwiki-freshness]

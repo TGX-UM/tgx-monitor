@@ -1,0 +1,84 @@
+# Pages that only a real browser can judge: they answer 200 with an empty frame when
+# their JavaScript breaks. Chromium does not run on the cluster; GitHub Actions runs
+# scripts/browser_checks.py over this list every 6 h (.github/workflows/browser.yml)
+# and commits browser/latest.json to the `history` branch. The `browser_artifact`
+# checks in catalogue/targets/ read that file (request: {url, page: <id below>}).
+#
+# Per page:
+#   url, describe          what to open and why it matters
+#   wait_for               CSS selector that must appear (and be visible)
+#   min_count              at least this many matches of wait_for (default 1)
+#   marks                  CSS selector for drawn data (plot traces, numbers); must be >= 1
+#   title_contains         substring of <title>
+#   text_contains          substring of the rendered body text
+#   scroll                 scroll to the bottom first (lazy-loaded content)
+#   max_console_errors     fail above this many console errors (default: report only)
+#   timeout                seconds for the whole page (default 60)
+pages:
+  - id: aopwiki-dashboard-trends
+    url: https://aopwiki-dashboard.vhp4safety.nl/trends
+    describe: The trend plots draw data, not empty frames (Plotly renders client-side).
+    wait_for: ".js-plotly-plot .main-svg"
+    min_count: 3
+    marks: ".js-plotly-plot .scatterlayer .trace, .js-plotly-plot .barlayer .trace"
+    title_contains: AOP-Wiki
+    scroll: true
+    timeout: 120
+
+  - id: vhp-platform-tools
+    url: https://platform.vhp4safety.nl/tools
+    describe: The VHP4Safety tool catalogue renders its cards and the search box works.
+    wait_for: ".card .card-title"
+    min_count: 12
+    marks: "#searchInput, #search-input"
+    title_contains: VHP4Safety
+    timeout: 60
+
+  - id: wikipathways-upload-landing
+    url: https://upload.wikipathways.org/
+    describe: The WikiPathways curation portal front page renders its call to action.
+    wait_for: "main#main .hero h1"
+    marks: "a.btn--github"
+    text_contains: Upload, update, and review
+    timeout: 60
+
+  - id: molaop-builder-landing
+    url: https://molaop-builder.vhp4safety.nl/
+    describe: The molAOP Builder landing page shows its live mapping counts.
+    wait_for: ".stat-card__value"
+    min_count: 4
+    marks: ".stat-card__value"
+    title_contains: Molecular AOP Builder
+    timeout: 60
+
+  - id: oppbk
+    url: https://oppbk.cloud.vhp4safety.nl/
+    describe: The OP PBK model app starts its Shiny session and draws its outputs.
+    wait_for: ".shiny-bound-output"
+    min_count: 7
+    title_contains: OP PBK model
+    timeout: 60
+
+  - id: xploreaop
+    url: https://xploreaop.cloud.vhp4safety.nl/
+    describe: xploreAOP renders its chemical network canvas.
+    wait_for: "#chem canvas"
+    marks: "#chem canvas"
+    title_contains: xploreaop
+    timeout: 60
+
+  - id: arrayanalysis
+    url: https://arrayanalysis.vhp4safety.nl/
+    describe: ArrayAnalysis starts its Shiny session and binds its inputs and outputs.
+    wait_for: ".shiny-bound-output"
+    min_count: 100
+    title_contains: ArrayAnalysis
+    timeout: 60
+
+  - id: llemy
+    url: https://llemy.vhp4safety.nl/
+    describe: Llemy's Streamlit app renders its login screen without console errors.
+    wait_for: "[data-testid=stApp]"
+    text_contains: API Key Login
+    max_console_errors: 0
+    timeout: 60

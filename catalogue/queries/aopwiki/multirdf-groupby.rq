@@ -1,0 +1,14 @@
+# AOP-Wiki multi-release: AOPs per release graph, one row per graph, plus the number of
+# graphs. A Virtuoso GROUP BY regression (issue #58) repeated rows; then rows > total.
+PREFIX aopo: <http://aopkb.org/aop_ontology#>
+SELECT ?graph ?n ?total
+WHERE {
+  { SELECT ?graph (COUNT(DISTINCT ?aop) AS ?n)
+    WHERE { GRAPH ?graph { ?aop a aopo:AdverseOutcomePathway }
+            FILTER(STRSTARTS(STR(?graph), "http://aopwiki.org/graph/")) }
+    GROUP BY ?graph }
+  { SELECT (COUNT(DISTINCT ?g) AS ?total)
+    WHERE { GRAPH ?g { ?x a aopo:AdverseOutcomePathway }
+            FILTER(STRSTARTS(STR(?g), "http://aopwiki.org/graph/")) } }
+}
+ORDER BY ?graph

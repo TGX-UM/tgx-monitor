@@ -1,0 +1,55 @@
+id: job-ontoportal-fairness-cache
+name: ExpoPortal O'FAIRe score-cache rebuild
+group: Jobs and backups
+class: cron
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [swarm, expoportal-api]
+public: true
+public_summary: Every night at 03:30 UTC a cluster job recomputes the FAIRness scores of every ontology in ExpoPortal.
+links:
+  - https://data.expoportal.biohackeu.bigcat-bioinformatics.org/ofaire?ontologies=all
+# Stack-defined swarm-cronjob service ontoportal_fairness-cache (30 3 * * *). A stack
+# redeploy removes its task history, so the recorder must have picked the run up
+# within its 2-minute cycle; the output file's age (mount ontoportal-fairness, not yet
+# in stack.yml) is the second witness.
+checks:
+  - id: fairness-cache-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The nightly score-cache rebuild ran at its slot and exited cleanly.
+    request:
+      service: ontoportal_fairness-cache
+      grace: 30m
+    assert:
+      - {that: schedule, eq: "30 3 * * *", label: "scheduled daily 03:30 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+    inv_ids: [fairness-cache-ran, fc-task-evidence]
+
+  - id: fairness-cache-file
+    kind: file_age
+    every: 1h
+    via: [core]
+    describe: The score cache was rewritten in the last 26 hours and is not empty.
+    request: {mount: ontoportal-fairness, glob: "save.json", verify_gzip: false}
+    assert:
+      - {that: count, eq: 1}
+      - {that: newest_age_h, lt: 26}
+      - {that: newest_size, gt: 1000000, label: "> 1 MB"}
+    inv_ids: [fairness-cache-file-age, fc-output-fresh]
+
+  - id: fairness-cache-coverage
+    kind: http
+    every: 1h
+    describe: The FAIRness scores are served from the rebuilt cache, shown here for the AOP Ontology.
+    # The all-ontologies answer (about 6 MB) is larger than the 4 MiB the HTTP client
+    # keeps, so coverage of every ontology cannot be counted from it.
+    request: {url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/ofaire?ontologies=AOPO", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status.success, eq: true}
+      - {that: json.status.useCache, eq: true, label: "served from the score cache"}
+      - {that: json.ontologies.AOPO.normalizedScore, gte: 1, label: "AOPO has a score"}
+    inv_ids: [fairness-cache-coverage]

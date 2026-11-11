@@ -1,0 +1,73 @@
+id: wikipathways-snorql
+name: WikiPathways Snorql query UI
+group: WikiPathways
+class: service
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, wikipathways-sparql, github-raw]
+public: true
+public_summary: The browser query editor at sparql.wikipathways.org, with example queries loaded from the SPARQLQueries repository.
+links: [https://sparql.wikipathways.org/]
+notes: >-
+  The example tree is fetched in the browser from wikipathways/SPARQLQueries on GitHub, so the
+  examples depend on GitHub raw. The AOP-Wiki and nanosafety Snorql overlays build from the same
+  snorql-ui base image, so a broken base image reaches them too. The known-answer query that the
+  UI's "Genes of a Pathway" example runs is checked on the endpoint (wp-sparql-wp254).
+checks:
+  - id: snorql-page
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The query UI page loads with its configuration script, through public DNS and on each node.
+    request: {url: "https://sparql.wikipathways.org/", headers: {Accept: text/html}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/html}
+      - {that: body, contains: "<title>WikiPathways SNORQL</title>"}
+      - {that: body, contains: "assets/js/config.js"}
+    inv_ids: [snorql-page]
+
+  - id: snorql-config
+    kind: http
+    every: 1h
+    describe: The UI is configured for the WikiPathways endpoint and the SPARQLQueries example repository.
+    request: {url: "https://sparql.wikipathways.org/assets/js/config.js"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: 'endpoint: "https://sparql.wikipathways.org/sparql/"'}
+      - {that: body, contains: 'examplesRepo: "https://github.com/wikipathways/SPARQLQueries"'}
+      - {that: body, contains: 'examplesBranch: "master"'}
+    inv_ids: [snorql-config]
+
+  - id: snorql-examples-source
+    kind: http
+    every: 1h
+    describe: An example query the UI deep-links to is still published with its parameter header.
+    request: {url: "https://raw.githubusercontent.com/wikipathways/SPARQLQueries/master/D.%20General/GenesofPathway.rq"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "# param: pathwayId"}
+    inv_ids: [snorql-examples-source]
+
+  - id: snorql-image
+    kind: registry
+    every: 1h
+    via: [core]
+    describe: The pinned UI image can be pulled from the registry, and both nodes have it.
+    request: {image: "ghcr.io/wikipathways/snorql-ui:1.3.0"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: missing_on_nodes, len_eq: 0}
+    inv_ids: [snorql-image-drift]
+
+  - id: snorql-image-drift
+    kind: digest_drift
+    every: 1h
+    via: [core]
+    severity: low
+    describe: The UI service keeps running the image it was deployed with (a change is shown, for information).
+    request: {services: [wikipathways_wikipathways-snorql]}
+    assert:
+      - {that: changed_count, eq: 0, warn: true}
+      - {that: redeployed, len_eq: 0, warn: true}
+    inv_ids: [snorql-image-drift]

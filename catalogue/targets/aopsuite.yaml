@@ -1,0 +1,116 @@
+id: aopsuite
+name: AOP-Suite (AOP Network Builder)
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [jmillanacosta, ozancinar, marvinm2]
+depends_on: [edge-tgx1, aopwiki-sparql]
+public: true
+public_summary: The AOP Network Builder, a web app that assembles AOP networks from AOP-Wiki and compound data.
+links: [https://aopsuite.cloud.vhp4safety.nl/]
+checks:
+  - id: aopsuite-root
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The AOP Network Builder page loads in full, through public DNS and on each node.
+    request: {url: "https://aopsuite.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/html}
+      - {that: body, contains: "<title>AOP Network Builder"}
+      - {that: size, gt: 50000}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [aopsuite-root]
+
+  - id: aopsuite-static
+    kind: http
+    every: 1h
+    describe: The network drawing library the page relies on is served.
+    request: {url: "https://aopsuite.cloud.vhp4safety.nl/static/js/cytoscape.min.js"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: size, gt: 100000}
+    inv_ids: [aopsuite-static]
+
+  - id: aopsuite-session-status
+    kind: http
+    every: 15m
+    describe: The application backend answers its session status call with JSON.
+    request: {url: "https://aopsuite.cloud.vhp4safety.nl/session/status", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.active, in: [true, false]}
+    inv_ids: [aopsuite-session-status]
+
+  - id: aopsuite-debugger-off
+    kind: security
+    every: 1h
+    describe: The development debugger console stays switched off.
+    request:
+      url: "https://aopsuite.cloud.vhp4safety.nl/console"
+      expect_status: [404]
+      absent_markers: ["Interactive Console", "Werkzeug Debugger"]
+    assert:
+      - {that: exposed, eq: false}
+    inv_ids: [aopsuite-debugger-off]
+
+  - id: aopsuite-upstream-aopwiki
+    kind: sparql
+    every: 1h
+    timeout: 30s
+    describe: The AOP-Wiki RDF endpoint still describes AOP 1 with its first and last key events, which every network build reads.
+    request:
+      endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/vhp-tools/aop1-network.rq
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+      - {that: latency_ms, lt: 10000, warn: true}
+    inv_ids: [aopsuite-dep-aopwiki-sparql]
+
+  - id: aopsuite-upstream-compoundcloud
+    kind: sparql
+    every: 1h
+    timeout: 30s
+    describe: The compound wiki query service that supplies chemical data to the builder answers.
+    request:
+      endpoint: "https://compoundcloud.wikibase.cloud/query/sparql"
+      ask: "ASK { ?s ?p ?o }"
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+    inv_ids: [aopsuite-dep-compoundcloud]
+
+  # Disabled until the owners agree: /session/start creates server-side state and
+  # every new session allocates an in-memory logger that is never freed.
+  - id: aopsuite-network-query
+    kind: roundtrip
+    every: 6h
+    enabled: false
+    timeout: 1m
+    describe: With one session, a network built from AOP 1 has a molecular initiating event and at least five elements.
+    request:
+      base: https://aopsuite.cloud.vhp4safety.nl
+      steps:
+        - {method: POST, url: /session/start, json: {project_name: tgx-monitor}}
+        - method: POST
+          url: /add_aop_network_data
+          json: {query_type: aop, values: "https://identifiers.org/aop/1", status: "", cy_elements: {elements: []}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.json.success, eq: true}
+      - {that: last.json.elements_count, gte: 5}
+      - {that: last.json.report.mie_count, gte: 1}
+    inv_ids: [aopsuite-feature-network-query]
+
+  - id: aopsuite-image
+    kind: registry
+    every: 1d
+    via: [core]
+    describe: The published container image can be pulled, and both nodes hold a copy for a fast reschedule.
+    request: {image: "ghcr.io/vhp4safety/aopsuite:latest"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: missing_on_nodes, len_eq: 0, warn: true}
+    inv_ids: [aopsuite-image-drift, registry-pullability]

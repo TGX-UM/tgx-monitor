@@ -1,0 +1,170 @@
+/* tgx-monitor: one stylesheet for the public status page and the private UI.
+
+   Tokens from the tgx-outputs house style (extra.css): UM navy, the logo's blue and
+   orange, links darkened until they clear 4.5:1, a slate dark mode that follows the
+   reader's setting. Status is never carried by colour alone: every state has a word
+   and a glyph, the day bars also change height, and the charts carry text labels.
+   No inline styles anywhere, so the CSP can stay strict. */
+
+@font-face { font-family: "Open Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/open-sans-400.woff2") format("woff2"); }
+@font-face { font-family: "Open Sans"; font-style: italic; font-weight: 400; font-display: swap;
+  src: url("fonts/open-sans-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Open Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("fonts/open-sans-600.woff2") format("woff2"); }
+@font-face { font-family: "Open Sans"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("fonts/open-sans-700.woff2") format("woff2"); }
+
+:root {
+  --tgx-navy: #001c3d;
+  --tgx-blue: #00a2db;
+  --tgx-orange: #e84e10;
+  --bg: #ffffff;
+  --tile: #f5f7fa;
+  --fg: #333333;
+  --head: var(--tgx-navy);
+  --muted: #565c66;          /* >= 4.5:1 on --bg and --tile */
+  --line: #d9dde3;
+  --link: #1e5a96;
+  --link-hover: #d2460f;
+  --ok: #0076a8;             /* "fresh": house blue, not a pass/fail green */
+  --warn: #b07d1e;
+  --warn-ink: #8a6116;      /* amber as text: #b07d1e is only 3.4:1 */
+  --down: #c2410c;
+  --maint: #5b5f97;
+  --none: #9aa3ae;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e2129;
+    --tile: #262a33;
+    --fg: #e2e5ea;
+    --head: #e2e5ea;
+    --muted: #a7b0bd;
+    --line: #3a404c;
+    --link: #4fc3f0;
+    --link-hover: #ff8a5c;
+    --ok: #4fc3f0;
+    --warn: #e0b04e;
+    --warn-ink: #e0b04e;
+    --down: #ff8a5c;
+    --maint: #a9adf0;
+    --none: #5d6573;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 400 1rem/1.6 "Open Sans", system-ui, sans-serif;
+  display: flex; flex-direction: column; min-height: 100vh;
+}
+main { flex: 1; padding-bottom: 2.5rem; }
+.wrap { width: 100%; max-width: 78rem; margin: 0 auto; padding: 0 1rem; }
+h1, h2, h3 { color: var(--head); font-weight: 600; line-height: 1.25; }
+h1 { font-size: 1.6rem; margin: 1.4rem 0 .8rem; }
+h2 { font-size: 1.2rem; margin: 2rem 0 .6rem; }
+h3 { font-size: 1rem; margin: 1.2rem 0 .4rem; }
+a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+a:hover, a:focus { color: var(--link-hover); }
+code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85em; }
+.muted { color: var(--muted); }
+.small { font-size: .82rem; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip { position: absolute; left: -999px; top: 0; background: #fff; color: var(--tgx-navy); padding: .5rem 1rem; z-index: 10; }
+.skip:focus { left: 1rem; }
+
+/* Header and sections, on UM navy in both themes. */
+.hdr { background: var(--tgx-navy); color: #fff; }
+.hdr__in { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; padding-top: .6rem; padding-bottom: .6rem; }
+.hdr__brand { display: flex; align-items: center; gap: .8rem; color: #fff; text-decoration: none; }
+.hdr__brand:hover, .hdr__brand:focus { color: #fff; }
+.hdr__logo { height: 2.6rem; width: auto; display: block; }
+.hdr__name { font-weight: 600; font-size: 1.05rem; }
+.hdr__acct { display: flex; align-items: center; gap: .6rem; font-size: .85rem; }
+.nav { background: #00132a; }
+.nav__in { display: flex; flex-wrap: wrap; gap: .3rem; padding-top: .4rem; padding-bottom: .4rem; }
+.nav__link { color: #ffffffd9; text-decoration: none; font-size: .85rem; padding: .2rem .6rem; border-radius: .3rem; border: 1px solid transparent; }
+.nav__link:hover, .nav__link:focus-visible { color: #fff; border-color: #ffffff5c; }
+.nav__link--active { background: var(--tgx-blue); color: var(--tgx-navy); font-weight: 600; }
+
+.ftr { background: var(--tgx-navy); color: #ffffffd9; font-size: .8rem; }
+.ftr a { color: #fff; }
+.ftr__in { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 2rem; padding-top: 1.2rem; padding-bottom: 1.2rem; }
+.ftr__um { height: 1.9rem; width: auto; display: block; }
+.ftr p { margin: 0; }
+
+/* Status pills: glyph + word, colour third. */
+.st { display: inline-flex; align-items: center; gap: .3rem; padding: 0 .5rem; border-radius: 1rem; border: 1px solid currentColor; font-size: .85rem; font-weight: 600; white-space: nowrap; }
+.st--sm { padding: 0 .25rem; font-size: .8rem; }
+.st__x { font-weight: 400; }
+.st--operational { color: var(--ok); }
+.st--degraded { color: var(--warn-ink); }
+.st--down { color: var(--down); }
+.st--maintenance { color: var(--maint); }
+.st--unknown { color: var(--muted); border-style: dashed; }
+.counts { display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; list-style: none; padding: 0; margin: 0 0 1rem; }
+
+/* Strips: freshness and messages, as in tgx-outputs. */
+.strip { border-left: 4px solid; padding: .6rem .9rem; border-radius: .25rem; margin: 1rem 0; font-size: .9rem; }
+.strip--fresh { border-color: var(--ok); background: #0076a814; }
+.strip--amber { border-color: var(--warn); background: #b07d1e1c; }
+.strip--red { border-color: var(--down); background: #c2410c1c; }
+
+/* Tables scroll inside their box instead of pushing the page sideways. */
+.tbl { overflow-x: auto; margin: .4rem 0 1rem; border: 1px solid var(--line); border-radius: .4rem; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th, td { text-align: left; vertical-align: top; padding: .4rem .6rem; border-bottom: 1px solid var(--line); }
+th { background: var(--tile); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.wrapcell { overflow-wrap: anywhere; min-width: 12rem; }
+.kv { display: grid; grid-template-columns: minmax(7rem, 12rem) 1fr; gap: .35rem 1rem; margin: 0 0 1rem; }
+.kv dt { font-weight: 600; color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 40em) { .kv { grid-template-columns: 1fr; } .kv dd { margin-bottom: .4rem; } }
+
+.pre { background: var(--tile); border: 1px solid var(--line); border-radius: .4rem; padding: .8rem; overflow: auto; max-height: 32rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pre--copy { user-select: all; }
+.pre--sm { max-height: 12rem; max-width: 30rem; font-size: .75rem; }
+.runs { display: flex; flex-wrap: wrap; gap: .15rem; margin: .4rem 0; }
+.calls { padding-left: 1.2rem; overflow-wrap: anywhere; }
+.problems { color: var(--down); }
+
+/* Forms. */
+.form { display: grid; gap: .4rem; max-width: 36rem; margin: .5rem 0 1.5rem; }
+.form--narrow { max-width: 22rem; }
+.form label { font-weight: 600; font-size: .9rem; margin-top: .4rem; }
+.form label.check { font-weight: 400; margin: 0; display: flex; gap: .4rem; align-items: center; }
+.form input:not([type="checkbox"]), .form select { font: inherit; padding: .4rem .5rem; border: 1px solid var(--muted); border-radius: .3rem; background: var(--bg); color: var(--fg); width: 100%; }
+fieldset { border: 1px solid var(--line); border-radius: .4rem; margin: .4rem 0; }
+.btn { font: inherit; font-weight: 600; cursor: pointer; padding: .4rem 1rem; border-radius: .3rem; border: 1px solid var(--tgx-navy); background: var(--tgx-navy); color: #fff; justify-self: start; margin-top: .6rem; }
+.btn:hover { background: #123a63; }
+.btn--ghost { background: transparent; border-color: currentColor; color: inherit; margin: 0; padding: .15rem .6rem; font-weight: 400; }
+
+/* Public service list and 90-day bars. */
+.svc { list-style: none; padding: 0; margin: 0; display: grid; gap: .8rem; }
+.svc__row { border: 1px solid var(--line); border-radius: .5rem; background: var(--tile); padding: .7rem .9rem; }
+.svc__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .4rem; margin-bottom: .4rem; }
+.svc__name { font-weight: 600; }
+.svc__foot { display: flex; justify-content: space-between; gap: .5rem; }
+.incidents { padding-left: 1.2rem; }
+.bars { width: 100%; height: 2.2rem; display: block; }
+.bar--ok { fill: var(--ok); }
+.bar--warn { fill: var(--warn); }
+.bar--down { fill: var(--down); }
+.bar--none { fill: var(--none); }
+.spark { width: 100%; height: 5rem; display: block; background: var(--tile); border-radius: .3rem; }
+.spark__line { fill: none; stroke: var(--link); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+
+/* Keyboard focus: a ring, never only a colour change. */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+summary:focus-visible, .pre:focus-visible {
+  outline: 2px solid var(--link); outline-offset: 2px; border-radius: .25rem;
+}
+.hdr a:focus-visible, .nav a:focus-visible, .ftr a:focus-visible, .hdr button:focus-visible { outline-color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}

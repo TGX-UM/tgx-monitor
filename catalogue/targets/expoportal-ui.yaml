@@ -1,0 +1,119 @@
+id: expoportal-ui
+name: ExpoPortal web UI
+group: Ontology portals
+class: service
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, bigcat-domain-dns, expoportal-api]
+public: true
+public_summary: ExpoPortal, an OntoPortal instance for exposure and toxicology ontologies (BioHackathon Europe 2026 project 19).
+links:
+  - https://expoportal.biohackeu.bigcat-bioinformatics.org/
+notes: >-
+  High only for BioHackathon Europe (2026-11-09 to 13); lower it to low or muted once
+  its future (keep, hand over or take down) is decided. Pages take 3-7 s, so timeouts
+  are generous. The UI image runs a moving `master` tag.
+checks:
+  - id: expoportal-ui-home
+    kind: http
+    every: 5m
+    timeout: 20s
+    via: [public, tgx1, tgx2]
+    describe: The ExpoPortal home page loads within 15 seconds, through public DNS and on each node.
+    request: {url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "Welcome to ExpoPortal"}
+      - {that: latency_ms, lt: 15000}
+      - {that: latency_ms, lt: 8000, warn: true}
+    inv_ids: [expoportal-ui-presence]
+
+  - id: expoportal-ui-https-redirect
+    kind: http
+    every: 1h
+    describe: Plain HTTP is redirected permanently to HTTPS.
+    request: {url: "http://expoportal.biohackeu.bigcat-bioinformatics.org/", follow: false}
+    assert:
+      - {that: status, eq: 301}
+      - {that: headers.location, eq: "https://expoportal.biohackeu.bigcat-bioinformatics.org/"}
+    inv_ids: [expoportal-ui-presence]
+
+  - id: expoportal-ui-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    request: {host: expoportal.biohackeu.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [expoportal-ui-presence]
+
+  - id: expoportal-ontology-page
+    kind: http
+    every: 15m
+    timeout: 20s
+    describe: An ontology summary page (AOPO) renders, which needs the UI, the REST API and the triple store together.
+    request: {url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/ontologies/AOPO"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, matches: 'AOPO \|\s+Summary \| ExpoPortal'}
+      - {that: latency_ms, lt: 15000, warn: true}
+    inv_ids: [expoportal-ontology-page]
+
+  - id: expoportal-old-host-redirect
+    kind: http
+    every: 1h
+    describe: The old ontoportal name redirects permanently to the same page on the ExpoPortal name.
+    request: {url: "https://ontoportal.biohackeu.bigcat-bioinformatics.org/ontologies", follow: false}
+    assert:
+      - {that: status, eq: 301}
+      - {that: headers.location, eq: "https://expoportal.biohackeu.bigcat-bioinformatics.org/ontologies"}
+    inv_ids: [expoportal-old-host-redirect]
+
+  - id: expoportal-branding
+    kind: http
+    every: 1h
+    timeout: 20s
+    describe: The home page still carries the ExpoPortal branding, not the upstream portal's (the moving image tag can drop the overrides).
+    request: {url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: body, contains: "ExpoPortal"}
+      - {that: body, not_matches: '(?i)\b(lirmm|inrae|stanford)\b', label: "no upstream institution branding"}
+      - {that: body, not_matches: '<title>[^<]*AgroPortal', label: "page title is not AgroPortal"}
+    inv_ids: [expoportal-branding-drift]
+
+  - id: expoportal-dns
+    kind: dns
+    every: 1h
+    describe: The portal name resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: expoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [expoportal-dns-pair, bigcat-explicit-records]
+
+  - id: expoportal-old-dns
+    kind: dns
+    every: 1h
+    describe: The old ontoportal name, still used by early registrations, resolves to tgx1.
+    request: {name: ontoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+    inv_ids: [expoportal-dns-pair]
+
+  - id: expoportal-annotator-page
+    kind: http
+    every: 1h
+    timeout: 20s
+    describe: The annotator page opens with a sample text within 15 seconds.
+    request:
+      url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/annotator"
+      params: {text: "adverse outcome pathway key event"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, matches: 'Annotator \| ExpoPortal'}
+      - {that: latency_ms, lt: 15000}
+    inv_ids: [expoportal-annotator-page]

@@ -1,0 +1,79 @@
+id: molaop-builder-suggestions
+name: molAOP Builder curation features
+group: Molecular AOP
+class: service
+criticality: high
+owners: [marvinm2, SidraAdil]
+depends_on: [molaop-builder, aopwiki-sparql]
+maintenance: [molaop-apply-corpus]
+public: true
+public_summary: The pathway, GO and Reactome suggestions and the Key Event list that curators use in the molAOP Builder.
+links: [https://molaop-builder.vhp4safety.nl/]
+notes: >-
+  Split from molaop-builder so that curators are told about failures that block curation
+  (suggestions, the Key Event dropdown) without receiving every platform alert. The
+  suggestion calls must pass ke_title: without it the results do not depend on the Key Event.
+checks:
+  - id: mb-suggest-wp
+    kind: http
+    every: 30m
+    timeout: 30s
+    describe: For Key Event 941 (EGFR activation) the approved pathway WP437 is among the top three WikiPathways suggestions.
+    request:
+      url: "https://molaop-builder.vhp4safety.nl/suggest_pathways/KE%20941?ke_title=Activation%2C%20EGFR&bio_level=Molecular&limit=8"
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: latency_ms, lt: 10000}
+      - {that: json.combined_suggestions, len_gte: 5}
+      - {that: body, matches: '"combined_suggestions":\s*\[(?:(?!"embedding_based_suggestions")(?!"pathwayID").)*(?:"pathwayID":\s*"WP\d+"(?:(?!"embedding_based_suggestions")(?!"pathwayID").)*){0,2}"pathwayID":\s*"WP437"',
+         label: "WP437 in the top 3 combined suggestions"}
+      - {that: json.combined_suggestions.0.hybrid_score, gt: 0}
+      - {that: json.combined_suggestions.0.hybrid_score, lte: 1}
+      - {that: json.genes_found, gte: 10}
+    inv_ids: [mb-suggest-wp-canary]
+  - id: mb-suggest-go
+    kind: http
+    every: 1h
+    timeout: 30s
+    describe: For Key Event 941 the GO term GO:0038134 (ERBB2-EGFR signaling) is among the top five GO suggestions.
+    request:
+      url: "https://molaop-builder.vhp4safety.nl/suggest_go_terms/KE%20941?ke_title=Activation%2C%20EGFR&limit=20&aspect_filter=all"
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: latency_ms, lt: 10000}
+      - {that: json.suggestions, len_gte: 5}
+      - {that: body, matches: '"suggestions":\s*\[(?:(?!"total_suggestions")(?!"go_id").)*(?:"go_id":\s*"GO:\d+"(?:(?!"total_suggestions")(?!"go_id").)*){0,4}"go_id":\s*"GO:0038134"',
+         label: "GO:0038134 in the top 5 GO suggestions"}
+    inv_ids: [mb-suggest-go-reactome-canary]
+  - id: mb-suggest-reactome
+    kind: http
+    every: 1h
+    timeout: 30s
+    describe: For Key Event 941 the Reactome pathway R-HSA-177929 (Signaling by EGFR) is among the top five Reactome suggestions.
+    request:
+      url: "https://molaop-builder.vhp4safety.nl/suggest_reactome/KE%20941?ke_title=Activation%2C%20EGFR&limit=20"
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: latency_ms, lt: 10000}
+      - {that: json.suggestions, len_gte: 5}
+      - {that: body, matches: '"suggestions":\s*\[(?:(?!"total_suggestions")(?!"reactome_id").)*(?:"reactome_id":\s*"R-HSA-\d+"(?:(?!"total_suggestions")(?!"reactome_id").)*){0,4}"reactome_id":\s*"R-HSA-177929"',
+         label: "R-HSA-177929 in the top 5 Reactome suggestions"}
+    inv_ids: [mb-suggest-go-reactome-canary]
+  - id: mb-ke-dropdown
+    kind: compare
+    every: 1d
+    alert_after: 2d
+    timeout: 60s
+    describe: The Key Event list curators pick from has as many Key Events as AOP-Wiki (within 5) and is at most two weeks old.
+    request:
+      left: {http_json: {url: "https://molaop-builder.vhp4safety.nl/api/ke-snapshot", path: key_event_count}}
+      right: {sparql: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/marvin-apps/aopwiki-ke-count.rq}}
+      sources:
+        snapshot: {http_json: {url: "https://molaop-builder.vhp4safety.nl/api/ke-snapshot", path: snapshot_date}}
+    assert:
+      - {that: left, within_pct_of_path: {path: right, pct: 0.35}, label: "Builder Key Events within 5 of AOP-Wiki"}
+      - {that: snapshot_age_days, lte: 14, label: "Key Event snapshot at most 14 days old"}
+    inv_ids: [mb-ke-dropdown-vs-aopwiki]

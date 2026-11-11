@@ -1,0 +1,6 @@
+# Two single-class counts (never COUNT(*) the whole 672M-triple store).
+PREFIX cco: <http://rdf.ebi.ac.uk/terms/chembl#>
+SELECT ?k (COUNT(?x) AS ?n) FROM <https://www.ebi.ac.uk/chembl> WHERE {
+  VALUES (?c ?k) { (cco:SingleProtein "singleProtein") (cco:Document "document") }
+  ?x a ?c
+} GROUP BY ?k

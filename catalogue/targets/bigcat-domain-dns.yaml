@@ -1,0 +1,47 @@
+id: bigcat-domain-dns
+name: bigcat-bioinformatics.org domain
+group: Cluster
+class: infra
+criticality: high
+owners: [egonw, marvinm2]
+depends_on: []
+public: true
+public_summary: The department domain that carries the RDF endpoints, NSDRA, PSnpBind and ExpoPortal.
+links: []
+notes: >-
+  Registered through Strato. The apex and the *.bigcat-bioinformatics.org wildcard point
+  at tgx1. The *.rdf names need explicit records: rdf.bigcat-bioinformatics.org exists as
+  an empty non-terminal, so the wildcard does not cover names below it. Per-service
+  records are checked on each service's own target.
+checks:
+  - id: bigcat-domain-expiry
+    kind: compare
+    every: 1d
+    describe: The domain registration does not run out within the next month; amber within two months.
+    request:
+      left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/bigcat-bioinformatics.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
+      right: {const: "registration"}
+    assert:
+      - {that: left_age_days, lt: -60, warn: true, label: "more than 60 days to expiry"}
+      - {that: left_age_days, lt: -30, label: "more than 30 days to expiry"}
+    inv_ids: [bigcat-domain-expiry]
+
+  - id: bigcat-apex-dns
+    kind: dns
+    every: 1h
+    describe: The domain apex resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [bigcat-explicit-records]
+
+  - id: bigcat-ns
+    kind: dns
+    every: 1h
+    describe: The domain is delegated to name servers that answer.
+    request: {name: bigcat-bioinformatics.org, type: NS, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: nxdomain, eq: false}
+      - {that: answers, len_gte: 2}
+    inv_ids: [bigcat-explicit-records]

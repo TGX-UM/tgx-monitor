@@ -1,0 +1,193 @@
+id: bridgedb-webservice
+name: BridgeDb webservice
+group: BridgeDb
+class: service
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1]
+public_summary: The public BridgeDb identifier-mapping API at webservice.bridgedb.org, also reachable as swagger.bridgedb.org and bridgedb.cloud.vhp4safety.nl.
+links:
+  - https://webservice.bridgedb.org/
+  - https://swagger.bridgedb.org/
+  - https://bridgedb.cloud.vhp4safety.nl/
+notes: >-
+  One swarm service behind one Traefik router for all three host names. Status codes mean
+  little here: unknown paths and organisms answer 200 with an HTML error and an unknown
+  system code answers 500, so every functional check asserts on the body.
+checks:
+  - id: bridgedb-ws-presence
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    timeout: 30s
+    describe: The Swagger UI landing page of webservice.bridgedb.org loads within five seconds, through public DNS and on each node.
+    request: {url: "https://webservice.bridgedb.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "Swagger UI"}
+      - {that: size, gte: 20000, label: "page is the 2.1.9 Swagger UI (≥ 20 kB, the 2.1.7 page was 1.2 kB)"}
+      - {that: size, lte: 60000}
+      - {that: latency_ms, lt: 5000}
+    inv_ids: [bridgedb-webservice-presence]
+  - id: bridgedb-ws-swagger-host
+    kind: http
+    every: 15m
+    describe: The same service answers under the swagger.bridgedb.org name.
+    request: {url: "https://swagger.bridgedb.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "Swagger UI"}
+      - {that: size, gte: 20000}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [bridgedb-webservice-presence]
+  - id: bridgedb-ws-cloud-host
+    kind: http
+    every: 15m
+    describe: The same service answers under the bridgedb.cloud.vhp4safety.nl name.
+    request: {url: "https://bridgedb.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "Swagger UI"}
+      - {that: size, gte: 20000}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [bridgedb-webservice-presence]
+  - id: bridgedb-ws-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate that covers all three BridgeDb host names, with time to spare.
+    request: {host: webservice.bridgedb.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: webservice.bridgedb.org}
+      - {that: san, has: swagger.bridgedb.org}
+      - {that: san, has: bridgedb.cloud.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [bridgedb-webservice-tls-redirect-dns]
+  - id: bridgedb-ws-redirects
+    kind: roundtrip
+    every: 1h
+    describe: Plain http on each of the three names redirects permanently to https on the same name.
+    request:
+      steps:
+        - {url: "http://webservice.bridgedb.org/", follow: false, capture: {ws: {header: location}}}
+        - {url: "http://swagger.bridgedb.org/", follow: false, capture: {swagger: {header: location}}}
+        - {url: "http://bridgedb.cloud.vhp4safety.nl/", follow: false, capture: {cloud: {header: location}}}
+    assert:
+      - {that: steps.0.status, in: [301, 308]}
+      - {that: steps.1.status, in: [301, 308]}
+      - {that: steps.2.status, in: [301, 308]}
+      - {that: captures.ws, eq: "https://webservice.bridgedb.org/"}
+      - {that: captures.swagger, eq: "https://swagger.bridgedb.org/"}
+      - {that: captures.cloud, eq: "https://bridgedb.cloud.vhp4safety.nl/"}
+    inv_ids: [bridgedb-webservice-tls-redirect-dns]
+  - id: bridgedb-ws-dns-webservice
+    kind: dns
+    every: 1h
+    describe: webservice.bridgedb.org resolves to a cluster node (tgx1 normally) and two public resolvers agree.
+    request: {name: webservice.bridgedb.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, in: [tgx1, tgx2]}
+      - {that: node, eq: tgx1, warn: true, label: "points at tgx1 (tgx2 means a manual DNS failover happened)"}
+      - {that: consistent, eq: true}
+    inv_ids: [bridgedb-webservice-tls-redirect-dns]
+  - id: bridgedb-ws-dns-swagger
+    kind: dns
+    every: 1h
+    describe: swagger.bridgedb.org resolves to a cluster node (tgx1 normally).
+    request: {name: swagger.bridgedb.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, in: [tgx1, tgx2]}
+      - {that: node, eq: tgx1, warn: true, label: "points at tgx1 (tgx2 means a manual DNS failover happened)"}
+      - {that: consistent, eq: true}
+    inv_ids: [bridgedb-webservice-tls-redirect-dns]
+  - id: bridgedb-ws-dns-cloud
+    kind: dns
+    every: 1h
+    describe: bridgedb.cloud.vhp4safety.nl resolves to a cluster node (tgx1 normally).
+    request: {name: bridgedb.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, in: [tgx1, tgx2]}
+      - {that: node, eq: tgx1, warn: true, label: "points at tgx1 (tgx2 means a manual DNS failover happened)"}
+      - {that: consistent, eq: true}
+    inv_ids: [bridgedb-webservice-tls-redirect-dns]
+  - id: bridgedb-ws-version
+    kind: roundtrip
+    every: 15m
+    describe: The service runs the expected BridgeDb 3.0.31 and webservice 2.1.9, the same build behind all three names, and its API description reports the same version.
+    request:
+      steps:
+        - url: "https://webservice.bridgedb.org/config"
+          capture:
+            ws: {regex: 'webservice\.version\t(\S+)'}
+            bdb: {regex: 'bridgedb\.version\t(\S+)'}
+        - {url: "https://swagger.bridgedb.org/config"}
+        - {url: "https://bridgedb.cloud.vhp4safety.nl/config"}
+        - {url: "https://webservice.bridgedb.org/swagger.yaml", capture: {spec: {regex: '^  version:\s*(\S+)'}}}
+    assert:
+      - {that: captures.ws, eq: "2.1.9", label: "webservice.version is the pinned 2.1.9"}
+      - {that: captures.bdb, eq: "3.0.31", label: "bridgedb.version is the pinned 3.0.31"}
+      - {that: captures.spec, eq_path: captures.ws, label: "swagger.yaml info.version matches the running webservice"}
+      - {that: steps.1.body, eq_path: steps.0.body, label: "swagger.bridgedb.org serves the same build"}
+      - {that: steps.2.body, eq_path: steps.0.body, label: "bridgedb.cloud.vhp4safety.nl serves the same build"}
+    inv_ids: [bridgedb-webservice-version]
+  - id: bridgedb-ws-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    public: false
+    alert_after: 5m
+    describe: The bridgedb swarm service has its one replica running.
+    request: {check: replicas, services: [bridgedb]}
+    assert:
+      - {that: not_converged_count, eq: 0}
+      - {that: by.bridgedb.running, gte: 1}
+    inv_ids: [bridgedb-webservice-swarm-state]
+  - id: bridgedb-ws-crash-loops
+    kind: swarm
+    every: 15m
+    via: [core]
+    public: false
+    describe: The bridgedb task is not crash-looping; any failed task in the last day shows amber.
+    request: {check: crash_loops, services: [bridgedb], window: 24h, threshold: 3}
+    assert:
+      - {that: crash_looping_count, eq: 0}
+      - {that: failed_task_count, eq: 0, warn: true, label: "no failed or rejected bridgedb task in 24 h"}
+    inv_ids: [bridgedb-webservice-swarm-state]
+  - id: bridgedb-ws-image-pin
+    kind: registry
+    every: 1h
+    public: false
+    describe: The pinned image tag on Docker Hub still points at the digest production runs, so a re-push under the same tag is noticed.
+    request: {image: "bigcatum/bridgedb:3.0.31-2.1.9"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: digest, eq: "sha256:ab66d008a42bbfcfc8b359e5672ad89dab094ea194153a5c75025a1f2fb05a40"}
+    inv_ids: [bridgedb-webservice-swarm-state]
+  - id: bridgedb-ws-contents
+    kind: roundtrip
+    every: 15m
+    describe: The service lists its loaded organisms (an empty list is the database-driver failure mode), including human, mouse, rat and potato.
+    request:
+      steps: [{url: "https://webservice.bridgedb.org/contents"}]
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.lines, gte: 33, label: "≥ 33 organisms loaded"}
+      - {that: last.tsv_cols, eq: 2}
+      - {that: last.body, matches: "^Human\tHomo sapiens$"}
+      - {that: last.body, matches: "^Mouse\tMus musculus$"}
+      - {that: last.body, matches: "^Rat\tRattus norvegicus$"}
+      - {that: last.body, matches: "^Potato\tSolanum tuberosum$"}
+    inv_ids: [bridgedb-webservice-contents]
+  - id: bridgedb-ws-unknown-path
+    kind: http
+    every: 1d
+    describe: An unknown path still answers with the documented 'Unrecognized query' page; the body checks of this target rely on that behaviour.
+    request: {url: "https://webservice.bridgedb.org/definitely-not-a-real-endpoint-xyz"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/html}
+      - {that: body, matches: '\AUnrecognized query', label: "body starts with 'Unrecognized query'"}
+    inv_ids: [bridgedb-webservice-unknown-path-canary]

@@ -1,0 +1,286 @@
+# tgx-monitor stack: docker stack deploy -c stack.yml tgx-monitor   (see DEPLOY.md)
+#
+# Four services, one image (plus the socket proxy). No node pins, no host ports:
+# everything public goes through Traefik on `core`, everything else stays on two
+# private overlays. Every credential is an external Docker secret (AGENTS.md).
+#
+# Host paths are named here and nowhere else: the public catalogue refers to bind
+# mounts by alias only (/mounts/<alias> inside core).
+version: "3.8"
+
+x-image: &image ghcr.io/tgx-um/tgx-monitor:latest   # deploys use sha-<7>; see DEPLOY.md
+
+networks:
+  core:
+    external: true
+  # core <-> agents. Encrypted: the two nodes talk over the public internet.
+  tgxmon_int:
+    driver: overlay
+    driver_opts:
+      encrypted: "true"
+  # core <-> docker-proxy only. internal: no route out, so the proxy cannot be
+  # reached from, or reach, anything else.
+  tgxmon_dockerapi:
+    driver: overlay
+    internal: true
+    driver_opts:
+      encrypted: "true"
+
+secrets:
+  tgxmon_gh_app_key: {external: true}
+  tgxmon_gh_token: {external: true}
+  tgxmon_ghcr_read_pat: {external: true}
+  tgxmon_smtp: {external: true}
+  tgxmon_contacts: {external: true}
+  tgxmon_users: {external: true}
+  tgxmon_session_key: {external: true}
+  tgxmon_push_tokens: {external: true}
+  tgxmon_hc_urls: {external: true}
+  tgxmon_private_checks: {external: true}
+  tgxmon_slack_webhook: {external: true}
+
+services:
+  # Scheduler, checks, the single SQLite writer, alert engine and outbox, private UI,
+  # public snapshot writer.
+  core:
+    image: *image
+    command: ["tgx-monitor", "run"]
+    cap_drop: [ALL]
+    # gid 1000 is the hosts' docker group: it can read the 2770 documentation tree
+    # and write the 2775 data directories. It grants no Docker access here.
+    user: "10001:1000"
+    environment:
+      # Shadow mode: everything runs and is recorded, nothing is sent. DEPLOY.md
+      # "Enabling alerts" is the only place this changes.
+      TGXMON_DRY_RUN: "1"
+      TGXMON_DB: /data/monitor.db
+      TGXMON_BACKUP_DIR: /data/backups
+      TGXMON_PUBLIC_DIR: /public
+      TGXMON_HB_DIR: /hb
+      TGXMON_MOUNTS_DIR: /mounts
+      # Scratch copies for integrity checks of backups: the container's own disk, not
+      # a tmpfs, which would count a 100 MB copy against the 512M limit.
+      TGXMON_TMP: /tmp
+      TGXMON_DOCKER_PROXY: tasks.docker-proxy
+      TGXMON_AGENTS: tasks.agent
+      TGXMON_PRIVATE_URL: https://monitor.cloud.vhp4safety.nl
+      # GitHub issues are opened by the App tgx-monitor[bot] (its key is the secret
+      # tgxmon_gh_app_key). Ids are not secret; empty means "App not set up yet" and
+      # the channel falls back to tgxmon_gh_token. DEPLOY.md step 2.
+      TGXMON_GH_REPO: TGX-UM/tgx-monitor
+      TGXMON_GH_APP_ID: ""
+      TGXMON_GH_INSTALLATION_ID: ""
+    networks: [core, tgxmon_int, tgxmon_dockerapi]
+    volumes:
+      - {type: bind, source: /mnt/gluster/docker/tgx-monitor/data, target: /data}
+      - {type: bind, source: /mnt/gluster/docker/tgx-monitor/public, target: /public}
+      - {type: bind, source: /mnt/gluster/docker/tgx-monitor/agent-hb, target: /hb}
+      # Read-only evidence for the docs_drift, file_age and sqlite_backup checks.
+      # Alias = directory name under /mounts; the catalogue uses the alias only.
+      - {type: bind, source: /mnt/gluster/documentation, target: /mounts/docs, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/traefik/dynamic, target: /mounts/traefik-dynamic, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/molaop-builder/data/backups, target: /mounts/backups-molaop-builder, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/molaop-analyser/data/backups, target: /mounts/backups-molaop-analyser, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/aopwiki-dashboard/virtuoso-data/backups, target: /mounts/backups-aopwiki-dashboard, read_only: true}
+      - {type: bind, source: /mnt/gluster/backups/toxtempassistant, target: /mounts/backups-toxtempassistant, read_only: true}
+      - {type: bind, source: /mnt/hidrive/docker, target: /mounts/hidrive, read_only: true}
+      # Markers and state files the data-reload and failover checks read. Whole
+      # directories, not single files: the jobs replace these files with mv, and a
+      # single-file bind would keep showing the old inode.
+      - {type: bind, source: /mnt/gluster/docker/wikipathways, target: /mounts/wikipathways-state, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/wikipathways-ep/virtuoso-data/data, target: /mounts/wikipathways-ep-data, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/wikipathways-ep2/virtuoso-data/data, target: /mounts/wikipathways-ep2-data, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/molaop-builder/data, target: /mounts/molaop-builder-data, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/molaop-analyser/data, target: /mounts/molaop-analyser-data, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/mct8-docking/results, target: /mounts/mct8-results, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/robot/data, target: /mounts/robot-data, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/biodatafuse/data, target: /mounts/biodatafuse-data, read_only: true}
+      # Not mounted on purpose: the whole /mnt/gluster/docker (other services' files,
+      # some with credentials). Backup directories that do not exist yet (robot,
+      # biodatafuse, nsdra, ontoportal) are added when their backup jobs are.
+    secrets:
+      - tgxmon_gh_app_key
+      - tgxmon_gh_token
+      - tgxmon_ghcr_read_pat
+      - tgxmon_smtp
+      - tgxmon_contacts
+      - tgxmon_users
+      - tgxmon_session_key
+      - tgxmon_push_tokens
+      - tgxmon_hc_urls
+      - tgxmon_private_checks
+      - tgxmon_slack_webhook
+    # Time for the outbox dispatcher to finish a send and SQLite to close cleanly.
+    stop_grace_period: 30s
+    deploy:
+      replicas: 1
+      # dnsrr: the name tgx-monitor_core resolves to the task's own IP, which is the
+      # source address the socket proxy sees and checks with -allowfrom. Traefik
+      # routes to task IPs either way.
+      endpoint_mode: dnsrr
+      # One writer on a Gluster-backed SQLite file: never two containers at once.
+      update_config:
+        order: stop-first
+        failure_action: rollback
+        monitor: 90s
+      rollback_config:
+        order: stop-first
+      # `any`: a clean exit (SIGTERM, exit 0) must still be restarted.
+      restart_policy:
+        condition: any
+        delay: 10s
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+      labels:
+        # Off until the A record exists: HTTP-01 for a name that does not resolve here
+        # loops the ACME challenge (AGENTS.md). DEPLOY.md step 8 flips this to true.
+        - traefik.enable=false
+        - traefik.http.routers.tgxmon-core.rule=Host(`monitor.cloud.vhp4safety.nl`) && !PathPrefix(`/api/push`)
+        - traefik.http.routers.tgxmon-core.entrypoints=websecure
+        - traefik.http.routers.tgxmon-core.tls=true
+        - traefik.http.routers.tgxmon-core.tls.certresolver=letsencrypt
+        - traefik.http.routers.tgxmon-core.service=tgxmon-core
+        # /login gets its own router so it can carry a tight rate limit.
+        - traefik.http.routers.tgxmon-login.rule=Host(`monitor.cloud.vhp4safety.nl`) && Path(`/login`)
+        - traefik.http.routers.tgxmon-login.entrypoints=websecure
+        - traefik.http.routers.tgxmon-login.tls=true
+        - traefik.http.routers.tgxmon-login.tls.certresolver=letsencrypt
+        - traefik.http.routers.tgxmon-login.service=tgxmon-core
+        - traefik.http.routers.tgxmon-login.middlewares=tgxmon-login-rl
+        # Traefik ranks routers by rule length; without this the longer core rule wins
+        # and /login never passes the rate limit.
+        - traefik.http.routers.tgxmon-login.priority=1000
+        - traefik.http.middlewares.tgxmon-login-rl.ratelimit.average=5
+        - traefik.http.middlewares.tgxmon-login-rl.ratelimit.period=1m
+        - traefik.http.middlewares.tgxmon-login-rl.ratelimit.burst=10
+        - traefik.http.services.tgxmon-core.loadbalancer.server.port=8000
+        - traefik.docker.network=core
+
+  # The static public snapshot, read-only. No secrets, no database, no Docker access:
+  # if core dies, this keeps serving the last snapshot with its "data as of" banner.
+  public:
+    image: *image
+    command: ["tgx-monitor", "serve-public", "--dir", "/public", "--port", "8080"]
+    cap_drop: [ALL]
+    read_only: true
+    networks: [core]
+    volumes:
+      - {type: bind, source: /mnt/gluster/docker/tgx-monitor/public, target: /public, read_only: true}
+    healthcheck:
+      # Any TCP answer: before the first snapshot exists the page is a 404, and that
+      # must not restart-loop the server.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8080), 3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+      labels:
+        - traefik.enable=false
+        - traefik.http.routers.tgxmon-public.rule=Host(`status.cloud.vhp4safety.nl`)
+        - traefik.http.routers.tgxmon-public.entrypoints=websecure
+        - traefik.http.routers.tgxmon-public.tls=true
+        - traefik.http.routers.tgxmon-public.tls.certresolver=letsencrypt
+        - traefik.http.routers.tgxmon-public.middlewares=tgxmon-public-rl
+        - traefik.http.middlewares.tgxmon-public-rl.ratelimit.average=60
+        - traefik.http.middlewares.tgxmon-public-rl.ratelimit.period=1m
+        - traefik.http.middlewares.tgxmon-public-rl.ratelimit.burst=60
+        - traefik.http.services.tgxmon-public.loadbalancer.server.port=8080
+        - traefik.docker.network=core
+
+  # One per node: /proc signals, statvfs of read-only binds, Egon's root status file,
+  # the HiDrive listing, peer reachability, and the dead-man pings for core and peer.
+  agent:
+    image: *image
+    command: ["tgx-monitor", "agent"]
+    user: "10001:1000"
+    cap_drop: [ALL]
+    read_only: true
+    environment:
+      TGXMON_NODE: "{{.Node.Hostname}}"
+      TGXMON_DRY_RUN: "1"
+      TGXMON_AGENT_PORT: "8001"
+      TGXMON_AGENT_STATUS: "/hostfs/root-status/{host}.json"
+      TGXMON_AGENT_HB_DIR: /hb
+      TGXMON_AGENT_PATHS: "rootfs=/hostfs/rootfs-probe,gluster-brick=/hostfs/gluster-brick,hidrive=/hostfs/hidrive"
+      TGXMON_AGENT_HIDRIVE: "tgx-monitor=/hostfs/hidrive/docker/tgx-monitor,aopwiki-dashboard=/hostfs/hidrive/docker/aopwiki-dashboard/virtuoso"
+    networks: [tgxmon_int]
+    volumes:
+      # Never / and never /var/run: only what the signals need, read-only.
+      # statvfs of any file on / measures the root filesystem; os-release is harmless.
+      - {type: bind, source: /etc/os-release, target: /hostfs/rootfs-probe, read_only: true}
+      # Written by Egon's root cron (host/tgx-monitor-status.sh), one file per node.
+      - {type: bind, source: /mnt/gluster/docker/tgx-monitor/root-status, target: /hostfs/root-status, read_only: true}
+      - {type: bind, source: /mnt/gluster-brick, target: /hostfs/gluster-brick, read_only: true}
+      - {type: bind, source: /mnt/hidrive, target: /hostfs/hidrive, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/tgx-monitor/agent-hb, target: /hb}
+      - {type: tmpfs, target: /tmp, tmpfs: {size: 16777216}}
+    secrets:
+      - tgxmon_hc_urls
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/livez', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+        delay: 10s
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
+
+  # GET-only Docker API for core. Flags and their reasons: deploy/socket-proxy.md.
+  # The -allowGET pattern must stay equal to tgx_monitor.docker.ALLOWED_PATHS
+  # (tests/test_proxy_contract.py); socket-proxy anchors it with ^...$ itself.
+  docker-proxy:
+    image: wollomatic/socket-proxy:1.13.2@sha256:ff95d6ff6c27853005ef85eb8f4ab5923dc3d2f1e055f98fb6aeeaceec3fe848
+    # nobody, plus the hosts' docker group (gid 1000 on both nodes) to open the socket.
+    user: "65534:1000"
+    cap_drop: [ALL]
+    read_only: true
+    command:
+      - -loglevel=info
+      - -listenip=0.0.0.0
+      - -allowfrom=tgx-monitor_core
+      - '-allowGET=/v1\.(4[4-9]|5[0-3])/(info|nodes|services|tasks|events|images/json|containers/json|tasks/[a-z0-9]+/logs)'
+      - -allowhealthcheck
+      - -watchdoginterval=300
+      - -stoponwatchdog
+      - -shutdowngracetime=5
+    networks: [tgxmon_dockerapi]
+    volumes:
+      - {type: bind, source: /var/run/docker.sock, target: /var/run/docker.sock, read_only: true}
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 16M

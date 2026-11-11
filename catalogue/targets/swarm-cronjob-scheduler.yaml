@@ -1,0 +1,46 @@
+id: swarm-cronjob-scheduler
+name: Cron scheduler for the swarm jobs
+group: Jobs and backups
+class: cron
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+public: false
+public_summary: The scheduler that starts the weekly reloads, nightly backups and other cluster jobs is running and firing.
+links: []
+notes: >-
+  crazymax/swarm-cronjob in the cronjobs stack, on a manager node. Each job is checked in
+  its own target (exit code, markers). Here only "the scheduler fires at all" is judged:
+  a daily job that did not even start is the scheduler's failure, whatever the job's
+  own result.
+checks:
+  - id: cron-scheduler-running
+    kind: swarm
+    every: 5m
+    via: [core]
+    describe: The scheduler service runs its one replica.
+    request: {check: replicas, services: [cronjobs_scheduler]}
+    assert:
+      - {that: by.cronjobs_scheduler.running, eq: 1}
+    inv_ids: [cron-scheduler-running]
+
+  - id: cron-scheduler-fires
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The daily dashboard store build was started at its last scheduled time, so the scheduler fires.
+    request: {service: cronjobs_aopwiki-dashboard-store-build, grace: 30m}
+    assert:
+      - {that: ran, eq: true, label: "the 04:30 job started on time"}
+      - {that: last_run_age_h, lt: 26}
+    inv_ids: [cron-start-job-logged]
+
+  - id: cron-scheduler-fires-backup
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The daily molAOP Analyser backup was started at its last scheduled time, a second witness that the scheduler fires.
+    request: {service: cronjobs_molaop-analyser-backup, grace: 30m}
+    assert:
+      - {that: ran, eq: true, label: "the 03:30 job started on time"}
+    inv_ids: [cron-start-job-logged]

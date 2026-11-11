@@ -1,0 +1,11 @@
+# The three h2020-riskgone/SPARQLQueries counts the UI release was verified with.
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+SELECT ?assays ?types ?names FROM <http://nanosafety.org> WHERE {
+  { SELECT (COUNT(DISTINCT ?assay) AS ?assays) WHERE {
+      ?s a <http://www.bioassayontology.org/bao#BAO_0000015> ; rdfs:label ?assay } }
+  { SELECT (COUNT(DISTINCT ?t) AS ?types) WHERE {
+      ?m a <http://purl.obolibrary.org/obo/CHEBI_59999> ; dcterms:type ?t } }
+  { SELECT (COUNT(DISTINCT ?l) AS ?names) WHERE {
+      ?m2 a <http://purl.obolibrary.org/obo/CHEBI_59999> ; rdfs:label ?l } }
+}

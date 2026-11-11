@@ -1,0 +1,65 @@
+id: vhp1-legacy-host
+name: VHP-1 legacy server (old AOP-Wiki SNORQL and grlc, retired apps)
+group: Legacy hosts
+class: infra
+criticality: low
+owners: [egonw, marvinm2]
+depends_on: []
+public: false
+public_summary: Names still served by the legacy VHP-1 server, tracked to drive their decommission or redirection.
+links: []
+notes: >-
+  Outside the swarm. The old AOP-Wiki SNORQL UI still loads but its SPARQL proxy answers
+  502, and the old grlc API loads but its queries fail (500), while the VHP4Safety
+  tutorial and workshop still link to it. Three retired app names answer 502. Checks
+  assert these known states so a change is noticed; toxtempassistant.vhp4safety.nl,
+  also on this server, belongs to the ToxTempAssistant target.
+checks:
+  - id: vhp1-aopwiki-ui
+    kind: http
+    every: 1d
+    describe: The old AOP-Wiki SNORQL UI still loads (known state).
+    request: {url: "https://aopwiki.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>AOP-WikiSNORQLUI</title>"}
+    inv_ids: [vhp1-ui, vhp1-domains]
+
+  - id: vhp1-aopwiki-sparql
+    kind: http
+    every: 1d
+    describe: The old AOP-Wiki SPARQL address still answers 502 (known state; the current endpoint is on the cluster).
+    request: {url: "https://aopwiki.cloud.vhp4safety.nl/sparql"}
+    assert:
+      - {that: status, eq: 502, label: "known state: backend gone"}
+    inv_ids: [vhp1-ui]
+
+  - id: vhp1-aopwiki-grlc
+    kind: roundtrip
+    every: 1d
+    describe: The old grlc API page loads but its queries fail (known state; old tutorials still link here).
+    request:
+      base: "https://aopwiki-api.cloud.vhp4safety.nl"
+      steps:
+        - {url: /}
+        - {url: /api-git/marvinm2/AOPWikiQueries/get-all-aops}
+    assert:
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.body, contains: "<title>grlc</title>"}
+      - {that: steps.1.status, eq: 500, label: "known state: queries fail"}
+    inv_ids: [vhp1-grlc, vhp1-domains]
+
+  - id: vhp1-retired-apps
+    kind: roundtrip
+    every: 1d
+    describe: Three retired app names on the legacy server still answer 502 (known state).
+    request:
+      steps:
+        - {url: "https://o-qt-oecd.vhp4safety.nl/"}
+        - {url: "https://biohackeu24.cloud.vhp4safety.nl/"}
+        - {url: "https://aopapp.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: steps.0.status, eq: 502}
+      - {that: steps.1.status, eq: 502}
+      - {that: steps.2.status, eq: 502}
+    inv_ids: [vhp1-domains]

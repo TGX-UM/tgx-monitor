@@ -1,0 +1,24 @@
+# Known problems in the WikiPathways area. They show on the page but do not alert until `until`.
+- target: data-wikipathways
+  check: wp-release-pages-build
+  reason: >-
+    The GitHub Pages build of 2026-11-10 20:12 UTC (after the index pages were regenerated for the
+    November RDF) failed, so data.wikipathways.org still serves the old index pages. Re-running the
+    Pages build, or any new push, should fix it.
+  owner: AlexanderPico
+  until: "2026-11-20"
+- target: data-wikipathways
+  check: wp-release-rdf-listed
+  reason: >-
+    All four November RDF files are served, but the current/rdf/ and 20261110/rdf/ listings still show
+    only rdf-authors because the Pages build failed. The reload on the 12th reads the rdf-gpml file
+    name from this listing, so it will fail unless the listing is rebuilt before 02:00 UTC.
+  owner: egonw
+  until: "2026-11-20"
+- target: wikipathways-virtuoso-bg
+  check: wp-bg-layers-ep
+  reason: >-
+    ep still holds the old single-graph layout (release 20261010), which has no per-layer VoID
+    statistics. It gets the named-graph layout with the reload of 2026-12-12.
+  owner: marvinm2
+  until: "2026-12-13"

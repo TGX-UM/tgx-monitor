@@ -1,0 +1,39 @@
+id: alert-delivery
+name: Alert delivery
+group: Cluster
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [monitor-self]
+public: false
+public_summary: Alerts reach people by e-mail, GitHub and Slack.
+links: []
+notes: >-
+  Every alert goes through the outbox, which retries with backoff and dead-letters a
+  message a channel keeps refusing; a failing channel is then reported on the other two.
+  A dead letter therefore means a channel (SMTP relay, GitHub, Slack) is broken or
+  unreachable from the cluster. The end-to-end test (test-incident) is run by hand and
+  monthly; it reads the monitor-selftest check in monitor-self.
+checks:
+  - id: delivery-dead-letters
+    kind: self
+    every: 5m
+    via: [core]
+    describe: No alert was given up on because a channel kept refusing it.
+    request: {signal: outbox}
+    assert:
+      - {that: dead_letters, eq: 0}
+      - {that: pending, lt: 20, warn: true, label: "fewer than 20 messages waiting"}
+    inv_ids: [al-alert-self-test, al-smtp-egress]
+
+  - id: delivery-github-api
+    kind: self
+    every: 1h
+    via: [core]
+    describe: The GitHub token the monitor opens issues with is valid and has plenty of API calls left this hour.
+    request: {signal: token, secret: tgxmon_gh_token}
+    assert:
+      - {that: valid, eq: true}
+      - {that: rate_remaining, gte: 1000, warn: true}
+      - {that: rate_remaining, gte: 100}
+    inv_ids: [al-github-api]

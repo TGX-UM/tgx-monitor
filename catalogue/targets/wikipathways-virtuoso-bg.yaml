@@ -1,0 +1,182 @@
+id: wikipathways-virtuoso-bg
+name: WikiPathways Virtuoso blue-green pair
+group: WikiPathways
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+maintenance: [wp-reload, wp-switch]
+public: false
+public_summary: The two Virtuoso instances behind the WikiPathways endpoint; one serves, the other holds the next release or the rollback.
+notes: >-
+  Both instances are reachable only on the core overlay, so every check runs in core.
+  Each instance is probed by its service alias and by tasks.<service>: on 2026-10-09 the
+  overlay lost its DNS records while Virtuoso still answered by IP, and every route gave 502.
+  Mount aliases used here: wikipathways-state (the stack's state dir holding live.state),
+  traefik-dynamic, wikipathways-ep-data and wikipathways-ep2-data (each instance's Virtuoso
+  data dir holding .load-ok). The live pointer and the Traefik url line are read by two
+  checks because no kind can join two files yet.
+checks:
+  - id: wp-bg-ep-ask
+    kind: sparql
+    every: 15m
+    via: [core]
+    timeout: 20s
+    describe: The ep instance answers a trivial query through its service name on the overlay.
+    request: {endpoint: "http://wikipathways-ep:8890/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert: [{that: status, eq: 200}, {that: boolean, eq: true}]
+    inv_ids: [wp-bg-instances-direct]
+
+  - id: wp-bg-ep2-ask
+    kind: sparql
+    every: 15m
+    via: [core]
+    timeout: 20s
+    describe: The ep2 instance answers a trivial query through its service name on the overlay.
+    request: {endpoint: "http://wikipathways-ep2:8890/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert: [{that: status, eq: 200}, {that: boolean, eq: true}]
+    inv_ids: [wp-bg-instances-direct]
+
+  - id: wp-bg-ep-task-ask
+    kind: sparql
+    every: 30m
+    via: [core]
+    timeout: 20s
+    describe: The ep task answers by its task address; if this passes while the service-name check fails, the overlay lost its DNS record.
+    request: {endpoint: "http://tasks.wikipathways_wikipathways-ep:8890/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert: [{that: status, eq: 200}, {that: boolean, eq: true}]
+    inv_ids: [wp-bg-instances-direct]
+
+  - id: wp-bg-ep2-task-ask
+    kind: sparql
+    every: 30m
+    via: [core]
+    timeout: 20s
+    describe: The ep2 task answers by its task address; if this passes while the service-name check fails, the overlay lost its DNS record.
+    request: {endpoint: "http://tasks.wikipathways_wikipathways-ep2:8890/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert: [{that: status, eq: 200}, {that: boolean, eq: true}]
+    inv_ids: [wp-bg-instances-direct]
+
+  - id: wp-bg-live-state
+    kind: restore_marker
+    every: 15m
+    via: [core]
+    describe: The live-instance pointer exists and names one of the two instances.
+    request: {mount: wikipathways-state, file: live.state, format: text}
+    assert:
+      - {that: exists, eq: true}
+      - {that: text, matches: '^\s*ep2?\s*$', label: "live.state is ep or ep2"}
+    inv_ids: [wp-bg-live-pointer-agree]
+
+  - id: wp-bg-traefik-pointer
+    kind: restore_marker
+    every: 15m
+    via: [core]
+    describe: The Traefik route for the endpoint has exactly one backend URL, and it is one of the two instances.
+    request: {mount: traefik-dynamic, file: wikipathways.yml, format: text}
+    assert:
+      - {that: exists, eq: true}
+      - {that: text, matches: '^\s*-\s*url:\s*"?http://wikipathways-ep2?:8890"?\s*$', label: "the url line names wikipathways-ep or -ep2"}
+      - {that: text, not_matches: '^\s*-\s*url:[\s\S]*^\s*-\s*url:', label: "exactly one url line (a half-done switch leaves two)"}
+    inv_ids: [wp-bg-live-pointer-agree]
+
+  - id: wp-bg-release-pair
+    kind: compare
+    every: 1h
+    via: [core]
+    timeout: 30s
+    describe: Each instance holds a release at most about two months old, so the offline one can serve as rollback or next month's cutover.
+    request:
+      left: {sparql: {endpoint: "http://wikipathways-ep:8890/sparql", file: q/wikipathways/release.rq}, extract: '(\d{8})'}
+      right: {sparql: {endpoint: "http://wikipathways-ep2:8890/sparql", file: q/wikipathways/release.rq}, extract: '(\d{8})'}
+    assert:
+      - {that: left_age_days, lt: 66, label: "ep holds the current or the previous release"}
+      - {that: right_age_days, lt: 66, label: "ep2 holds the current or the previous release"}
+    inv_ids: [wp-bg-offline-ready]
+
+  - id: wp-bg-load-ok-ep
+    kind: restore_marker
+    every: 6h
+    via: [core]
+    describe: The ep instance carries a completed-load marker naming a release.
+    request: {mount: wikipathways-ep-data, file: .load-ok, format: text}
+    assert:
+      - {that: exists, eq: true}
+      - {that: fields.0, matches: '^\d{8}$', label: "marker starts with the release YYYYMMDD"}
+    inv_ids: [wp-bg-offline-ready]
+
+  - id: wp-bg-load-ok-ep2
+    kind: restore_marker
+    every: 6h
+    via: [core]
+    describe: The ep2 instance carries a completed-load marker naming a release.
+    request: {mount: wikipathways-ep2-data, file: .load-ok, format: text}
+    assert:
+      - {that: exists, eq: true}
+      - {that: fields.0, matches: '^\d{8}$', label: "marker starts with the release YYYYMMDD"}
+    inv_ids: [wp-bg-offline-ready]
+
+  - id: wp-bg-task-failures
+    kind: swarm
+    every: 15m
+    via: [core]
+    describe: Neither Virtuoso instance had a failed or killed task in the last day; after any crash the nameless-IRI check must be run on it.
+    request:
+      check: crash_loops
+      services: [wikipathways_wikipathways-ep, wikipathways_wikipathways-ep2]
+      window: 24h
+      threshold: 1
+    assert:
+      - {that: failed_task_count, eq: 0, label: "no failed Virtuoso task in 24 h (then run wp-bg-nameless-iri by hand)"}
+      - {that: killed_count, eq: 0}
+    inv_ids: [wp-bg-task-restarts]
+
+  - id: wp-bg-layers-ep
+    kind: sparql
+    every: 6h
+    via: [core]
+    timeout: 30s
+    describe: The ep instance's per-layer triple counts (wp, gpml, authors, ontologies) are present and close to the previous release.
+    request:
+      endpoint: "http://wikipathways-ep:8890/sparql"
+      file: q/wikipathways/layer-triples.rq
+      pivot: {key: g, value: n}
+    assert:
+      - {that: by.wp, gte: 1668000, label: "wp layer ≥ 90% of 1,853,980 (20261010)"}
+      - {that: by.gpml, gte: 8466000, label: "gpml layer ≥ 90% of 9,406,772"}
+      - {that: by.authors, gte: 63000, label: "authors layer ≥ 90% of 70,256"}
+      - {that: by.ontologies, gte: 1073000, label: "ontologies layer ≥ 90% of 1,193,161"}
+      - {that: by.gpml, max_drop_pct: 10, window: 35d}
+    inv_ids: [wp-bg-layer-counts]
+
+  - id: wp-bg-layers-ep2
+    kind: sparql
+    every: 6h
+    via: [core]
+    timeout: 30s
+    describe: The ep2 instance's per-layer triple counts (wp, gpml, authors, ontologies) are present and close to the previous release.
+    request:
+      endpoint: "http://wikipathways-ep2:8890/sparql"
+      file: q/wikipathways/layer-triples.rq
+      pivot: {key: g, value: n}
+    assert:
+      - {that: by.wp, gte: 1668000, label: "wp layer ≥ 90% of 1,853,980 (20261010)"}
+      - {that: by.gpml, gte: 8466000, label: "gpml layer ≥ 90% of 9,406,772"}
+      - {that: by.authors, gte: 63000, label: "authors layer ≥ 90% of 70,256"}
+      - {that: by.ontologies, gte: 1073000, label: "ontologies layer ≥ 90% of 1,193,161"}
+      - {that: by.gpml, max_drop_pct: 10, window: 35d}
+    inv_ids: [wp-bg-layer-counts]
+
+  - id: wp-bg-nameless-iri
+    kind: sparql
+    enabled: false
+    every: 7d
+    via: [core]
+    timeout: 10m
+    describe: No triple sits on a nameless IRI (a damaged Virtuoso dictionary); a full scan, run by hand on the offline instance after a reload or crash.
+    request:
+      endpoint: "http://wikipathways-ep2:8890/sparql"
+      file: q/wikipathways/nameless-iri.rq
+    assert:
+      - {that: first.n, eq: 0}
+    inv_ids: [wp-bg-nameless-iri]

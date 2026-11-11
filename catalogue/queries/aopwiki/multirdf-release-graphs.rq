@@ -1,0 +1,6 @@
+# AOP-Wiki multi-release: number of quarterly release graphs that hold AOPs.
+SELECT (COUNT(DISTINCT ?g) AS ?n)
+WHERE {
+  GRAPH ?g { ?s a <http://aopkb.org/aop_ontology#AdverseOutcomePathway> }
+  FILTER(STRSTARTS(STR(?g), "http://aopwiki.org/graph/"))
+}

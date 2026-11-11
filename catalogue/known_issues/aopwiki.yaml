@@ -1,0 +1,6 @@
+# aopwiki area: problems we know about. They show on the page but do not alert until `until`.
+- target: aopwiki-swarm-infra
+  check: aopwiki-swarm-restart-policy
+  reason: aopwiki-snorql_virtuoso still restarts only on failure, so a clean exit would leave the main endpoint down; changing it restarts Virtuoso and waits for a planned window.
+  owner: marvinm2
+  until: "2026-12-31"

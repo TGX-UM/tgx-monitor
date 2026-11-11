@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block account %}
+{% if role %}
+<form class="hdr__acct" method="post" action="/logout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <span class="hdr__user">{{ role.handle }}{% if role.admin %} · admin{% endif %}</span>
+  <button type="submit" class="btn btn--ghost">Log out</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block nav %}
+{% if role %}
+<nav class="nav" aria-label="Sections"><div class="wrap nav__in">
+{% for href, label in nav %}<a class="nav__link{% if path == href or (href != '/' and path.startswith(href)) %} nav__link--active" aria-current="page{% endif %}" href="{{ href }}">{{ label }}</a>{% endfor %}
+</div></nav>
+{% endif %}
+{% endblock %}
+{% block banner %}
+{% if role %}
+{% if tick_age is none or tick_age > 180 %}
+<p class="strip strip--red" role="status"><strong>Scheduler stalled.</strong> {% if tick_age is none %}No tick recorded yet.{% else %}Last tick {{ (tick_age / 60)|round(1) }} min ago.{% endif %} Results below may be old.</p>
+{% endif %}
+{% endif %}
+{% endblock %}
+{% block footer %}Catalogue <code>{{ sha }}</code> · page rendered {{ now.isoformat(timespec="seconds") }} UTC.{% endblock %}

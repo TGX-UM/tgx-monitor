@@ -1,0 +1,124 @@
+id: sbd4nano-landscape
+name: SbD4Nano data landscape (SPARQL endpoint and Snorql UI)
+group: Nanosafety and RDF
+class: data
+criticality: low
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, bigcat-domain-dns]
+public: true
+public_summary: The SbD4Nano safe-by-design data landscape (datasets, models, causal assertions) as queryable RDF.
+links:
+  - https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/
+  - https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql
+notes: >-
+  Loaded once on first database init (open.ttl and enanomapper-full.ttl); graph sizes are
+  exact. sbd:Database, Framework, GuidanceTool and GuidanceDocument are absent by design.
+checks:
+  - id: sbd4nano-ui
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The Snorql query page loads, through public DNS and on each node.
+    request: {url: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>SbD4Nano landscape Snorql UI</title>"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [sbd4nano-ui-presence]
+
+  - id: sbd4nano-https-redirect
+    kind: http
+    every: 1h
+    describe: Plain HTTP is redirected permanently to HTTPS.
+    request: {url: "http://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/", follow: false}
+    assert:
+      - {that: status, eq: 301}
+      - {that: headers.location, eq: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/"}
+    inv_ids: [sbd4nano-ui-presence]
+
+  - id: sbd4nano-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    request: {host: sbd4nanolandscape.rdf.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [sbd4nano-ui-presence]
+
+  - id: sbd4nano-dns
+    kind: dns
+    every: 1h
+    describe: The name resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: sbd4nanolandscape.rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [bigcat-explicit-records]
+
+  - id: sbd4nano-sd
+    kind: http
+    every: 1d
+    describe: The endpoint publishes a SPARQL service description that names its public HTTPS address.
+    request:
+      url: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql"
+      headers: {Accept: text/turtle}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "sd:Service"}
+      - {that: body, matches: '(?s)@prefix (ns\d+):\s*<https://sbd4nanolandscape\.rdf\.bigcat-bioinformatics\.org/>.*sd:endpoint\s+\1:sparql', label: "sd:endpoint is the public HTTPS URL"}
+    inv_ids: [sbd4nano-sd]
+
+  - id: sbd4nano-graphs
+    kind: sparql
+    every: 15m
+    describe: The eNanoMapper and landscape graphs hold exactly the triples of the initial load, so the store is up and complete.
+    request:
+      endpoint: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/sbd4nano-graphs.rq
+      pivot: {key: k, value: n}
+    assert:
+      - {that: status, eq: 200}
+      - {that: by.enm, eq: 199104}
+      - {that: by.landscape, eq: 34552}
+    inv_ids: [sbd4nano-graph-shape]
+
+  - id: sbd4nano-classes
+    kind: sparql
+    every: 1h
+    describe: Causal assertions, models and datasets are present in the expected numbers.
+    request:
+      endpoint: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/sbd4nano-classes.rq
+      pivot: {key: k, value: n}
+    assert:
+      - {that: by.causalAssertion, eq: 1393}
+      - {that: by.model, eq: 401}
+      - {that: by.dataset, eq: 45}
+    inv_ids: [sbd4nano-class-shape]
+
+  - id: sbd4nano-datasets-canary
+    kind: sparql
+    every: 1h
+    describe: The landscape's "all databases" example query finds every labelled dataset.
+    request:
+      endpoint: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/sbd4nano-datasets.rq
+    assert:
+      - {that: first.n, eq: 45}
+    inv_ids: [sbd4nano-canary-datasets]
+
+  - id: sbd4nano-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    public: false
+    describe: The Virtuoso and Snorql services both run their one replica.
+    request: {check: replicas, services: ["sbd4nano_*"]}
+    assert:
+      - {that: checked, eq: 2}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [sbd4nano-swarm-replicas]

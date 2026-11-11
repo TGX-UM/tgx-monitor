@@ -1,0 +1,53 @@
+id: cytargetlinker-site
+name: CyTargetLinker website
+group: WikiPathways
+class: service
+criticality: low
+owners: [mkutmon, fehrhart, marvinm2]
+depends_on: []
+public: true
+public_summary: The CyTargetLinker website with its linkset downloads, and the app's page in the Cytoscape App Store.
+links: [https://cytargetlinker.github.io/, https://apps.cytoscape.org/apps/cytargetlinker]
+checks:
+  - id: ctl-site
+    kind: http
+    every: 15m
+    describe: The CyTargetLinker home page loads.
+    request: {url: "https://cytargetlinker.github.io/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>Welcome to CyTargetLinker!"}
+    inv_ids: [ctl-site]
+
+  - id: ctl-linksets-page
+    kind: http
+    every: 1h
+    describe: The linksets download page loads.
+    request: {url: "https://cytargetlinker.github.io/pages/linksets"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "CyTargetLinker"}
+      - {that: size, gte: 3000}
+    inv_ids: [ctl-site]
+
+  - id: ctl-appstore
+    kind: http
+    every: 6h
+    describe: The app's page in the Cytoscape App Store is up.
+    request: {url: "https://apps.cytoscape.org/apps/cytargetlinker"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "CyTargetLinker"}
+    inv_ids: [ctl-appstore]
+
+  - id: ctl-tls
+    kind: tls
+    every: 1d
+    describe: The site's certificate is trusted, with at least two weeks to spare.
+    request: {host: cytargetlinker.github.io}
+    assert:
+      - {that: verified, eq: true}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 14}
+    inv_ids: [ctl-tls]

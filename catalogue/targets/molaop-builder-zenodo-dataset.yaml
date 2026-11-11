@@ -1,0 +1,27 @@
+id: molaop-builder-zenodo-dataset
+name: molAOP Builder mappings on Zenodo
+group: Molecular AOP
+class: data
+criticality: low
+owners: [marvinm2]
+public: true
+public_summary: The curated Key Event mappings from the molAOP Builder, deposited on Zenodo with a DOI.
+links: [https://doi.org/10.5281/zenodo.20184643]
+notes: >-
+  Deposited by hand from the Builder admin page when the mapping counts change, so age alone is
+  only a hint: compare the live totals in mb-api-v1-totals with the last deposit.
+checks:
+  - id: zen-latest-version
+    kind: http
+    every: 6h
+    timeout: 30s
+    describe: The newest Zenodo version holds the three mapping archives and the README; an old deposit shows amber.
+    request: {url: "https://zenodo.org/api/records/20184643/versions/latest", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: '"KE-WikiPathways.zip"'}
+      - {that: body, contains: '"KE-GO.zip"'}
+      - {that: body, contains: '"KE-Reactome.zip"'}
+      - {that: body, contains: '"README.md"'}
+      - {that: json.metadata.publication_date, max_age: {warn: 60d}}
+    inv_ids: [zen-latest-version-age]

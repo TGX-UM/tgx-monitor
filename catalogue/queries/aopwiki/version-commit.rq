@@ -1,0 +1,7 @@
+# AOP-Wiki RDF: "<pav:version>-<generator commit, 7 chars>", the form of the API's X-Dataset-Version.
+PREFIX pav: <http://purl.org/pav/>
+SELECT (CONCAT(STR(?v), "-", SUBSTR(STRAFTER(STR(?c), "/commit/"), 1, 7)) AS ?vc)
+FROM <http://aopwiki.org/void>
+WHERE {
+  <https://aopwiki.rdf.bigcat-bioinformatics.org/AOPWikiRDF> pav:version ?v ; pav:createdWith ?c .
+}

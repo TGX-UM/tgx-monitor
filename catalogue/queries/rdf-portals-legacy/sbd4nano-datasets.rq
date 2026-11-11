@@ -1,0 +1,4 @@
+# LandscapeQueries All-Databases-labels.rq, wrapped as a count of labelled datasets.
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT (COUNT(DISTINCT ?d) AS ?n) WHERE {
+  ?d a <https://www.sbd4nano.eu/rdf/#Dataset> ; rdfs:label ?l }

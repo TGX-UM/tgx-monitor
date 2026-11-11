@@ -1,0 +1,11 @@
+{% macro pill(key, extra="") -%}
+<span class="st st--{{ key }}"><span class="st__g" aria-hidden="true">{{ STATES[key].glyph }}</span> {{ STATES[key].word }}{% if extra %} <span class="st__x">({{ extra }})</span>{% endif %}</span>
+{%- endmacro %}
+{% macro probe(view) -%}
+{% if view %}{{ pill(CLASS_STATE[view.cls], (view.last.status ~ ", unconfirmed") if view.state == "UNKNOWN" and view.last else view.state|lower|replace("_", " ")) }}{% else %}{{ pill("unknown") }}{% endif %}
+{%- endmacro %}
+{% macro result_glyph(status) -%}
+{% set k = {"ok": "operational", "failed": "down", "unknown": "unknown", "skipped": "unknown", "blocked": "maintenance"}.get(status, "unknown") %}<span class="st st--{{ k }} st--sm" title="{{ status }}"><span aria-hidden="true">{{ STATES[k].glyph }}</span><span class="vh"> {{ status }}</span></span>
+{%- endmacro %}
+{% macro ts(value) -%}{% if value %}<time datetime="{{ value }}">{{ value[:16]|replace("T", " ") }}</time>{% else %}–{% endif %}{%- endmacro %}
+{% macro csrf_field() -%}<input type="hidden" name="csrf" value="{{ csrf }}">{%- endmacro %}

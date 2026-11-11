@@ -1,0 +1,8 @@
+# Known answer: CHEMBL25 is aspirin, a small molecule.
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX cco: <http://rdf.ebi.ac.uk/terms/chembl#>
+SELECT ?label ?id ?type WHERE {
+  <http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL25> rdfs:label ?label ;
+      cco:chemblId ?id ; a ?type .
+  FILTER(?type = cco:SmallMolecule)
+} LIMIT 5

@@ -1,0 +1,13 @@
+# Known answer: WP254 is "Apoptosis" in Homo sapiens, has CASP3 (ncbigene:836) and about
+# 87 gene products. It is also the Snorql "Genes of a Pathway" example (pathwayId=WP254).
+PREFIX wp: <http://vocabularies.wikipathways.org/wp#>
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+SELECT ?title ?org (COUNT(DISTINCT ?gp) AS ?genes)
+       (MAX(IF(?ncbi = <https://identifiers.org/ncbigene/836>, 1, 0)) AS ?casp3)
+WHERE {
+  ?p a wp:Pathway ; dcterms:identifier "WP254" ; dc:title ?title ; wp:organismName ?org .
+  ?gp a wp:GeneProduct ; dcterms:isPartOf ?p .
+  OPTIONAL { ?gp wp:bdbEntrezGene ?ncbi }
+}
+GROUP BY ?title ?org

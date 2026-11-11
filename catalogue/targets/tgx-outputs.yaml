@@ -1,0 +1,78 @@
+id: tgx-outputs
+name: TGX Outputs site and weekly refresh
+group: Pipelines
+class: pipeline
+criticality: low
+owners: [marvinm2, egonw]
+depends_on: []
+public: true
+public_summary: A public site, refreshed every week by GitHub Actions, that tracks the department's software, data and publication outputs.
+links:
+  - https://tgx-um.github.io/tgx-outputs/
+  - https://github.com/TGX-UM/tgx-outputs/actions/workflows/refresh.yml
+# refresh.yml is scheduled Mon 04:17 UTC but runs land around 10:00-13:00 UTC.
+checks:
+  - id: tgx-outputs-page
+    kind: http
+    every: 15m
+    describe: The site's front page loads with its project table.
+    request: {url: "https://tgx-um.github.io/tgx-outputs/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: Projects tracked}
+    inv_ids: [tgxo-presence]
+
+  - id: tgx-outputs-refreshed
+    kind: compare
+    every: 1h
+    describe: The site says it was refreshed less than nine days ago, and its data files carry the same date.
+    request:
+      left: {http_regex: {url: "https://tgx-um.github.io/tgx-outputs/", re: 'sources refreshed (\d{4}-\d{2}-\d{2})'}}
+      right: {http_regex: {url: "https://tgx-um.github.io/tgx-outputs/data/releases_by_year.csv", re: ',(\d{4}-\d{2}-\d{2})\s*$'}}
+    assert:
+      - {that: relation, eq: equal, label: "banner date == collected_on in the data"}
+      - {that: left_date, max_age: {crit: 9d}}
+    inv_ids: [tgxo-freshness, tgxo-data-csv-shape]
+
+  - id: tgx-outputs-sources
+    kind: http
+    every: 6h
+    describe: Every source was collected completely at the last refresh; amber when the site reports incomplete sources.
+    request: {url: "https://tgx-um.github.io/tgx-outputs/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, matches: '\d+ of \d+ sources refreshed'}
+      - {that: body, not_matches: '[1-9]\d* sources? incomplete', warn: true, label: "no incomplete sources"}
+    inv_ids: [tgxo-source-completeness]
+
+  - id: tgx-outputs-data
+    kind: roundtrip
+    every: 6h
+    describe: The published data files keep their documented columns and the release table its usual length.
+    request:
+      base: https://tgx-um.github.io/tgx-outputs/data
+      steps:
+        - {url: /paper_citations.csv}
+        - {url: /docker_pulls_total.csv}
+        - {url: /releases_by_year.csv}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.body, matches: '^metric,entity,period,value,partial,collected_on\r?$'}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.body, matches: '^metric,entity,period,value,partial,collected_on\r?$'}
+      - {that: last.status, eq: 200}
+      - {that: last.first_line, matches: '^metric,entity,period,value,partial,collected_on\s*$'}
+      - {that: last.lines, gte: 89, label: "≥ 88 rows in releases_by_year"}
+    inv_ids: [tgxo-data-csv-shape]
+
+  - id: tgx-outputs-refresh-workflow
+    kind: gha
+    every: 1h
+    describe: The weekly refresh workflow is enabled and its last scheduled run, less than nine days ago, succeeded.
+    request: {repo: TGX-UM/tgx-outputs, workflow: refresh.yml, event: schedule}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 9d}}
+    inv_ids: [tgxo-workflow-health, to-refresh]

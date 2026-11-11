@@ -1,0 +1,93 @@
+id: bridgedb-website
+name: BridgeDb website
+group: BridgeDb
+class: service
+criticality: low
+owners: [egonw, DeniseSl22, ozancinar]
+public_summary: The BridgeDb project website at www.bridgedb.org, with its documentation, the gene database page and the data-source registry.
+links:
+  - https://www.bridgedb.org/
+  - https://www.bridgedb.org/datasources/datasources.tsv
+notes: GitHub Pages of bridgedb/bridgedb.github.io; the data-source registry comes from bridgedb/datasources.
+checks:
+  - id: bridgedb-website-home
+    kind: http
+    every: 15m
+    describe: The home page loads with its BridgeDb title and links to the webservice and gene database pages.
+    request: {url: "https://www.bridgedb.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, matches: '<title>[^<]*BridgeDb', label: "title mentions BridgeDb"}
+      - {that: body, contains: 'href="/pages/webservice.html"'}
+      - {that: body, contains: 'href="/data/gene_database/"'}
+    inv_ids: [bridgedb-website-home]
+  - id: bridgedb-website-redirects
+    kind: roundtrip
+    every: 1h
+    describe: The bare domain (http and https) and the github.io address redirect permanently to https://www.bridgedb.org/.
+    request:
+      steps:
+        - {url: "https://bridgedb.org/", follow: false, capture: {apex_https: {header: location}}}
+        - {url: "http://bridgedb.org/", follow: false, capture: {apex_http: {header: location}}}
+        - {url: "https://bridgedb.github.io/", follow: false, capture: {github_io: {header: location}}}
+    assert:
+      - {that: steps.0.status, eq: 301}
+      - {that: steps.1.status, eq: 301}
+      - {that: steps.2.status, eq: 301}
+      - {that: captures.apex_https, eq: "https://www.bridgedb.org/"}
+      - {that: captures.apex_http, eq: "https://www.bridgedb.org/"}
+      - {that: captures.github_io, eq: "https://www.bridgedb.org/"}
+    inv_ids: [bridgedb-website-redirects]
+  - id: bridgedb-website-gene-db-page
+    kind: http
+    every: 1d
+    describe: The gene database page leads to the data.bridgedb.org listing, which links at least 36 Zenodo or figshare downloads.
+    request: {url: "https://www.bridgedb.org/data/gene_database/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: final_url, eq: "https://data.bridgedb.org/gene_database/"}
+      - {that: body, matches: '(?s)(?:(?:zenodo|figshare)\..*?){36}', label: "≥ 36 Zenodo/figshare links"}
+    inv_ids: [bridgedb-website-gene-db-page]
+  - id: bridgedb-website-datasources
+    kind: roundtrip
+    every: 1d
+    describe: The data-source registry has at least 140 well-formed rows and the key system codes keep their names.
+    request:
+      steps: [{url: "https://www.bridgedb.org/datasources/datasources.tsv"}]
+      derive:
+        codes: {tsv_by_key: {key: 1, value: 0}}
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.lines, gte: 140}
+      - {that: last.tsv_cols, eq: 14}
+      - {that: last.body, not_matches: '^(?!$)(?:[^\t\n]*\t){0,12}[^\t\n]*$', label: "no row with fewer than 14 fields"}
+      - {that: last.body, not_matches: '^(?:[^\t\n]*\t){14}', label: "no row with more than 14 fields"}
+      - {that: derived.codes.H, eq: HGNC}
+      - {that: derived.codes.L, eq: Entrez Gene}
+      - {that: derived.codes.En, eq: Ensembl}
+      - {that: derived.codes.Ce, eq: ChEBI}
+      - {that: derived.codes.Ch, eq: HMDB}
+      - {that: derived.codes.Wd, eq: Wikidata}
+      - {that: derived.codes.Ca, eq: CAS}
+      - {that: derived.codes.S, eq: UniProtKB}
+      - {that: derived.codes.Cpc, eq: PubChem-compound}
+      - {that: derived.codes.Ck, eq: KEGG Compound}
+    inv_ids: [bridgedb-website-datasources-tsv]
+  - id: bridgedb-website-webservice-link
+    kind: http
+    every: 1d
+    describe: The webservice documentation page links to the live webservice.
+    request: {url: "https://www.bridgedb.org/pages/webservice.html"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "https://webservice.bridgedb.org"}
+    inv_ids: [bridgedb-website-webservice-link]
+  - id: bridgedb-website-pages-workflow
+    kind: gha
+    every: 1d
+    describe: The last GitHub Pages build of the website completed successfully.
+    request: {repo: bridgedb/bridgedb.github.io, workflow: "18226764"}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+    inv_ids: [bridgedb-website-pages-build]

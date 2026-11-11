@@ -1,0 +1,35 @@
+id: backup-hidrive
+name: Off-cluster backup drive (HiDrive)
+group: Jobs and backups
+class: backup
+criticality: medium
+owners: [egonw, marvinm2]
+depends_on: []
+public: true
+public_summary: The network drive outside the cluster that receives off-site backups is mounted on both nodes, has room, and is being written to.
+# The SMB mount is read by the node agents: the hidrive signal lists the directories in
+# TGXMON_AGENT_HIDRIVE; the disk signal needs a "hidrive" entry in TGXMON_AGENT_PATHS
+# (not set in stack.yml yet).
+checks:
+  - id: hidrive-mounted
+    kind: host
+    every: 15m
+    via: [agent:tgx1, agent:tgx2]
+    describe: Each node sees the backup drive mounted, with last night's off-site archive on it.
+    request: {signal: hidrive}
+    assert:
+      - {that: hidrive.aopwiki-dashboard.count, gte: 12, label: "the archive directory is listed (mount present)"}
+      - {that: hidrive.aopwiki-dashboard.newest_age_h, lt: 26, label: "last night's archive is visible"}
+    inv_ids: [hd-mounted]
+
+  - id: hidrive-capacity
+    kind: host
+    every: 6h
+    via: [agent:tgx1, agent:tgx2]
+    describe: The backup drive is a network mount, not the node's own disk, and is less than 80% full.
+    request: {signal: disk}
+    assert:
+      - {that: disk.hidrive.fstype, eq: cifs, label: "mounted over SMB (else jobs write into the root disk)"}
+      - {that: disk.hidrive.used_pct, lt: 70, warn: true}
+      - {that: disk.hidrive.used_pct, lt: 80}
+    inv_ids: [hd-mounted, hd-capacity]

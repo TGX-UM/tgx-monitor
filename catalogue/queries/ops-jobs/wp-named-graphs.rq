@@ -1,0 +1,13 @@
+# How many of the six named graphs of the WikiPathways layout (2026-10) hold data.
+# Cheap: one EXISTS probe per graph, no scan over the store.
+SELECT (COUNT(?g) AS ?n) WHERE {
+  VALUES ?g {
+    <http://rdf.wikipathways.org/graph/wp>
+    <http://rdf.wikipathways.org/graph/gpml>
+    <http://rdf.wikipathways.org/graph/authors>
+    <http://rdf.wikipathways.org/graph/ontologies>
+    <http://rdf.wikipathways.org/graph/void>
+    <http://rdf.wikipathways.org/graph/servicedescription>
+  }
+  FILTER EXISTS { GRAPH ?g { ?s ?p ?o } }
+}

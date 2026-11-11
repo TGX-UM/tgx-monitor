@@ -1,0 +1,23 @@
+# Keep the build context to what the image needs, and never ship local state.
+.git
+.github
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+*.egg-info
+build
+dist
+data
+public-out
+secrets
+*.db
+*.db-journal
+report*.json
+tests
+docs
+scripts
+catalogue/_import/private
+.env
+.env.*

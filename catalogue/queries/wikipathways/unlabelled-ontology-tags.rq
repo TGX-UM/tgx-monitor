@@ -1,0 +1,12 @@
+# Ontology tags on pathways that have no rdfs:label, per ontology prefix (CL, DOID, PW, ...).
+# The wp#Curation:* markers carry no label by design and are left out, so any row is a
+# regression (for example the silent Cell Ontology drop seen until 2026-08-05).
+PREFIX wp: <http://vocabularies.wikipathways.org/wp#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?prefix (COUNT(DISTINCT ?tag) AS ?unlabelled) WHERE {
+  ?p a wp:Pathway ; wp:ontologyTag ?tag .
+  FILTER NOT EXISTS { ?tag rdfs:label ?l }
+  BIND(REPLACE(STR(?tag), "^(.*[/#])([A-Za-z]+)[_:].*$", "$2") AS ?prefix)
+  FILTER(?prefix != "Curation")
+}
+GROUP BY ?prefix

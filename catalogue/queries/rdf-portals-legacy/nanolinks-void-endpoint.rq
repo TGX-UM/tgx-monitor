@@ -1,0 +1,3 @@
+# The SPARQL endpoint the in-store VoID advertises.
+PREFIX void: <http://rdfs.org/ns/void#>
+SELECT ?e FROM <https://w3id.org/nanolinks/void/> WHERE { ?d void:sparqlEndpoint ?e } LIMIT 1

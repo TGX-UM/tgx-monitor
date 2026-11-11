@@ -1,0 +1,202 @@
+id: bridgedb-mapping-regression
+name: BridgeDb mapping correctness
+group: BridgeDb
+class: service
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [bridgedb-webservice]
+public_summary: Known identifier mappings come back in the expected tab-separated format, with one result set per input, including the exact calls the AOP-Wiki RDF conversion makes.
+links:
+  - https://webservice.bridgedb.org/Human/xrefs/H/TP53
+notes: >-
+  Hard checks are baseline-free (wire format, one distinct mapping set per batch input,
+  known answers). Mapping counts (609 / 986 / 590 for TP53 / BRCA1 / EGFR) are warnings,
+  re-baselined in the same change that promotes a new gene database (Ensembl 115 is
+  deposited and pending).
+checks:
+  - id: bridgedb-map-wire-format
+    kind: roundtrip
+    every: 15m
+    describe: A single-gene lookup returns tab-separated identifier and source lines, not JSON and not bioregistry prefixes (the 2.1.8 regression).
+    request:
+      steps: [{url: "https://webservice.bridgedb.org/Human/xrefs/H/TP53"}]
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.headers.content-type, contains: text/plain}
+      - {that: last.first_line, matches: '^[^\t{\[]+\t[^\t]+$', label: "first line is identifier<TAB>source, not JSON"}
+      - {that: last.body, not_matches: '(^|\s)(ncbigene|hgnc\.symbol|chebi|ensembl):', label: "no bioregistry-style prefixes"}
+      - {that: last.lines, gte: 100, label: "TP53 maps to many identifiers"}
+      - {that: last.lines, gte: 579, warn: true, label: "TP53 count within 5% of the 609 baseline"}
+      - {that: last.lines, lte: 639, warn: true, label: "TP53 count within 5% of the 609 baseline (upper)"}
+    inv_ids: [bridgedb-mapping-wire-format, bridgedb-mapping-get-counts]
+  - id: bridgedb-map-batch-union
+    kind: roundtrip
+    every: 15m
+    describe: A three-gene batch request returns one row per gene, each with its own mapping set (the 2.1.8 bug returned the union for every gene).
+    request:
+      steps:
+        - {method: POST, url: "https://webservice.bridgedb.org/Human/xrefsBatch/H", data: "TP53\nBRCA1\nEGFR\n", headers: {Content-Type: text/plain}}
+      derive:
+        keys: {tsv_distinct: 0}
+        systems: {tsv_distinct: 1}
+        sets: {tsv_distinct_sets: {col: 2}}
+        n: {tsv_count_by_key: {key: 0, value: 2}}
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.lines, eq: 3}
+      - {that: derived.keys, eq: [BRCA1, EGFR, TP53]}
+      - {that: derived.systems, eq: [HGNC]}
+      - {that: derived.sets, eq: 3, label: "each input has its own mapping set"}
+      - {that: derived.n.TP53, gte: 100}
+      - {that: derived.n.TP53, gte: 579, warn: true, label: "TP53 ≈ 609"}
+      - {that: derived.n.TP53, lte: 639, warn: true, label: "TP53 ≈ 609 (upper)"}
+      - {that: derived.n.BRCA1, gte: 937, warn: true, label: "BRCA1 ≈ 986"}
+      - {that: derived.n.BRCA1, lte: 1035, warn: true, label: "BRCA1 ≈ 986 (upper)"}
+      - {that: derived.n.EGFR, gte: 560, warn: true, label: "EGFR ≈ 590"}
+      - {that: derived.n.EGFR, lte: 620, warn: true, label: "EGFR ≈ 590 (upper)"}
+    inv_ids: [bridgedb-mapping-batch-union-detector]
+  - id: bridgedb-map-batch-tab-body
+    kind: roundtrip
+    every: 1h
+    describe: The documented batch form with a system code per line also returns one distinct mapping set per input.
+    request:
+      steps:
+        - {method: POST, url: "https://webservice.bridgedb.org/Human/xrefsBatch", data: "TP53\tH\nBRCA1\tH\nEGFR\tH\n", headers: {Content-Type: text/plain}}
+      derive:
+        keys: {tsv_distinct: 0}
+        sets: {tsv_distinct_sets: {col: 2}}
+        n: {tsv_count_by_key: {key: 0, value: 2}}
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.lines, eq: 3}
+      - {that: derived.keys, eq: [BRCA1, EGFR, TP53]}
+      - {that: derived.sets, eq: 3, label: "each input has its own mapping set"}
+      - {that: derived.n.TP53, gte: 579, warn: true, label: "TP53 ≈ 609"}
+      - {that: derived.n.BRCA1, gte: 937, warn: true, label: "BRCA1 ≈ 986"}
+      - {that: derived.n.EGFR, gte: 560, warn: true, label: "EGFR ≈ 590"}
+    inv_ids: [bridgedb-mapping-batch-tab-body]
+  - id: bridgedb-map-get-counts-brca1
+    kind: roundtrip
+    every: 1h
+    describe: A single lookup of BRCA1 returns its usual number of mappings.
+    request:
+      steps: [{url: "https://webservice.bridgedb.org/Human/xrefs/H/BRCA1"}]
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.lines, gte: 100}
+      - {that: last.lines, gte: 937, warn: true, label: "BRCA1 within 5% of the 986 baseline"}
+      - {that: last.lines, lte: 1035, warn: true, label: "BRCA1 within 5% of the 986 baseline (upper)"}
+    inv_ids: [bridgedb-mapping-get-counts]
+  - id: bridgedb-map-get-counts-egfr
+    kind: roundtrip
+    every: 1h
+    describe: A single lookup of EGFR returns its usual number of mappings.
+    request:
+      steps: [{url: "https://webservice.bridgedb.org/Human/xrefs/H/EGFR"}]
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.lines, gte: 100}
+      - {that: last.lines, gte: 560, warn: true, label: "EGFR within 5% of the 590 baseline"}
+      - {that: last.lines, lte: 620, warn: true, label: "EGFR within 5% of the 590 baseline (upper)"}
+    inv_ids: [bridgedb-mapping-get-counts]
+  - id: bridgedb-map-aopwikirdf-chemicals
+    kind: roundtrip
+    every: 15m
+    describe: The chemical calls the AOP-Wiki RDF conversion makes (CAS lookups, single and batch) return HMDB, ChEBI and Wikidata mappings.
+    request:
+      base: https://webservice.bridgedb.org
+      steps:
+        - {url: "/Human/xrefs/Ca/80-05-7"}
+        - {method: POST, url: "/Human/xrefsBatch/Ca", data: "80-05-7\n50-28-2\n", headers: {Content-Type: text/plain}}
+      derive:
+        systems: {tsv_distinct: 1}
+        byk: {tsv_by_key: {key: 0, value: 2}}
+    assert:
+      - {that: steps.0.body, matches: "^DTXSID7020182\tEPA CompTox$", label: "single CAS lookup is TSV with the CompTox id"}
+      - {that: last.status, eq: 200}
+      - {that: last.lines, eq: 2}
+      - {that: derived.systems, eq: [CAS]}
+      - {that: derived.byk.80-05-7, contains: "Ch:HMDB"}
+      - {that: derived.byk.80-05-7, contains: "Ce:CHEBI:"}
+      - {that: derived.byk.80-05-7, contains: "Wd:Q"}
+      - {that: derived.byk.50-28-2, contains: "Ch:HMDB"}
+      - {that: derived.byk.50-28-2, contains: "Ce:CHEBI:"}
+      - {that: derived.byk.50-28-2, contains: "Wd:Q"}
+    inv_ids: [bridgedb-mapping-aopwikirdf-paths]
+  - id: bridgedb-map-aopwikirdf-genes
+    kind: roundtrip
+    every: 15m
+    describe: The Entrez Gene batch call the AOP-Wiki RDF conversion makes maps 7157 to TP53 and 672 to BRCA1, each with its own set.
+    request:
+      steps:
+        - {method: POST, url: "https://webservice.bridgedb.org/Human/xrefsBatch/L", data: "7157\n672\n", headers: {Content-Type: text/plain}}
+      derive:
+        systems: {tsv_distinct: 1}
+        sets: {tsv_distinct_sets: {col: 2}}
+        byk: {tsv_by_key: {key: 0, value: 2}}
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.lines, eq: 2}
+      - {that: derived.systems, eq: [Entrez Gene]}
+      - {that: derived.sets, eq: 2}
+      - {that: derived.byk.7157, matches: '(^|,)H:TP53(,|$)'}
+      - {that: derived.byk.672, matches: '(^|,)H:BRCA1(,|$)'}
+    inv_ids: [bridgedb-mapping-aopwikirdf-paths]
+  - id: bridgedb-map-metabolite
+    kind: roundtrip
+    every: 1h
+    describe: A ChEBI metabolite lookup returns HMDB and Wikidata mappings among at least twelve.
+    request:
+      steps: [{url: "https://webservice.bridgedb.org/Human/xrefs/Ce/CHEBI:16842"}]
+    assert:
+      - {that: last.status, eq: 200}
+      - {that: last.lines, gte: 12}
+      - {that: last.body, matches: "\tHMDB$"}
+      - {that: last.body, matches: "\tWikidata$"}
+    inv_ids: [bridgedb-mapping-metabolite]
+  - id: bridgedb-map-smoke
+    kind: roundtrip
+    every: 1h
+    describe: Ensembl lookups for human and mouse, a Wikidata-targeted lookup and an attribute lookup give their known answers.
+    request:
+      base: https://webservice.bridgedb.org
+      steps:
+        - url: "/Homo%20sapiens/xrefs/En/ENSG00000139618"
+          capture:
+            hgnc: {regex: '^(BRCA2)\tHGNC$'}
+            entrez: {regex: '^(675)\tEntrez Gene$'}
+        - {url: "/Homo%20sapiens/xrefs/En/ENSG00000139618/Wd", capture: {wd: {regex: '^(Q\d+)\tWikidata$'}}}
+        - {url: "/Mus%20musculus/xrefs/En/ENSMUSG00000017146", capture: {mgi: {regex: '^(Brca1)\tMGI$'}}}
+        - {url: "/Homo%20sapiens/attributes/En/ENSG00000139618", capture: {symbol: {regex: '^Symbol\t(\S+)$'}}}
+    assert:
+      - {that: captures.hgnc, eq: BRCA2}
+      - {that: captures.entrez, eq: "675"}
+      - {that: captures.wd, eq: Q17853272}
+      - {that: captures.mgi, eq: Brca1}
+      - {that: captures.symbol, eq: BRCA2}
+      - {that: steps.0.body, not_matches: '\AUnrecognized query'}
+      - {that: steps.2.body, not_matches: '\AUnrecognized query'}
+    inv_ids: [bridgedb-mapping-smoke]
+  - id: bridgedb-map-discovery
+    kind: roundtrip
+    every: 1d
+    describe: The data-source lists, the free-search flag and a capped identifier search answer as expected.
+    request:
+      base: https://webservice.bridgedb.org
+      steps:
+        - {url: "/Homo%20sapiens/sourceDataSources"}
+        - {url: "/Homo%20sapiens/targetDataSources"}
+        - {url: "/Human/isFreeSearchSupported"}
+        - {url: "/Human/search/TP53/5"}
+      derive:
+        systems: {tsv_distinct: 1}
+    assert:
+      - {that: steps.0.body, matches: '(?:[^\n]+\n){40}', label: "≥ 40 source data sources"}
+      - {that: steps.0.body, matches: '^Wikidata$'}
+      - {that: steps.1.body, matches: '(?:[^\n]+\n){40}', label: "≥ 40 target data sources"}
+      - {that: steps.1.body, matches: '^Wikidata$'}
+      - {that: steps.2.body, matches: '\Atrue\s*\Z', label: "free search is supported"}
+      - {that: last.lines, eq: 5}
+      - {that: last.body, matches: '^TP53\S*\tHGNC$'}
+      - {that: derived.systems, eq: [HGNC]}
+    inv_ids: [bridgedb-mapping-catalogue]

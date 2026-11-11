@@ -1,0 +1,76 @@
+id: job-aopwiki-reload
+name: Weekly AOP-Wiki RDF reload job
+group: Jobs and backups
+class: cron
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm, github-raw]
+maintenance: [aopwiki-reload]
+public: true
+public_summary: Every Sunday at 06:00 UTC a cluster job reloads the AOP-Wiki RDF endpoint from the files the weekly generator committed on Saturday.
+links:
+  - https://aopwiki.rdf.bigcat-bioinformatics.org/sparql
+  - https://github.com/marvinm2/AOPWikiRDF/tree/master/data
+# The job is swarm service cronjobs_aopwiki-snorql-reload (schedule label 0 6 * * 0).
+# Its runs are recorded from the task logs by the job-run recorder. That the reload
+# landed is judged from outside by aopwiki-version-master (area aopwiki).
+checks:
+  - id: job-aopwiki-reload-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The Sunday reload ran at its slot, exited cleanly and logged its finish line.
+    request:
+      service: cronjobs_aopwiki-snorql-reload
+      grace: 30m
+      marker_re: '=== AOP-Wiki RDF reload finished (\S+) ==='
+    assert:
+      - {that: schedule, eq: "0 6 * * 0", label: "scheduled Sundays 06:00 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true, label: "log ends with '=== AOP-Wiki RDF reload finished'"}
+    inv_ids: [reload-last-task, aws-last-run]
+
+  - id: job-aopwiki-reload-triples
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: The reload's own count of triples in the main graph is in its normal range and did not fall against previous weeks.
+    request:
+      service: cronjobs_aopwiki-snorql-reload
+      grace: 30m
+      marker_re: 'triple count in http://aopwiki\.org/ ---[\s\S]*?^\s*(\d{5,})\s*$'
+    assert:
+      - {that: marker_found, eq: true}
+      - {that: marker, gte: 320000, label: "≥ 320,000 triples loaded"}
+      - {that: marker, max_drop_pct: 5, window: 21d}
+    inv_ids: [aws-marker, reload-log-signal]
+
+  - id: job-aopwiki-reload-load-list
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: Every file the reload registered reached the loaded state without an error.
+    request:
+      service: cronjobs_aopwiki-snorql-reload
+      grace: 30m
+      # A load_list status row is "<file> <ll_state> <ll_error>"; a good row is "2 NULL".
+      marker_re: '^/database/data/\S+\.ttl\s+(?:[013-9]|\d{2,})\s+\S.*$|^/database/data/\S+\.ttl\s+2\s+(?!NULL\s*$)\S.*$'
+    assert:
+      - {that: marker_found, eq: false, label: "no load_list row other than state 2 / NULL"}
+      - {that: last_run.exit_code, eq: 0}
+    inv_ids: [reload-log-signal]
+
+  - id: job-aopwiki-reload-source-size
+    kind: http
+    every: 6h
+    describe: The main Turtle file the reload downloads from the generator's master branch is there and of normal size.
+    request:
+      url: https://raw.githubusercontent.com/marvinm2/AOPWikiRDF/master/data/AOPWikiRDF.ttl
+      method: HEAD
+      headers: {Accept-Encoding: identity}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-length, gte: 19500000, label: "AOPWikiRDF.ttl ≥ 19.5 MB"}
+      - {that: headers.content-length, max_drop_pct: 5, window: 21d}
+    inv_ids: [reload-staged-size]

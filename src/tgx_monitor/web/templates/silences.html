@@ -1,0 +1,36 @@
+{% extends "private.html" %}
+{% from "_macros.html" import ts %}
+{% block main %}
+{% if error %}<p class="strip strip--red" role="alert">{{ error }}</p>{% endif %}
+<h2>Active</h2>
+{% if active %}
+<div class="tbl"><table>
+<thead><tr><th>Target</th><th>Check</th><th>Reason</th><th>By</th><th>Until</th><th></th></tr></thead>
+<tbody>
+{% for s in active %}
+<tr><td><a href="/target/{{ s.target_id }}">{{ s.target_id }}</a></td><td>{{ s.check_id or "all checks" }}</td><td class="wrapcell">{{ s.reason }}</td><td>{{ s.created_by }}</td><td>{{ ts(s.until) }}</td>
+<td>{% if role.may_change(s.target_id) %}<form method="post" action="/silences/{{ s.id }}/end"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn--ghost" type="submit">End now</button></form>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}<p class="muted">None.</p>{% endif %}
+
+<h2>New silence</h2>
+{% if targets %}
+<form class="form" method="post" action="/silences/new">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="t">Target</label>
+  <select id="t" name="target_id" required>{% for t in targets %}<option value="{{ t.id }}">{{ t.id }}</option>{% endfor %}</select>
+  <label for="c">Check id <span class="muted">(empty: the whole target)</span></label>
+  <input id="c" name="check_id" maxlength="100">
+  <label for="r">Reason</label>
+  <input id="r" name="reason" required maxlength="500">
+  <label for="u">Until <span class="muted">(a duration such as 2h or 3d, or a UTC time 2026-11-12T18:00; at most 30 days)</span></label>
+  <input id="u" name="until" required maxlength="40" value="2h">
+  <button class="btn" type="submit">Silence</button>
+</form>
+{% else %}<p class="muted">You own no targets, so there is nothing you may silence.</p>{% endif %}
+
+<h2>Recently ended</h2>
+{% if recent %}<ul>{% for s in recent %}<li>{{ s.target_id }}{% if s.check_id %}/{{ s.check_id }}{% endif %}: {{ s.reason }} ({{ s.created_by }}, ended {{ ts(s.until) }})</li>{% endfor %}</ul>
+{% else %}<p class="muted">None.</p>{% endif %}
+{% endblock %}

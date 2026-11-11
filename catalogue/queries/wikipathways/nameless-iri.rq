@@ -1,0 +1,6 @@
+# Triples on nameless IRIs (a damaged Virtuoso IRI dictionary). Full-store scan: run it by
+# hand on the OFFLINE instance after a reload or a crash, never on a schedule against live.
+SELECT (COUNT(*) AS ?n) WHERE {
+  ?s ?p ?o
+  FILTER(STRSTARTS(STR(?s), "iri_id_") || (isIRI(?o) && STRSTARTS(STR(?o), "iri_id_")))
+}

@@ -1,0 +1,55 @@
+id: aopwiki-dashboard-pipeline
+name: AOP-Wiki RDF dashboard watchdog workflows (GitHub Actions)
+group: Pipelines
+class: pipeline
+criticality: medium
+owners: [marvinm2]
+depends_on: [aopwiki-multirdf]
+public: true
+public_summary: GitHub Actions test the AOP-Wiki RDF dashboard's queries, trends and downloads against the live endpoint every day or week.
+links:
+  - https://github.com/marvinm2/AOP-Wiki-RDF-dashboard/actions
+checks:
+  - id: dashboard-live-trends
+    kind: gha
+    every: 1h
+    describe: The daily live-trends workflow succeeded within the past two days.
+    request: {repo: marvinm2/AOP-Wiki-RDF-dashboard, workflow: live-trends.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 2d}}
+    inv_ids: [dash-trends, watchdog-wfs]
+
+  - id: dashboard-virtuoso-canary
+    kind: gha
+    every: 1h
+    describe: The weekly database canary workflow succeeded within the past eight days.
+    request: {repo: marvinm2/AOP-Wiki-RDF-dashboard, workflow: virtuoso-canary.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 8d}}
+    inv_ids: [dash-canary, watchdog-wfs]
+
+  - id: dashboard-methodology-lint
+    kind: gha
+    every: 1h
+    describe: The weekday methodology lint of every plot query succeeded within the past four days.
+    request: {repo: marvinm2/AOP-Wiki-RDF-dashboard, workflow: methodology-lint.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 4d}}
+    inv_ids: [dash-lint, watchdog-wfs]
+
+  - id: dashboard-download-audit
+    kind: gha
+    every: 1h
+    describe: The weekly download audit succeeded within the past eight days.
+    request: {repo: marvinm2/AOP-Wiki-RDF-dashboard, workflow: download-audit.yml, event: schedule}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 8d}}
+    inv_ids: [watchdog-wfs]

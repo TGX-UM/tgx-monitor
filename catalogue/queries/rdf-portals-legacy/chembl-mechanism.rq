@@ -1,0 +1,6 @@
+# Known answer: aspirin's mechanism of action and its target.
+PREFIX cco: <http://rdf.ebi.ac.uk/terms/chembl#>
+SELECT ?mech ?target WHERE {
+  ?m cco:hasMolecule <http://rdf.ebi.ac.uk/resource/chembl/molecule/CHEMBL25> ;
+     cco:mechanismDescription ?mech ; cco:hasTarget ?target .
+} LIMIT 5

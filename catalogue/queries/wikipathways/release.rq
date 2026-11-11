@@ -1,0 +1,8 @@
+# The release this store serves: the void:Dataset of the monthly RDF dump,
+# https://data.wikipathways.org/YYYYMMDD/rdf/. One row is expected; newest first.
+PREFIX void: <http://rdfs.org/ns/void#>
+SELECT ?d WHERE {
+  ?d a void:Dataset .
+  FILTER(REGEX(STR(?d), "^https://data.wikipathways.org/[0-9]{8}/rdf/$"))
+}
+ORDER BY DESC(STR(?d))

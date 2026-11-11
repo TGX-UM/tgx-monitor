@@ -1,0 +1,9 @@
+# The release the WikiPathways endpoint serves, as its VoID dataset IRI
+# (https://data.wikipathways.org/<YYYYMMDD>/...).
+PREFIX void: <http://rdfs.org/ns/void#>
+SELECT ?dataset WHERE {
+  ?dataset a void:Dataset .
+  FILTER(REGEX(STR(?dataset), "^https?://data\\.wikipathways\\.org/"))
+}
+ORDER BY DESC(?dataset)
+LIMIT 1

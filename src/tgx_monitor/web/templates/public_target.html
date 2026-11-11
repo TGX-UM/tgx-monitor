@@ -1,0 +1,13 @@
+{% extends "public_base.html" %}
+{% from "_macros.html" import pill %}
+{% block main %}
+<p><a href="{{ root }}index.html">All services</a> · {{ t.group }}</p>
+<p>{{ pill(t.state) }}</p>
+{% if t.summary %}<p>{{ t.summary }}</p>{% endif %}
+<h2>Last 90 days</h2>
+{{ t.bars }}
+<p class="muted small">{% if t.uptime is not none %}{{ "%.2f"|format(t.uptime) }}% of checks passed, averaged over the days with data.{% else %}No data yet.{% endif %}</p>
+<h2>What we check</h2>
+{% if t.checks %}<ul>{% for d in t.checks %}<li>{{ d }}</li>{% endfor %}</ul>{% else %}<p class="muted">No public checks described.</p>{% endif %}
+{% if t.links %}<h2>Links</h2><ul>{% for u in t.links %}<li><a href="{{ u }}" rel="noopener noreferrer">{{ u }}</a></li>{% endfor %}</ul>{% endif %}
+{% endblock %}

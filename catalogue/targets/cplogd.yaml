@@ -1,0 +1,114 @@
+id: cplogd
+name: cpLogD conformal logD predictor
+group: VHP4Safety tools
+class: service
+criticality: low
+owners: [olas, StaffanArvidsson, marvinm2]
+depends_on: [edge-tgx1]
+public: true
+public_summary: Predicts logD with conformal prediction intervals through a small REST API.
+links: [https://cplogd.cloud.vhp4safety.nl/api/openapi.json]
+checks:
+  - id: cplogd-health
+    kind: http
+    every: 15m
+    describe: The service reports that it is running.
+    request: {url: "https://cplogd.cloud.vhp4safety.nl/api/v2/health", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.message, eq: Service running}
+    inv_ids: [cplogd-health]
+
+  - id: cplogd-modelinfo
+    kind: http
+    every: 1d
+    describe: The loaded model is still cpLogD v2 of December 2023, so predictions are reproducible.
+    request: {url: "https://cplogd.cloud.vhp4safety.nl/api/v2/modelInfo", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.modelName, eq: cpLogD_v2}
+      - {that: json.version, eq: "1.0.0+2023-12-07T10:35:33.800795Z"}
+    inv_ids: [cplogd-modelinfo]
+
+  - id: cplogd-predict-ethanol
+    kind: http
+    every: 30m
+    describe: Ethanol gets its known logD prediction and interval at 80% confidence.
+    request:
+      url: "https://cplogd.cloud.vhp4safety.nl/api/v2/predict"
+      params: {molecule: CCO, confidence: "0.8"}
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.predictionMidpoint, gte: -0.32}
+      - {that: json.predictionMidpoint, lte: -0.30}
+      - {that: json.lower, gte: -0.580}
+      - {that: json.lower, lte: -0.578}
+      - {that: json.upper, gte: -0.043}
+      - {that: json.upper, lte: -0.041}
+      - {that: json.confidence, eq: 0.8}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [cplogd-predict-ethanol]
+
+  - id: cplogd-predict-phenol
+    kind: http
+    every: 6h
+    describe: Phenol gets its known logD prediction and interval.
+    request:
+      url: "https://cplogd.cloud.vhp4safety.nl/api/v2/predict"
+      params: {molecule: c1ccccc1O, confidence: "0.8"}
+      parse_json: true
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.predictionMidpoint, gte: 1.466}
+      - {that: json.predictionMidpoint, lte: 1.486}
+      - {that: json.lower, gte: 1.283}
+      - {that: json.lower, lte: 1.285}
+      - {that: json.upper, gte: 1.667}
+      - {that: json.upper, lte: 1.669}
+    inv_ids: [cplogd-predict-phenol]
+
+  - id: cplogd-predict-image
+    kind: http
+    every: 1h
+    describe: The prediction image for ethanol is drawn as a PNG.
+    request:
+      url: "https://cplogd.cloud.vhp4safety.nl/api/v2/predictImage"
+      params: {molecule: CCO, confidence: "0.8"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: image/png}
+      - {that: size, gt: 10000}
+    inv_ids: [cplogd-predict-image]
+
+  - id: cplogd-openapi
+    kind: http
+    every: 1d
+    describe: The API description is version 2.0.0 and still lists the four endpoints.
+    request: {url: "https://cplogd.cloud.vhp4safety.nl/api/openapi.json", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.info.version, eq: "2.0.0"}
+      - {that: json.paths, len_eq: 4}
+      - {that: json.paths./api/v2/predict, exists: true}
+    inv_ids: [cplogd-openapi]
+
+  - id: cplogd-draw-ui
+    kind: http
+    every: 1d
+    severity: low
+    describe: The drawing page that the API description promises is served.
+    request: {url: "https://cplogd.cloud.vhp4safety.nl/draw/"}
+    assert:
+      - {that: status, eq: 200}
+    inv_ids: [cplogd-draw-ui]
+
+  - id: cplogd-image
+    kind: registry
+    every: 1d
+    via: [core]
+    describe: The upstream container image can still be pulled.
+    request: {image: "ghcr.io/pharmbio/cplogd-v2.0:latest"}
+    assert:
+      - {that: reachable, eq: true}
+    inv_ids: [registry-pullability]

@@ -1,0 +1,12 @@
+# Triples per named graph, keyed by the graph IRI without its query string (the ENM,
+# BAO and NPO graph IRIs carry a download URL; only the part before '?' is kept).
+SELECT ?k (COUNT(*) AS ?n) WHERE {
+  GRAPH ?g { ?s ?p ?o }
+  BIND(IF(CONTAINS(STR(?g), "?"), STRBEFORE(STR(?g), "?"), STR(?g)) AS ?base)
+  VALUES (?base ?k) {
+    ("https://data.bioontology.org/ontologies/ENM/download" "enm")
+    ("https://data.bioontology.org/ontologies/BAO/download" "bao")
+    ("https://data.bioontology.org/ontologies/NPO/download" "npo")
+    ("https://ammar257ammar.github.com/RDFied-datasets/ns" "rdfied")
+  }
+} GROUP BY ?k

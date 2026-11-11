@@ -1,0 +1,63 @@
+id: bigcat-unrouted-names
+name: Department names with no service behind them
+group: Legacy hosts
+class: infra
+criticality: muted
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1]
+public: false
+public_summary: Names under bigcat-bioinformatics.org that reach the cluster but have no service; tracked so a change is noticed.
+links: []
+notes: >-
+  Known states: the old grlc API name (service removed 2026-10-04; old tutorial and
+  registry links break here until a redirect router is added), the DOI service name (no
+  service deployed) and the domain apex (no site configured, proxy default certificate).
+  All three answer 404 from the proxy. Each check asserts the known state, so any change
+  (a redirect added, a service deployed, the name moved) shows up.
+checks:
+  - id: grlc-legacy-host-state
+    kind: http
+    every: 1d
+    describe: The old grlc API name still reaches the cluster proxy and answers 404 (known state).
+    request: {url: "https://aopwiki.api.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 404, label: "known state: no router for the removed grlc service"}
+    inv_ids: [grlc-host-state]
+
+  - id: grlc-legacy-host-dns
+    kind: dns
+    every: 1h
+    describe: The old grlc API name still resolves to tgx1.
+    request: {name: aopwiki.api.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+    inv_ids: [grlc-host-dns]
+
+  - id: grlc-legacy-path-redirect
+    kind: http
+    every: 1d
+    describe: An old grlc query link is redirected to the same query on the current AOP-Wiki API (amber until that redirect exists).
+    request: {url: "https://aopwiki.api.bigcat-bioinformatics.org/api-git/marvinm2/AOPWikiQueries/get-all-aops"}
+    assert:
+      - {that: redirect_count, gte: 1, warn: true, label: "redirected"}
+      - {that: final_url, contains: "aopwiki.rdf.bigcat-bioinformatics.org/api/", warn: true}
+      - {that: status, eq: 200, warn: true}
+    inv_ids: [grlc-host-legacy-path]
+
+  - id: doi-bigcat-state
+    kind: http
+    every: 1d
+    describe: The DOI service name answers 404 from the proxy until the service is deployed (known state).
+    request: {url: "https://doi.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 404, label: "known state: no DOI service deployed"}
+    inv_ids: [doi-presence]
+
+  - id: bigcat-apex-state
+    kind: http
+    every: 1d
+    describe: The domain apex has no site and answers 404 with the proxy's default certificate (known state).
+    request: {url: "https://bigcat-bioinformatics.org/", verify: false}
+    assert:
+      - {that: status, eq: 404, label: "known state: no site configured for the apex"}
+    inv_ids: [bigcat-apex-site]

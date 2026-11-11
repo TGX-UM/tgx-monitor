@@ -1,0 +1,6 @@
+# Real pathways only: the identifiers.org filter leaves out the ~130 Pathway-type DataNodes.
+PREFIX wp: <http://vocabularies.wikipathways.org/wp#>
+SELECT (COUNT(DISTINCT ?p) AS ?n) WHERE {
+  ?p a wp:Pathway .
+  FILTER(STRSTARTS(STR(?p), "https://identifiers.org/wikipathways/"))
+}

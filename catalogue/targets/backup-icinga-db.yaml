@@ -1,0 +1,24 @@
+id: backup-icinga-db
+name: Icinga database backup
+group: Jobs and backups
+class: backup
+criticality: low
+owners: [egonw, marvinm2]
+depends_on: [swarm]
+public: false
+public_summary: The database of the cluster's Icinga monitoring is backed up off the cluster.
+# icinga_icinga-mariadb has no scheduled dump. The check expects a nightly dump copied
+# to the off-cluster drive under icinga/.
+checks:
+  - id: bk-icinga-exists
+    kind: file_age
+    every: 1h
+    via: [core]
+    describe: A dump of the Icinga database less than 26 hours old exists off the cluster.
+    request: {mount: hidrive, glob: "icinga/*.sql.gz", small_bytes: 10000}
+    assert:
+      - {that: count, gte: 1, label: "a backup exists"}
+      - {that: newest_age_h, lt: 26}
+      - {that: gzip_ok, eq: true}
+      - {that: small_count, eq: 0}
+    inv_ids: []

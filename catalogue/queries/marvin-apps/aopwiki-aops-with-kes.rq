@@ -1,0 +1,4 @@
+# AOPs that have at least one Key Event: what the molAOP Builder AOP list must match.
+PREFIX aopo: <http://aopkb.org/aop_ontology#>
+SELECT (COUNT(DISTINCT ?aop) AS ?n)
+WHERE { ?aop a aopo:AdverseOutcomePathway ; aopo:has_key_event ?ke }

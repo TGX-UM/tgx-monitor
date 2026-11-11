@@ -1,0 +1,66 @@
+id: expoportal-ontology-pipeline
+name: ExpoPortal ontology processing pipeline
+group: Ontology portals
+class: pipeline
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [swarm, expoportal-sparql]
+public: true
+public_summary: Each ontology uploaded or imported into ExpoPortal is parsed, indexed, measured and scored by a background pipeline.
+links:
+  - https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql
+# ncbo_cron works a Redis queue: an upload becomes UPLOADED, then RDF, indexing,
+# METRICS, ANNOTATOR and FAIRNESS_FOOPS. Large ontologies are deliberately left on the
+# queue, so the backlog never reaches zero. The error counts drift with new uploads, so
+# they are amber thresholds; the progress counts must never fall.
+checks:
+  - id: expoportal-pipeline-status
+    kind: sparql
+    every: 1h
+    timeout: 30s
+    describe: Processed submissions never decrease, and the number that failed parsing, scoring or diffing stays within its usual range.
+    request:
+      endpoint: https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql
+      file: q/ops-jobs/expoportal-submission-status.rq
+      pivot: {key: status, value: n}
+    assert:
+      - {that: status, eq: 200}
+      - {that: by.UPLOADED, gte: 151, label: "≥ 151 submissions"}
+      - {that: by.RDF, gte: 82, label: "≥ 82 parsed to RDF"}
+      - {that: by.ANNOTATOR, gte: 80, label: "≥ 80 through the annotator"}
+      - {that: by.RDF, monotonic: true}
+      - {that: by.ANNOTATOR, monotonic: true}
+      - {that: by.ERROR_RDF, lte: 12, warn: true}
+      - {that: by.ERROR_FAIRNESS_FOOPS, lte: 6, warn: true}
+      - {that: by.ERROR_DIFF, lte: 3, warn: true}
+    inv_ids: [pipeline-status-histogram, pipeline-backlog]
+
+  - id: expoportal-pipeline-activity
+    kind: sparql
+    every: 6h
+    timeout: 30s
+    severity: low
+    describe: The newest ontology submission is less than a month old; amber otherwise, as a sign of activity rather than a fault.
+    request:
+      endpoint: https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql
+      file: q/ops-jobs/expoportal-latest-submission.rq
+    assert:
+      - {that: status, eq: 200}
+      - {that: first.n, gte: 151}
+      - {that: first.latest, max_age: {warn: 30d}}
+    inv_ids: [pipeline-latest-submission]
+
+  - id: expoportal-pipeline-oom
+    kind: swarm
+    every: 15m
+    via: [core]
+    describe: Neither the pipeline worker nor its queue store was killed for lack of memory in the past day, which loses parse work.
+    request:
+      check: crash_loops
+      services: [ontoportal_redis, ontoportal_ncbo_cron]
+      window: 24h
+      threshold: 1
+    assert:
+      - {that: killed_count, eq: 0, label: "no exit-137 kill in 24 h"}
+      - {that: crash_looping_count, eq: 0}
+    inv_ids: [pipeline-redis-oom]

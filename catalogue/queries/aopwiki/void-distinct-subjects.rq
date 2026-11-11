@@ -1,0 +1,5 @@
+# AOP-Wiki RDF: distinct subjects the generator recorded in the VoID description.
+PREFIX void: <http://rdfs.org/ns/void#>
+SELECT ?n
+FROM <http://aopwiki.org/void>
+WHERE { <https://aopwiki.rdf.bigcat-bioinformatics.org/AOPWikiRDF> void:distinctSubjects ?n }

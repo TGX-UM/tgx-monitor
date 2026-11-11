@@ -1,0 +1,72 @@
+id: aopwiki-rdf-metadata
+name: AOP-Wiki RDF service description and VoID
+group: AOP-Wiki RDF
+class: service
+criticality: medium
+owners: [marvinm2]
+depends_on: [edge-tgx1, aopwiki-sparql]
+maintenance: [aopwiki-reload]
+public: true
+public_summary: The machine-readable description of the AOP-Wiki RDF endpoint and dataset (SPARQL service description, VoID, CORS).
+links:
+  - https://aopwiki.rdf.bigcat-bioinformatics.org/.well-known/void
+checks:
+  - id: aopwiki-sd-served
+    kind: roundtrip
+    every: 1h
+    describe: Asking the endpoint for Turtle returns a non-empty SPARQL service description at /sparql, /sparql/ and /.
+    request:
+      base: "https://aopwiki.rdf.bigcat-bioinformatics.org"
+      steps:
+        - {url: /sparql/, headers: {Accept: text/turtle}}
+        - {url: /, headers: {Accept: text/turtle}}
+        - {url: /sparql, headers: {Accept: text/turtle}}
+    assert:
+      - {that: steps.0.status, eq: 200, label: "/sparql/ answers 200"}
+      - {that: steps.0.content_type, contains: text/turtle, label: "/sparql/ is Turtle"}
+      - {that: steps.0.body, contains: "sd:Service", label: "/sparql/ describes an sd:Service"}
+      - {that: steps.1.status, eq: 200, label: "/ answers 200"}
+      - {that: steps.1.content_type, contains: text/turtle, label: "/ is Turtle"}
+      - {that: steps.1.body, contains: "sd:Service", label: "/ describes an sd:Service"}
+      - {that: last.status, eq: 200}
+      - {that: last.headers.content-type, contains: text/turtle}
+      - {that: last.body, contains: "sd:Service"}
+      - {that: last.body, contains: "dcterms:modified"}
+      - {that: last.size, gte: 1000}
+    inv_ids: [sd-served]
+
+  - id: aopwiki-void-per-node
+    kind: http
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: Each node serves the full VoID description at /.well-known/void, so a routing file that did not reach one node shows up.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/.well-known/void", headers: {Accept: text/html}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/turtle}
+      - {that: size, gte: 90000}
+    inv_ids: [void-served-per-node, infra-per-node-routing]
+
+  - id: aopwiki-void-rdfxml
+    kind: http
+    every: 1d
+    describe: The VoID description is also served as RDF/XML when a client asks for it.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/.well-known/void", headers: {Accept: application/rdf+xml}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: application/rdf+xml}
+      - {that: size, gte: 300000}
+    inv_ids: [void-negotiation]
+
+  - id: aopwiki-cors-star
+    kind: http
+    every: 1d
+    describe: A query without an Origin header gets exactly one Access-Control-Allow-Origin "*" header, as strict CORS checkers expect.
+    request:
+      url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+      params: {query: "ASK { ?s ?p ?o }"}
+      headers: {Accept: application/sparql-results+json}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.access-control-allow-origin, eq: "*", label: "exactly one allow-origin: *"}
+    inv_ids: [cors-literal-star]

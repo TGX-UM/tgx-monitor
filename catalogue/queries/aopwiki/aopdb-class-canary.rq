@@ -1,0 +1,8 @@
+# AOP-DB RDF: two class sizes that do not change in the static load.
+SELECT ?t (COUNT(?s) AS ?n)
+FROM <http://aopwiki.org/>
+WHERE {
+  VALUES ?t { <http://aopkb.org/aop_ontology#KeyEvent> <http://purl.obolibrary.org/obo/MI_1047> }
+  ?s a ?t
+}
+GROUP BY ?t

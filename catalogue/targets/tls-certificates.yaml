@@ -1,0 +1,297 @@
+id: tls-certificates
+name: TLS certificates on both nodes
+group: Cluster
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, edge-tgx2]
+public: true
+public_summary: Every site on the cluster presents a valid certificate that is renewed well before it expires, on both nodes.
+links: []
+notes: >-
+  The proxy renews Let's Encrypt certificates about 30 days before expiry, but its ACME
+  account e-mail belongs to the admin who left, so nobody is told when a renewal keeps
+  failing. These checks replace that mail: a renewal that fails shows as days_left falling
+  under 21 (amber) and 10 (red). Each node's proxy keeps its own copy in memory, so the two
+  can diverge (bridgedb.cloud: 72 days on tgx1, 32 on tgx2 on 2026-11-11); both are checked.
+  Names whose own target already has a tls check are not repeated here.
+checks:
+  - id: tls-aopsuite
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for aopsuite.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: aopsuite.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-qsprpred
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for qsprpred.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: qsprpred.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-cdkdepict
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for cdkdepict.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: cdkdepict.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-cplogd
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for cplogd.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: cplogd.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-sombie
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for sombie.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: sombie.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-flame
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for flame.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: flame.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-oppbk
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for oppbk.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: oppbk.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-xploreaop
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for xploreaop.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: xploreaop.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-llemy
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for llemy.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: llemy.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-mct8-docking
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for mct8-docking.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: mct8-docking.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-arrayanalysis
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for arrayanalysis.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: arrayanalysis.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-biodatafuse
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for biodatafuse.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    request: {host: biodatafuse.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-bridgedb-cloud
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for bridgedb.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    request: {host: bridgedb.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-bridgedb-swagger
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for swagger.bridgedb.org that covers the name and is not close to expiry.
+    request: {host: swagger.bridgedb.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-expoportal-sparql
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for sparql.expoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    request: {host: sparql.expoportal.biohackeu.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-expoportal-data
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for data.expoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    request: {host: data.expoportal.biohackeu.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-ontoportal-ui
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for ontoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    request: {host: ontoportal.biohackeu.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-ontoportal-data
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for data.ontoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    request: {host: data.ontoportal.biohackeu.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-ontoportal-sparql
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for sparql.ontoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    request: {host: sparql.ontoportal.biohackeu.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]
+
+  - id: tls-r-odaf-www
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for www.r-odaf.nl that covers the name and is not close to expiry.
+    request: {host: www.r-odaf.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [tls-days-left, tls-not-default-and-san, tls-node-divergence]

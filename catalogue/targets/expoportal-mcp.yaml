@@ -1,0 +1,153 @@
+id: expoportal-mcp
+name: ExpoPortal SPARQL MCP server
+group: Ontology portals
+class: service
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, bigcat-domain-dns, expoportal-sparql]
+public: true
+public_summary: A Model Context Protocol server that lets AI assistants query ExpoPortal's ontology metadata read-only.
+links:
+  - https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp
+notes: >-
+  Checks use the stateless MCP calls (tools/list, tools/call) so they do not open a
+  server session on every run; a full initialize runs hourly. The read-only guard is
+  tested only with a rejected Virtuoso extension, never with a write.
+checks:
+  - id: expoportal-mcp-tools
+    kind: roundtrip
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The MCP server lists its four tools, through public DNS and on each node.
+    request:
+      steps:
+        - method: POST
+          url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+          headers: {Content-Type: application/json, Accept: "application/json, text/event-stream"}
+          json: {jsonrpc: "2.0", id: 1, method: tools/list}
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.body, contains: '"name":"get_schema_card"'}
+      - {that: last.body, contains: '"name":"list_terms"'}
+      - {that: last.body, contains: '"name":"resolve_ontology"'}
+      - {that: last.body, contains: '"name":"run_sparql"'}
+      - {that: last.latency_ms, lt: 5000, warn: true}
+    inv_ids: [mcp-initialize]
+
+  - id: expoportal-mcp-initialize
+    kind: roundtrip
+    every: 1h
+    describe: A full MCP handshake works, the server names itself, and the session it hands out can list the tools.
+    request:
+      steps:
+        - method: POST
+          url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+          headers: {Content-Type: application/json, Accept: "application/json, text/event-stream"}
+          json: {jsonrpc: "2.0", id: 1, method: initialize, params: {protocolVersion: "2025-03-26", capabilities: {}, clientInfo: {name: tgx-monitor, version: "0.1"}}}
+          capture: {session: {header: mcp-session-id}}
+        - method: POST
+          url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+          headers: {Content-Type: application/json, Accept: "application/json, text/event-stream", Mcp-Session-Id: "{session}"}
+          json: {jsonrpc: "2.0", id: 2, method: tools/list}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.body, contains: '"serverInfo":{"name":"expoportal-sparql"'}
+      - {that: last.status, eq: 200}
+      - {that: last.body, contains: '"name":"run_sparql"'}
+    inv_ids: [mcp-initialize]
+
+  - id: expoportal-mcp-run-sparql
+    kind: roundtrip
+    every: 15m
+    describe: The run_sparql tool executes a count of ontologies and returns the portal's full number.
+    request:
+      steps:
+        - method: POST
+          url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+          headers: {Content-Type: application/json, Accept: "application/json, text/event-stream"}
+          json:
+            jsonrpc: "2.0"
+            id: 3
+            method: tools/call
+            params:
+              name: run_sparql
+              arguments: {query: "PREFIX m: <http://data.bioontology.org/metadata/> SELECT (COUNT(?o) AS ?n) WHERE { GRAPH m:Ontology { ?o a m:Ontology } }"}
+          capture: {n: {regex: '\\"n\\": \\"(\d+)\\"'}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.body, contains: '\"outcome\": \"ok\"'}
+      - {that: captures.n, gte: 126, label: "at least 126 ontologies (133 today)"}
+    inv_ids: [mcp-run-sparql]
+
+  - id: expoportal-mcp-guard
+
+    public: false  # a security property: its regression is not for the public page
+    kind: roundtrip
+    every: 1h
+    describe: The read-only guard rejects a query that uses a Virtuoso extension function.
+    request:
+      steps:
+        - method: POST
+          url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+          headers: {Content-Type: application/json, Accept: "application/json, text/event-stream"}
+          json:
+            jsonrpc: "2.0"
+            id: 4
+            method: tools/call
+            params:
+              name: run_sparql
+              arguments: {query: 'SELECT (bif:concat("a","b") AS ?x) WHERE {}'}
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.body, contains: '\"outcome\": \"rejected\"'}
+      - {that: last.body, contains: '"isError":true'}
+    inv_ids: [mcp-guard-canary]
+
+  - id: expoportal-mcp-resolve
+    kind: roundtrip
+    every: 1h
+    timeout: 30s
+    describe: The resolve_ontology tool finds AOPO, the Adverse Outcome Pathways Ontology.
+    request:
+      steps:
+        - method: POST
+          url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+          headers: {Content-Type: application/json, Accept: "application/json, text/event-stream"}
+          json: {jsonrpc: "2.0", id: 5, method: tools/call, params: {name: resolve_ontology, arguments: {term: AOPO}}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: last.body, matches: '\\"matches\\": \[(?:\\n|\s)*\{(?:\\n|\s)*\\"acronym\\": \\"AOPO\\"', label: "first match is AOPO"}
+      - {that: last.body, contains: 'Adverse Outcome Pathways Ontology'}
+    inv_ids: [mcp-resolve-ontology]
+
+  - id: expoportal-mcp-origin-guard
+    kind: roundtrip
+    every: 1h
+    describe: Requests from a foreign web origin are refused, while the old ontoportal name still serves registered clients.
+    request:
+      steps:
+        - method: POST
+          url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+          headers: {Content-Type: application/json, Accept: "application/json, text/event-stream", Origin: "https://evil.example"}
+          json: {jsonrpc: "2.0", id: 6, method: tools/list}
+        - method: POST
+          url: "https://ontoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+          headers: {Content-Type: application/json, Accept: "application/json, text/event-stream"}
+          json: {jsonrpc: "2.0", id: 7, method: tools/list}
+    assert:
+      - {that: steps.0.status, eq: 403, label: "foreign Origin is refused"}
+      - {that: steps.1.status, eq: 200, label: "old host still answers"}
+    inv_ids: [mcp-origin-and-old-host]
+
+  - id: expoportal-mcp-page
+    kind: http
+    every: 1h
+    describe: A browser opening the MCP address gets a page about the server, not an error.
+    request:
+      url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
+      headers: {Accept: text/html}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/html}
+    inv_ids: [mcp-browser-page]

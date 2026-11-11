@@ -1,0 +1,20 @@
+{% extends "private.html" %}
+{% block main %}
+<p>Catalogue <code>{{ sha }}</code>: {{ targets|length }} targets.</p>
+{% if problems %}
+<h2>Problems ({{ problems|length }})</h2>
+<ul class="problems">{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+{% else %}<p class="strip strip--fresh">No problems found by <code>doctor</code>.</p>{% endif %}
+<h2>Targets</h2>
+<div class="tbl"><table>
+<thead><tr><th>Id</th><th>Group</th><th>Class</th><th>Criticality</th><th>Owners</th><th>Checks</th><th>Public</th><th>Depends on</th></tr></thead>
+<tbody>
+{% for t in targets %}
+<tr><td><a href="/target/{{ t.id }}">{{ t.id }}</a></td><td>{{ t.group }}</td><td>{{ t.class_ }}</td><td>{{ t.criticality }}</td><td>{{ t.owners|join(", ") }}</td>
+<td>{% for c in t.checks %}<a href="/check/{{ c.probe_ids()[0][0] }}">{{ c.id }}</a> <span class="muted">{{ c.kind }}</span>{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+<td>{{ "yes" if t.public else "no" }}</td><td>{{ t.depends_on|join(", ") }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+<h2>Maintenance windows (UTC)</h2>
+<ul>{% for w in windows %}<li><code>{{ w.id }}</code>: {{ w.rrule }} at {{ w.start }} for {{ w.duration }}. {{ w.describe }}</li>{% endfor %}</ul>
+{% endblock %}

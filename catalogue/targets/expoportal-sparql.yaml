@@ -1,0 +1,100 @@
+id: expoportal-sparql
+name: ExpoPortal SPARQL endpoint
+group: Ontology portals
+class: data
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, bigcat-domain-dns]
+public: true
+public_summary: The public SPARQL endpoint over ExpoPortal's ontology metadata.
+links:
+  - https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql
+notes: >-
+  Avoid cross-graph aggregates on this store (a GROUP BY over the metadata graphs takes
+  about 15 s); checks use one named graph each.
+checks:
+  - id: expoportal-sparql-ontologies
+    kind: sparql
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The endpoint answers and its ontology metadata graph lists every ontology, through public DNS and on each node.
+    request:
+      endpoint: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/expoportal-ontology-count.rq
+    assert:
+      - {that: status, eq: 200}
+      - {that: first.n, gte: 126, label: "at least 126 ontologies (133 today)"}
+      - {that: first.n, max_drop_pct: 5, window: 7d}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [expoportal-sparql-ontology-count]
+
+  - id: expoportal-sparql-vs-api
+    kind: invariant
+    every: 1h
+    describe: The triple store and the REST API agree on the number of ontologies.
+    request:
+      endpoint: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
+      left: q/rdf-portals-legacy/expoportal-ontology-count.rq
+      right: {http_json: {url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/", path: numberOfArtefacts}}
+    assert:
+      - {that: equal, eq: true, label: "SPARQL ontology count == API numberOfArtefacts"}
+    inv_ids: [expoportal-sparql-ontology-count]
+
+  - id: expoportal-sparql-root-redirect
+    kind: http
+    every: 1h
+    describe: The bare host redirects to the HTTPS SPARQL page on the same name, not to an internal port.
+    request: {url: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/", follow: false}
+    assert:
+      - {that: status, eq: 302}
+      - {that: headers.location, matches: '^(/sparql|https://sparql\.expoportal\.biohackeu\.bigcat-bioinformatics\.org/sparql)$', label: "Location is /sparql on this HTTPS host"}
+    inv_ids: [expoportal-sparql-root-redirect]
+
+  - id: expoportal-sparql-cors
+    kind: http
+    every: 1d
+    describe: Browser clients on other sites may query the endpoint (CORS allows any origin).
+    request:
+      url: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
+      params: {query: "ASK {}"}
+      headers: {Origin: "https://example.org", Accept: application/sparql-results+json}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.access-control-allow-origin, eq: "*"}
+    inv_ids: [expoportal-sparql-sd-cors]
+
+  - id: expoportal-sparql-sd
+    kind: http
+    every: 1d
+    describe: The endpoint publishes a SPARQL service description; amber while it names an internal address instead of the public one.
+    request:
+      url: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
+      headers: {Accept: text/turtle}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "sd:endpoint"}
+      - {that: body, contains: "<https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/", warn: true, label: "sd:endpoint is the public HTTPS URL"}
+    inv_ids: [expoportal-sparql-sd-cors]
+
+  - id: expoportal-sparql-no-keys
+
+    public: false  # a security property: its regression is not for the public page
+    kind: sparql
+    every: 1h
+    describe: No ontology submission record carries an API key in a URL (imported pull locations must be cleared).
+    request:
+      endpoint: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/expoportal-submission-keys.rq
+    assert:
+      - {that: first.n, eq: 0}
+    inv_ids: [expoportal-apikey-leak-canary]
+
+  - id: expoportal-sparql-dns
+    kind: dns
+    every: 1h
+    describe: The SPARQL name resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: sparql.expoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [expoportal-dns-pair]

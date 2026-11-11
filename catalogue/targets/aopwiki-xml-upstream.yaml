@@ -1,0 +1,49 @@
+id: aopwiki-xml-upstream
+name: AOP-Wiki XML exports (aopwiki.org)
+group: External upstreams
+class: data
+criticality: low
+owners: [marvinm2]
+depends_on: []
+public: true
+public_summary: The nightly and quarterly AOP-Wiki XML exports from aopwiki.org that the RDF releases are built from.
+links:
+  - https://aopwiki.org/downloads
+checks:
+  - id: aopwiki-xml-nightly
+    kind: http
+    every: 1d
+    describe: The nightly AOP-Wiki XML export is downloadable and full size.
+    request: {url: "https://aopwiki.org/downloads/aop-wiki-xml.gz", method: HEAD}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-length, gte: 8000000}
+      - {that: headers.last-modified, exists: true}
+    inv_ids: [xml-nightly]
+
+  - id: aopwiki-xml-quarterly-listing
+    kind: compare
+    every: 1d
+    describe: The downloads page lists a quarterly export from the current or the previous quarter.
+    request:
+      left: {http_list: {url: "https://aopwiki.org/downloads", re: 'aop-wiki-xml-(\d{4}-\d{2}-\d{2})\.gz', pick: newest}}
+      right: {const: quarterly}
+    assert:
+      - {that: left_age_days, lt: 107, label: "newest quarterly export < 107 days old (a quarter plus 14 days)"}
+    inv_ids: [xml-quarterly-listing]
+
+  - id: aopwiki-xml-quarterly-file
+    kind: roundtrip
+    every: 7d
+    describe: The newest quarterly export on the downloads page is downloadable and full size.
+    request:
+      base: "https://aopwiki.org"
+      steps:
+        - url: /downloads
+          capture: {f: {regex: 'href="downloads/(aop-wiki-xml-\d{4}-\d{2}-\d{2}\.gz)"'}}
+        - {method: HEAD, url: "/downloads/{f}"}
+    assert:
+      - {that: completed, eq: true}
+      - {that: last.status, eq: 200}
+      - {that: last.headers.content-length, gte: 8000000}
+    inv_ids: [xml-quarterly-file]

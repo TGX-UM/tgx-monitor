@@ -1,0 +1,37 @@
+id: enanomapper-purl
+name: eNanoMapper ontology PURLs
+group: Nanosafety and RDF
+class: service
+criticality: medium
+owners: [egonw]
+depends_on: []
+public: true
+public_summary: The persistent URLs of the eNanoMapper ontology (purl.enanomapper.org) and the eNanoMapper data search.
+links:
+  - http://purl.enanomapper.org/onto/enanomapper.owl
+  - https://search.data.enanomapper.net/
+notes: >-
+  The PURL namespace is the graph IRI of eNanoMapper data in NanoLinks and SbD4Nano and
+  the IRI of every eNanoMapper ontology term. The PURL host sits on a legacy server whose
+  web server is down; the owner has to decide whether to restore the redirects or mute
+  this target.
+checks:
+  - id: enm-purl-resolves
+    kind: http
+    every: 1h
+    timeout: 1m
+    describe: The eNanoMapper ontology PURL resolves to an OWL document.
+    request: {url: "http://purl.enanomapper.org/onto/enanomapper.owl"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, matches: 'owl:Ontology|<Ontology', label: an OWL ontology}
+    inv_ids: [enm-purl-resolves]
+
+  - id: enm-data-search
+    kind: http
+    every: 1h
+    describe: The external eNanoMapper data search loads after its redirect.
+    request: {url: "https://search.data.enanomapper.net/"}
+    assert:
+      - {that: status, eq: 200}
+    inv_ids: [enm-upstream-search]

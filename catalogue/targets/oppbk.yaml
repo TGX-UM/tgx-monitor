@@ -1,0 +1,60 @@
+id: oppbk
+name: OP PBK model (R/Shiny)
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [TmoerWUR, ozancinar, Maddocent, marvinm2]
+depends_on: [edge-tgx1]
+public: true
+public_summary: An interactive physiologically based kinetic model for organophosphates, built in R Shiny.
+links: [https://oppbk.cloud.vhp4safety.nl/]
+checks:
+  - id: oppbk-root
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    timeout: 30s
+    describe: The model page loads with the pinned Shiny version, through public DNS and on each node.
+    request: {url: "https://oppbk.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>OP PBK model"}
+      - {that: body, contains: shiny-javascript-1.13.0, label: "Shiny 1.13.0 (reproducibility pin of the build)"}
+      - {that: size, gt: 50000}
+      - {that: latency_ms, lt: 10000, warn: true}
+    inv_ids: [oppbk-root]
+
+  - id: oppbk-session
+    kind: shiny
+    every: 30m
+    describe: A Shiny session opens over a websocket, so the model is usable and not only the page.
+    request: {url: "https://oppbk.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: page_has_shiny, eq: true}
+      - {that: websocket, eq: true}
+      - {that: ws_open, eq: true}
+      - {that: ws_ms, lt: 10000, warn: true}
+    inv_ids: [oppbk-sockjs]
+
+  - id: oppbk-browser
+    kind: browser_artifact
+    every: 1h
+    via: [core]
+    describe: In a real browser the model connects and draws its inputs and outputs without errors.
+    request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser/latest.json", page: oppbk}
+    assert:
+      - {that: page_found, eq: true}
+      - {that: age_h, lt: 13}
+      - {that: page.ok, eq: true}
+    inv_ids: [oppbk-session]
+
+  - id: oppbk-image
+    kind: registry
+    every: 1d
+    via: [core]
+    describe: The private image can still be pulled with the read credential, which a reschedule needs.
+    request: {image: "ghcr.io/vhp4safety/oppbk:latest"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: missing_on_nodes, len_eq: 0, warn: true}
+    inv_ids: [oppbk-registry-auth, registry-pullability]

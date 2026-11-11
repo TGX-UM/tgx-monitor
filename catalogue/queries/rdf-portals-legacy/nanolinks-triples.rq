@@ -1,0 +1,2 @@
+# Live size of the NanoLinks graph.
+SELECT (COUNT(*) AS ?n) FROM <https://w3id.org/nanolinks/> WHERE { ?s ?p ?o }

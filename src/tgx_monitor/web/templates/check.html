@@ -1,0 +1,65 @@
+{% extends "private.html" %}
+{% from "_macros.html" import pill, probe, ts, result_glyph %}
+{% block main %}
+<p>{{ probe(view) }} · target <a href="/target/{{ t.id }}">{{ t.name }}</a> · via <code>{{ via }}</code> · kind <code>{{ c.kind }}</code> every {{ c.every }}</p>
+{% if c.describe %}<p>{{ c.describe }}</p>{% endif %}
+
+<h2>Why it is in this state</h2>
+<dl class="kv">
+  <dt>Engine state</dt><dd>{{ view.state }}{% if view.since %} since {{ ts(view.since) }}{% endif %}</dd>
+  <dt>Failing since</dt><dd>{{ ts(view.first_fail_at) if view.first_fail_at else "not failing" }}</dd>
+  <dt>Last OK</dt><dd>{{ ts(view.last_ok_at) }}</dd>
+  <dt>Dependencies</dt><dd>{% for a, s in ancestors %}<a href="/target/{{ a }}">{{ a }}</a> {{ pill(s) }}{% if not loop.last %} → {% endif %}{% else %}none{% endfor %}</dd>
+  {% if view.state == "BLOCKED" %}<dt>Blocked by</dt><dd>{{ blockers|join(", ") or "an ancestor that has since recovered" }}</dd>{% endif %}
+  <dt>Maintenance</dt><dd>{% if window %}in window <code>{{ window.id }}</code> ({{ window.describe }}){% elif next_window %}next window {{ next_window[0].strftime("%a %Y-%m-%d %H:%M") }} to {{ next_window[1].strftime("%H:%M") }} UTC{% else %}none scheduled{% endif %}</dd>
+  <dt>Silences</dt><dd>{% for s in silences %}until {{ ts(s.until) }} by {{ s.created_by }}: {{ s.reason }}{% if not loop.last %}<br>{% endif %}{% else %}none{% endfor %}</dd>
+  <dt>Known issue</dt><dd>{% for k in known %}{{ k.reason }} (owner {{ k.owner }}, until {{ k.until }}){% if not loop.last %}<br>{% endif %}{% else %}none{% endfor %}</dd>
+</dl>
+
+<h2>Assertions in the last run</h2>
+{% if last %}
+<p class="muted">{{ ts(last.started_at) }} · {{ last.status }} · {{ (last.duration_ms or 0)|round|int }} ms · catalogue <code>{{ last.config_sha or "?" }}</code> (now <code>{{ sha }}</code>)</p>
+{% if last.outcomes %}
+<div class="tbl"><table>
+<thead><tr><th>Assertion</th><th>Result</th><th>Expected</th><th>Found</th></tr></thead>
+<tbody>
+{% for o in last.outcomes %}
+<tr><td><code>{{ o.assertion }}</code>{% if o.warn_only %} <span class="muted">(warn only)</span>{% endif %}</td><td>{{ result_glyph(o.status) }} {{ o.status }}</td><td class="wrapcell">{{ o.expected }}</td><td class="wrapcell">{{ o.found }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}<p>{{ last.summary }}</p>{% endif %}
+{% if last.calls %}
+<h3>Requests made</h3>
+<ul class="calls">{% for k in last.calls %}<li><code>{{ k.method }} {{ k.url }}</code> via {{ k.via }}: {{ k.status if k.status is not none else "no answer" }}{% if k.ms %} in {{ k.ms|round|int }} ms{% endif %}{% if k.note %} ({{ k.note }}){% endif %}</li>{% endfor %}</ul>
+{% endif %}
+{% else %}<p class="muted">Not run yet.</p>{% endif %}
+
+{% if curl %}
+<h2>Repeat it by hand</h2>
+<pre class="pre pre--copy" tabindex="0" aria-label="curl command">{{ curl }}</pre>
+{% endif %}
+
+<h2>History</h2>
+{% if metric.svg %}<h3>{{ metric.path }}, last 7 days</h3>{{ metric.svg }}{% endif %}
+<p class="runs" aria-label="Last {{ history|length }} runs, newest first">{% for h in history %}{{ result_glyph(h.status) }}{% endfor %}</p>
+<details><summary>Last {{ history|length }} runs</summary>
+<div class="tbl"><table><thead><tr><th>Started</th><th>Status</th><th>ms</th><th>Summary</th></tr></thead><tbody>
+{% for h in history %}<tr><td>{{ ts(h.started_at) }}</td><td>{{ result_glyph(h.status) }} {{ h.status }}{% if h.warn %} (warn){% endif %}</td><td>{{ (h.duration_ms or 0)|round|int }}</td><td class="wrapcell">{{ h.summary|truncate(240) }}</td></tr>{% endfor %}
+</tbody></table></div></details>
+
+<h2>Who was told</h2>
+{% if deliveries %}
+<div class="tbl"><table><thead><tr><th>Created</th><th>Incident</th><th>Channel</th><th>Event</th><th>Attempts</th><th>Delivered</th><th>Reply</th></tr></thead><tbody>
+{% for d in deliveries %}<tr><td>{{ ts(d.created_at) }}</td><td>#{{ d.incident_id }}</td><td>{{ d.channel }}{% if d.dry_run %} (dry run){% endif %}</td><td>{{ d.event }}</td><td>{{ d.attempts }}</td><td>{% if d.dead %}dead letter{% else %}{{ ts(d.sent_at) if d.sent_at else "pending" }}{% endif %}</td><td class="wrapcell">{{ d.reply }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<p class="muted">No notifications for this target's recent incidents.</p>{% endif %}
+
+<h2>Last failing evidence</h2>
+{% if evidence %}
+<p class="muted">From the run at {{ ts(evidence.started_at) }}. <a href="/check/{{ pid }}/evidence/{{ evidence.id }}">Download as text</a>.</p>
+<pre class="pre" tabindex="0">{{ evidence.body }}</pre>
+{% else %}<p class="muted">None kept (evidence is stored for failed runs, 90 days).</p>{% endif %}
+
+<h2>Definition</h2>
+<pre class="pre" tabindex="0">{{ definition }}</pre>
+{% endblock %}

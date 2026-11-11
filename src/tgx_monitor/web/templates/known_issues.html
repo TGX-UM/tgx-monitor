@@ -1,0 +1,14 @@
+{% extends "private.html" %}
+{% block main %}
+<p>From <code>catalogue/known_issues.yaml</code>. A known issue keeps a check from alerting until its date; after that it alerts again.</p>
+{% if known %}
+<div class="tbl"><table>
+<thead><tr><th>Target</th><th>Check</th><th>Reason</th><th>Owner</th><th>Until</th><th>Ticket</th></tr></thead>
+<tbody>
+{% for k in known %}
+<tr><td><a href="/target/{{ k.target }}">{{ k.target }}</a></td><td>{{ k.check or "all checks" }}</td><td class="wrapcell">{{ k.reason }}</td><td>{{ k.owner }}</td>
+<td>{{ k.until }}{% if k.until < today %} <strong>(expired, alerting)</strong>{% endif %}</td><td>{{ k.ticket or "" }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}<p class="muted">None.</p>{% endif %}
+{% endblock %}

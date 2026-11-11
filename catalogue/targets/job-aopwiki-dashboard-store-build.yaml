@@ -1,0 +1,55 @@
+id: job-aopwiki-dashboard-store-build
+name: Daily AOP-Wiki dashboard query-store build
+group: Jobs and backups
+class: cron
+criticality: medium
+owners: [marvinm2]
+depends_on: [swarm, aopwiki-multirdf]
+maintenance: [dashboard-store-build]
+public: true
+public_summary: Every night at 04:30 UTC a cluster job re-runs the dashboard's plot queries against the multi-release endpoint and publishes the stored results.
+links:
+  - https://aopwiki-dashboard.vhp4safety.nl
+# Swarm service cronjobs_aopwiki-dashboard-store-build (30 4 * * *): starts a one-off
+# build with the dashboard's own image and echoes its 'Published manifest' line.
+checks:
+  - id: job-dashboard-store-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The nightly store build ran at its slot and finished with "Store build complete".
+    request:
+      service: cronjobs_aopwiki-dashboard-store-build
+      grace: 30m
+      marker_re: '^Store build complete\.'
+    assert:
+      - {that: schedule, eq: "30 4 * * *", label: "scheduled daily 04:30 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true}
+    inv_ids: [store-last-task, sb-last-run]
+
+  - id: job-dashboard-store-manifest
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: The build published a manifest with no failed plot queries, covering every release.
+    request:
+      service: cronjobs_aopwiki-dashboard-store-build
+      grace: 30m
+      marker_re: 'Published manifest: \{.*"failed": \[\].*"versions": (\d+)'
+    assert:
+      - {that: marker_found, eq: true, label: "manifest line with \"failed\": []"}
+      - {that: marker, gte: 35, label: "≥ 35 releases in the store"}
+    inv_ids: [store-build-log, sb-manifest]
+
+  - id: job-dashboard-store-age
+    kind: http
+    every: 1h
+    describe: The dashboard's published plot store was built less than 26 hours ago.
+    request: {url: "https://aopwiki-dashboard.vhp4safety.nl/api/v2/manifest", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.store_built_at, max_age: {crit: 26h}}
+      - {that: json.versions, len_gte: 35}
+    inv_ids: [store-manifest-age]

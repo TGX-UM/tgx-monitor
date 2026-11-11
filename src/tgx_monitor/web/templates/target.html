@@ -1,0 +1,31 @@
+{% extends "private.html" %}
+{% from "_macros.html" import pill, probe, ts %}
+{% block main %}
+<p>{{ pill(state) }}{% if window %} <span class="muted">in window {{ window.id }}: {{ window.describe }}</span>{% endif %}</p>
+<dl class="kv">
+  <dt>Id</dt><dd><code>{{ t.id }}</code></dd>
+  <dt>Group</dt><dd>{{ t.group }}</dd>
+  <dt>Class</dt><dd>{{ t.class_ }}</dd>
+  <dt>Criticality</dt><dd>{{ t.criticality }}</dd>
+  <dt>Owners</dt><dd>{% for h, name in owners %}{{ name }} <span class="muted">({{ h }})</span>{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}</dd>
+  <dt>Public</dt><dd>{{ "yes" if t.public else "no" }}{% if t.public_summary %}: {{ t.public_summary }}{% endif %}</dd>
+  <dt>Depends on</dt><dd>{% for a, s in ancestors %}<a href="/target/{{ a }}">{{ a }}</a> {{ pill(s) }}{% if not loop.last %}<br>{% endif %}{% else %}nothing{% endfor %}</dd>
+  <dt>Windows</dt><dd>{{ t.maintenance|join(", ") or "none" }}</dd>
+  {% if t.links %}<dt>Links</dt><dd>{% for u in t.links %}<a href="{{ u }}" rel="noopener noreferrer">{{ u }}</a>{% if not loop.last %}<br>{% endif %}{% endfor %}</dd>{% endif %}
+  {% if t.notes %}<dt>Notes</dt><dd>{{ t.notes }}</dd>{% endif %}
+</dl>
+<h2>Checks</h2>
+<div class="tbl"><table>
+<thead><tr><th>Probe</th><th>Kind</th><th>Every</th><th>State</th><th>Last run</th><th>Summary</th></tr></thead>
+<tbody>
+{% for p in probes %}
+<tr><td><a href="/check/{{ p.pid }}">{{ p.pid }}</a>{% if not p.check.enabled %} <span class="muted">(disabled)</span>{% endif %}<br><span class="muted small">{{ p.check.describe }}</span></td>
+<td>{{ p.check.kind }}</td><td>{{ p.check.every }}</td><td>{{ probe(p.view) }}</td>
+<td>{{ ts(p.view.last.started_at if p.view and p.view.last else None) }}</td>
+<td class="wrapcell">{{ (p.view.last.summary if p.view and p.view.last else "")|truncate(200) }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+<h2>Incidents</h2>
+{% if incidents %}<ul>{% for i in incidents %}<li>#{{ i.id }} {{ i.severity }}: {{ i.title or "" }}, opened {{ ts(i.opened_at) }}{% if i.closed_at %}, closed {{ ts(i.closed_at) }}{% else %} <strong>(open)</strong>{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="muted">None recorded.</p>{% endif %}
+{% endblock %}

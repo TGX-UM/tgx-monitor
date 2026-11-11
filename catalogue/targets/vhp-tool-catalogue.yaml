@@ -1,0 +1,51 @@
+id: vhp-tool-catalogue
+name: VHP4Safety cloud tool catalogue
+group: VHP4Safety platform
+class: data
+criticality: medium
+owners: [ozancinar, egonw, jmillanacosta]
+depends_on: [github-raw]
+public: true
+public_summary: The catalogue of VHP4Safety tools that the platform renders, kept on GitHub and GitHub Pages.
+links:
+  - https://github.com/VHP4Safety/cloud
+  - https://cloud.vhp4safety.nl/
+notes: >-
+  The platform's tool pages fetch cloud.vhp4safety.nl/service/<id>.json for every catalogue
+  entry. The outbound link sweep over the tools' own URLs needs a kind that iterates a list and
+  is not here yet.
+checks:
+  - id: cat-shape
+    kind: http
+    every: 1d
+    describe: The catalogue file is valid JSON with at least 45 tools, none missing an id, name or stage.
+    request: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json, len_gte: 45}
+      - {that: body, not_matches: '"(id|service|stage)":\s*""', label: "no empty id, service or stage"}
+      - {that: body, not_matches: '"stage":\s*"(?!https://vhp4safety\.github\.io/glossary#VHP\d+"|NA"|Unknown"|Other")',
+         label: "every stage is a glossary IRI, NA, Unknown or Other"}
+      - {that: body, not_matches: '"reg_q_\w+":(?!\s*"(?:true|false|)")', label: "reg_q answers are the strings true, false or empty"}
+    inv_ids: [cat-shape]
+  - id: cat-detail-files
+    kind: compare
+    every: 1d
+    timeout: 30s
+    describe: Every catalogue entry has its detail JSON file in the repository, and there are no orphan detail files.
+    request:
+      left: {http_list: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", re: '"id":\s*"([^"]+)"', pick: all}}
+      right: {http_list: {url: "https://api.github.com/repos/VHP4Safety/cloud/contents/docs/service", re: '"name":\s*"((?!template\.)[^"/]+)\.json"', pick: all}, on_error: unknown}
+    assert:
+      - {that: equal, eq: true, label: "catalogue ids == detail JSON files"}
+    inv_ids: [cat-detail-json]
+  - id: cat-detail-served
+    kind: http
+    every: 1d
+    describe: GitHub Pages serves a catalogue entry's detail JSON to the platform.
+    request: {url: "https://cloud.vhp4safety.nl/service/molaopbuilder.json", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: application/json}
+      - {that: json.id, eq: molaopbuilder}
+    inv_ids: [cat-detail-json]

@@ -1,0 +1,28 @@
+id: aopwikirdf-zenodo
+name: AOP-Wiki RDF monthly Zenodo deposit
+group: AOP-Wiki RDF
+class: data
+criticality: low
+owners: [marvinm2]
+depends_on: []
+public: true
+public_summary: A citable monthly snapshot of the AOP-Wiki RDF files on Zenodo.
+links:
+  - https://doi.org/10.5281/zenodo.13353286
+checks:
+  - id: aopwikirdf-zenodo-latest
+    kind: http
+    every: 1d
+    describe: The newest Zenodo version is from the last 35 days, is labelled with its month, and holds all five Turtle files with a full-size main file.
+    request: {url: "https://zenodo.org/api/records/13353286/versions/latest", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.metadata.publication_date, max_age: {warn: 33d, crit: 35d}}
+      - {that: json.metadata.version, matches: '^\d{4}-\d{2}$'}
+      - {that: json.files, len_eq: 5}
+      - {that: body, contains: '"key": "AOPWikiRDF-Genes.ttl"'}
+      - {that: body, contains: '"key": "AOPWikiRDF-Enriched.ttl"'}
+      - {that: body, contains: '"key": "AOPWikiRDF-Void.ttl"'}
+      - {that: body, contains: '"key": "ServiceDescription.ttl"'}
+      - {that: body, matches: '"key": "AOPWikiRDF\.ttl", "size": (1[5-9]\d{6}|[2-9]\d{7}|[1-9]\d{8}),', label: "AOPWikiRDF.ttl ≥ 15 MB"}
+    inv_ids: [zenodo-latest, zenodo-files]

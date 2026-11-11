@@ -1,0 +1,96 @@
+id: aopwiki-snorql-ui
+name: AOP-Wiki RDF Explorer (SNORQL UI)
+group: AOP-Wiki RDF
+class: service
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, aopwiki-sparql, github-raw]
+maintenance: [aopwiki-reload]
+public: true
+public_summary: The browser front end for the AOP-Wiki RDF endpoint, with ready-made example queries.
+links:
+  - https://aopwiki.rdf.bigcat-bioinformatics.org/
+  - https://aopwiki-rdf.vhp4safety.nl/
+checks:
+  - id: aopwiki-ui-home
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The explorer page loads with its title, through public DNS and on each node.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>AOP-Wiki RDF Explorer</title>"}
+      - {that: latency_ms, lt: 3000, warn: true}
+    inv_ids: [ui-presence]
+
+  - id: aopwiki-ui-alias
+    kind: http
+    every: 15m
+    describe: The explorer also loads under its VHP4Safety name.
+    request: {url: "https://aopwiki-rdf.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>AOP-Wiki RDF Explorer</title>"}
+    inv_ids: [ui-presence]
+
+  - id: aopwiki-ui-alias-redirect
+    kind: http
+    every: 1d
+    describe: Plain http on the VHP4Safety name redirects permanently to https.
+    request: {url: "http://aopwiki-rdf.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, matches: '^https://aopwiki-rdf\.vhp4safety\.nl/'}
+    inv_ids: [ui-presence]
+
+  - id: aopwiki-ui-config
+    kind: http
+    every: 1h
+    describe: The explorer's configuration points at the AOP-Wiki endpoint and the example query repository, so an image update did not lose its settings.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/assets/js/config.js"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: 'endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"'}
+      - {that: body, contains: 'examplesRepo: "https://github.com/marvinm2/AOP-Wiki-Queries"'}
+      - {that: body, contains: 'examplesBranch: "main"'}
+    inv_ids: [ui-config]
+
+  - id: aopwiki-ui-examples-tree
+    kind: compare
+    every: 1d
+    describe: The example query repository the explorer lists still holds at least 40 queries.
+    request:
+      left:
+        http_list:
+          url: "https://api.github.com/repos/marvinm2/AOP-Wiki-Queries/git/trees/main?recursive=1"
+          re: '"path":\s*"([^"]+\.rq)"'
+          pick: all
+          headers: {Accept: application/vnd.github+json}
+        on_error: unknown
+      right: {const: 40}
+    assert:
+      - {that: left, len_gte: 40, label: "≥ 40 example .rq files"}
+    inv_ids: [ui-examples-tree]
+
+  - id: aopwiki-ui-example-count-aops
+    kind: roundtrip
+    every: 1h
+    describe: The "count AOPs" example, sent exactly as the explorer sends it (bare aopo prefix), gives the same number as a direct count.
+    request:
+      steps:
+        - url: "https://raw.githubusercontent.com/marvinm2/AOP-Wiki-Queries/main/A.%20Metadata/count-aops.rq"
+          capture: {q: {regex: '(?s)(.+)'}}
+        - url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+          params: {query: "{q}"}
+          headers: {Accept: application/sparql-results+json}
+        - url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+          params: {query: "SELECT (COUNT(DISTINCT ?a) AS ?n) FROM <http://aopwiki.org/> WHERE { ?a a <http://aopkb.org/aop_ontology#AdverseOutcomePathway> }"}
+          headers: {Accept: application/sparql-results+json}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200, label: "example query file is reachable"}
+      - {that: steps.1.status, eq: 200, label: "example query runs"}
+      - {that: steps.1.json.results.bindings.0.total_AOPs.value, gte: 590, label: "example counts ≥ 590 AOPs"}
+      - {that: steps.1.json.results.bindings.0.total_AOPs.value, eq_path: steps.2.json.results.bindings.0.n.value, label: "example count == direct count"}
+    inv_ids: [ui-example-roundtrip, aopwiki-sparql-canaries]

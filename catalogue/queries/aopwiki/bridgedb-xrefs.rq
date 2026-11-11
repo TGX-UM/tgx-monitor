@@ -1,0 +1,10 @@
+# AOP-Wiki RDF: gene cross-references written through BridgeDb, by identifier type
+# (HGNC, Ensembl, UniProt, NCBI Gene). They fall to about zero when BridgeDb fails silently.
+SELECT ?t (COUNT(DISTINCT ?s) AS ?n)
+FROM <http://aopwiki.org/>
+WHERE {
+  VALUES ?t { <http://edamontology.org/data_2298> <http://edamontology.org/data_1033>
+              <http://edamontology.org/data_2291> <http://edamontology.org/data_1027> }
+  ?s a ?t
+}
+GROUP BY ?t

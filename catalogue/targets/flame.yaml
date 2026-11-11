@@ -1,0 +1,63 @@
+id: flame
+name: Flame predictive-toxicology modelling framework
+group: VHP4Safety tools
+class: service
+criticality: low
+owners: [manuelpastor, marvinm2]
+depends_on: [edge-tgx1]
+public: true
+public_summary: A framework for building and running predictive toxicology models, with a web interface.
+links: [https://flame.cloud.vhp4safety.nl/]
+checks:
+  - id: flame-root
+    kind: http
+    every: 15m
+    describe: The Flame web interface shell loads.
+    request: {url: "https://flame.cloud.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>Flame"}
+      - {that: body, contains: 'base href="/flame.kh.svc/"'}
+    inv_ids: [flame-root]
+
+  - id: flame-ready
+    kind: http
+    every: 15m
+    describe: The Flame API reports that it is ready.
+    request: {url: "https://flame.cloud.vhp4safety.nl/api/v1/ready"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: I am ready}
+    inv_ids: [flame-ready]
+
+  - id: flame-assets
+    kind: roundtrip
+    every: 1h
+    describe: The application script and stylesheet named in the page are served (checked by HEAD, the script is 14 MB).
+    request:
+      base: https://flame.cloud.vhp4safety.nl
+      steps:
+        - url: /
+          capture:
+            main: {regex: 'static/(main-es2015\.[0-9a-f]+\.js)'}
+            css: {regex: 'static/(styles\.[0-9a-f]+\.css)'}
+        - {method: HEAD, url: "/flame.kh.svc/static/{main}"}
+        - {method: HEAD, url: "/flame.kh.svc/static/{css}"}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.content_type, contains: javascript}
+      - {that: steps.2.status, eq: 200}
+      - {that: steps.2.content_type, contains: css}
+    inv_ids: [flame-spa-assets]
+
+  - id: flame-models
+    kind: http
+    every: 1d
+    describe: At least one model is loaded, so predictions are possible.
+    request: {url: "https://flame.cloud.vhp4safety.nl/api/v1/manage/models", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.0, eq: true}
+      - {that: json.1, len_gte: 1, label: at least one model in the library}
+    inv_ids: [flame-models-nonempty]

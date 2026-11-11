@@ -1,0 +1,16 @@
+{% extends "private.html" %}
+{% block main %}
+{% if error %}<p class="strip strip--red" role="alert">{{ error }}</p>{% endif %}
+{% if disabled %}
+<p class="strip strip--amber">Login is disabled until a session key is configured.</p>
+{% else %}
+<form class="form form--narrow" method="post" action="/login?next={{ next|urlencode }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="u">GitHub handle</label>
+  <input id="u" name="username" autocomplete="username" required maxlength="64">
+  <label for="p">Password</label>
+  <input id="p" name="password" type="password" autocomplete="current-password" required>
+  <button type="submit" class="btn">Log in</button>
+</form>
+{% endif %}
+{% endblock %}

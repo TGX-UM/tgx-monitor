@@ -1,0 +1,17 @@
+# Known live problems in the marvin-apps area (molAOP, qAOP, VHP platform, R-ODAF, ingredient-SMILES).
+# Shown on the page; they do not alert until `until`.
+- target: ingredient-smiles
+  check: null
+  reason: >-
+    The service is at 0/1 replicas since late 2026-11-10: its task exited cleanly and the
+    on-failure restart policy did not start a new one, so Traefik answers 404 for every page.
+    Needs a redeploy (and a restart policy of any).
+  owner: marvinm2
+  until: "2026-11-25"
+- target: molaop-builder
+  check: mb-aop-membership
+  reason: >-
+    The Builder's AOP membership snapshot dates from 2026-07-21 and has no reload job, so it
+    lists 539 AOPs against 546 AOPs with Key Events in AOP-Wiki. AOP 625 still matches.
+  owner: marvinm2
+  until: "2026-12-31"

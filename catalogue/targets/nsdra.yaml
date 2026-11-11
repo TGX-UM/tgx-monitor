@@ -1,0 +1,168 @@
+id: nsdra
+name: NSDRA - NanoSafety Data Reusability Assessment
+group: Nanosafety and RDF
+class: service
+criticality: medium
+owners: [egonw, marvinm2, ammar257ammar]
+depends_on: [edge-tgx1, bigcat-domain-dns]
+public: true
+public_summary: A web app to assess how reusable nanosafety datasets are, against a list of maturity indicators.
+links:
+  - https://nsdra.bigcat-bioinformatics.org/
+  - https://nsdra.org/
+notes: >-
+  Never POST /assess: it runs a crawl and can store a submission. The database holds user
+  submissions. nsdra.org is registered outside the department; a renewal or
+  transfer has to be arranged.
+checks:
+  - id: nsdra-ui
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The assessment page loads on the department name, through public DNS and on each node.
+    request: {url: "https://nsdra.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>NSDRA: NanoSafety Data Reusability Assessment</title>"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [nsdra-presence]
+
+  - id: nsdra-apex
+    kind: http
+    every: 15m
+    describe: The same page loads on its own domain, nsdra.org.
+    request: {url: "https://nsdra.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>NSDRA: NanoSafety Data Reusability Assessment</title>"}
+    inv_ids: [nsdra-presence]
+
+  - id: nsdra-https-redirect
+    kind: http
+    every: 1h
+    describe: Plain HTTP on nsdra.org is redirected permanently to HTTPS.
+    request: {url: "http://nsdra.org/", follow: false}
+    assert:
+      - {that: status, eq: 301}
+      - {that: headers.location, eq: "https://nsdra.org/"}
+    inv_ids: [nsdra-presence]
+
+  - id: nsdra-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the department name, with time to spare.
+    request: {host: nsdra.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [nsdra-presence]
+
+  - id: nsdra-apex-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for nsdra.org, with time to spare.
+    request: {host: nsdra.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [nsdra-presence]
+
+  - id: nsdra-dns
+    kind: dns
+    every: 1h
+    describe: The department name resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: nsdra.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [bigcat-explicit-records]
+
+  - id: nsdra-indicators
+    kind: compare
+    every: 1h
+    describe: The assessment form lists its full set of maturity indicators.
+    request:
+      left: {http_list: {url: "https://nsdra.bigcat-bioinformatics.org/", re: '(w3id\.org/nsdra/maturity-indicator/readme/[^"<>\s]+)', pick: all}}
+      right: {const: 256}
+    assert:
+      - {that: left, len_gte: 243, label: "at least 243 distinct maturity indicators (256 today)"}
+    inv_ids: [nsdra-mi-list-shape]
+
+  - id: nsdra-db-path
+    kind: http
+    every: 15m
+    describe: An assessment lookup reaches the database and comes back empty for an unknown id, rather than failing.
+    request: {url: "https://nsdra.bigcat-bioinformatics.org/assessment/00000000-0000-0000-0000-000000000000"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "var jsonStr = `null`"}
+    inv_ids: [nsdra-db-path]
+
+  - id: nsdra-www
+    kind: tls
+    every: 1d
+    describe: www.nsdra.org serves a trusted certificate for its name, not the proxy's default one.
+    request: {host: www.nsdra.org}
+    assert:
+      - {that: is_traefik_default, eq: false}
+      - {that: verified, eq: true}
+    inv_ids: [nsdra-www-host]
+
+  - id: nsdra-domain-expiry
+    kind: compare
+    every: 1d
+    describe: The nsdra.org registration does not run out within the next two months.
+    request:
+      left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/nsdra.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
+      right: {const: "registration"}
+    assert:
+      - {that: left_age_days, lt: -90, warn: true, label: "more than 90 days to expiry"}
+      - {that: left_age_days, lt: -60, label: "more than 60 days to expiry"}
+    inv_ids: [nsdra-domain-expiry]
+
+  - id: nsdra-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    public: false
+    describe: The web app and its database both run their one replica.
+    request: {check: replicas, services: ["nsdra_*"]}
+    assert:
+      - {that: checked, eq: 2}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [nsdra-swarm-replicas]
+
+  - id: nsdra-crash-loops
+    kind: swarm
+    every: 1h
+    via: [core]
+    public: false
+    describe: The web app has had no failed tasks in the last day.
+    request: {check: crash_loops, services: ["nsdra_*"], window: 24h, threshold: 3}
+    assert:
+      - {that: failed_task_count, eq: 0}
+      - {that: crash_looping_count, eq: 0}
+    inv_ids: [nsdra-swarm-replicas]
+
+  - id: nsdra-db-backup
+    kind: file_age
+    every: 1h
+    via: [core]
+    timeout: 2m
+    public: false
+    describe: A fresh, non-empty dump of the NSDRA database exists.
+    request: {mount: nsdra-backups, glob: "*.sql.gz", small_bytes: 1000}
+    assert:
+      - {that: count, gte: 1, label: a backup exists}
+      - {that: newest_age_h, lt: 26}
+      - {that: gzip_ok, eq: true}
+      - {that: small_count, eq: 0}
+    inv_ids: [nsdra-backup]

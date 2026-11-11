@@ -1,0 +1,10 @@
+# NanoLinksKG-SPARQL-Queries "NanoLinks-KG Stats/NumberOfMaterialsPerDataset.rq":
+# distinct materials per dataset distribution label (Dataset 1..5).
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX dcat: <http://www.w3.org/ns/dcat#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?datasetLabel (COUNT(DISTINCT ?material) AS ?materialCount) WHERE {
+  ?dataset dcat:distribution ?datasetrdf .
+  ?datasetrdf rdfs:label ?datasetLabel .
+  ?material dct:source ?datasetrdf ; dct:type ?materialType .
+} GROUP BY ?datasetLabel ORDER BY ?datasetLabel

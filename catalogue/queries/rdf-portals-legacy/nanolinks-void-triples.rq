@@ -1,0 +1,3 @@
+# void:triples as declared in the in-store VoID graph.
+PREFIX void: <http://rdfs.org/ns/void#>
+SELECT ?n FROM <https://w3id.org/nanolinks/void/> WHERE { ?d void:triples ?n } LIMIT 1

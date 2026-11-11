@@ -1,0 +1,42 @@
+name: Outside probe
+
+# The alert path that shares nothing with the cluster: every 20 minutes, from GitHub's
+# runners, through each node IP. See scripts/outside_probe.py and RUNBOOK.md.
+#
+# Scheduled runs only start once the repository variable OUTSIDE_PROBE_ENABLED is
+# "true" (DEPLOY.md step 9): before the status page exists every run would be red.
+# GitHub disables schedules after 60 days without repository activity; core
+# re-enables this workflow daily through the API, and the gha-probe healthcheck
+# (6 h grace) notices if it stops anyway.
+on:
+  schedule:
+    - cron: "7,27,47 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: outside-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: >-
+      github.repository == 'TGX-UM/tgx-monitor' &&
+      (github.event_name == 'workflow_dispatch' || vars.OUTSIDE_PROBE_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+
+      # Standard library only: the runner's python3, nothing installed.
+      - name: Probe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HC_PROBE_URL: ${{ secrets.HC_PROBE_URL }}
+        run: python3 scripts/outside_probe.py --manage-issue --json probe.json

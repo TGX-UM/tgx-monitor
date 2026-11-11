@@ -1,0 +1,61 @@
+id: job-wikipathways-switch
+name: Monthly WikiPathways cutover job
+group: Jobs and backups
+class: cron
+criticality: high
+owners: [marvinm2]
+depends_on: [swarm, job-wikipathways-reload]
+maintenance: [wp-switch]
+public: true
+public_summary: Two hours after the monthly reload a cluster job switches the WikiPathways SPARQL endpoint to the freshly loaded copy, if that copy is complete.
+links:
+  - https://sparql.wikipathways.org/sparql
+# Swarm service cronjobs_wikipathways-switch (0 4 12 * *). Exit 0 = switched or nothing
+# to switch, 1 = shrink guard or bad state, 2 = a node is stale. Its first scheduled
+# run is 2026-11-12 04:00 UTC; until then job_run reports "not yet due" (unknown).
+# That both nodes then serve the new release is wp-sparql-release-current (area
+# wikipathways).
+checks:
+  - id: job-wikipathways-switch-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The monthly cutover ran at its slot, after a successful reload that month, and exited cleanly.
+    request:
+      service: cronjobs_wikipathways-switch
+      after_success_of: cronjobs_wikipathways-reload
+      grace: 30m
+    assert:
+      - {that: schedule, eq: "0 4 12 * *", label: "scheduled the 12th, 04:00 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0, label: "exit 0 (1 = shrink guard, 2 = a node is stale)"}
+      - {that: ran_after_dependency, eq: true, label: "ran after this month's successful reload"}
+    inv_ids: [wps-ran, wp-switch-registered, wp-switch-outcome]
+
+  - id: job-wikipathways-switch-layout
+    kind: sparql
+    every: 6h
+    via: [public, tgx1, tgx2]
+    timeout: 30s
+    describe: The endpoint serves the six named graphs of the current data layout (pathways, GPML, authors, ontologies, VoID, service description) on both nodes.
+    request:
+      endpoint: https://sparql.wikipathways.org/sparql
+      file: q/ops-jobs/wp-named-graphs.rq
+    assert:
+      - {that: status, eq: 200}
+      - {that: first.n, eq: 6, label: "all six named graphs hold data"}
+    inv_ids: [wp-switch-layout-live]
+
+  - id: job-wikipathways-switch-graph-group
+    kind: sparql
+    every: 6h
+    via: [public, tgx1, tgx2]
+    timeout: 30s
+    describe: Anonymous queries on the WikiPathways graph group still find pathways, so the switch kept the read permissions.
+    request:
+      endpoint: https://sparql.wikipathways.org/sparql
+      file: q/ops-jobs/wp-graph-group-ask.rq
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+    inv_ids: [wp-switch-layout-live]

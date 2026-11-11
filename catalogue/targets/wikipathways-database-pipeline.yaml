@@ -1,0 +1,64 @@
+id: wikipathways-database-pipeline
+name: WikiPathways content pipeline (GitHub Actions)
+group: Pipelines
+class: pipeline
+criticality: medium
+owners: [AlexanderPico, khanspers, egonw, mkutmon]
+depends_on: []
+public: true
+public_summary: GitHub Actions in wikipathways-database turn every pathway edit into the website and assets, and refresh identifier mappings and citations every week.
+links:
+  - https://github.com/wikipathways/wikipathways-database/actions
+checks:
+  - id: wpdb-workflow-states
+    kind: gha
+    every: 1h
+    describe: No workflow has been switched off by GitHub for inactivity; only the retired classic-site sync is disabled.
+    request: {repo: wikipathways/wikipathways-database}
+    assert:
+      - {that: inactive, len_eq: 0, label: "no workflow disabled for inactivity"}
+      - {that: disabled, eq: [scheduled_gpml_sync.yml], label: "only the retired GPML sync is disabled"}
+    inv_ids: [wpdb-workflow-states, wg-db]
+
+  - id: wpdb-on-gpml-change
+    kind: gha
+    every: 1h
+    describe: The last run of the pipeline that publishes edited pathways succeeded.
+    request: {repo: wikipathways/wikipathways-database, workflow: on_gpml_change.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+    inv_ids: [wpdb-on-gpml-change, wg-db]
+
+  - id: wpdb-bridge-cache
+    kind: gha
+    every: 1h
+    describe: The weekly cache of identifier mappings and metadata succeeded within the past eight days.
+    request: {repo: wikipathways/wikipathways-database, workflow: scheduled_bridge_cache.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 8d}}
+    inv_ids: [wpdb-weekly-jobs, wg-db]
+
+  - id: wpdb-citedin
+    kind: gha
+    every: 1h
+    describe: The weekly fetch of pathway citations succeeded within the past eight days.
+    request: {repo: wikipathways/wikipathways-database, workflow: scheduled_citedin_update.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {crit: 8d}}
+    inv_ids: [wpdb-weekly-jobs]
+
+  - id: wpdb-pr-workflow
+    kind: gha
+    every: 1h
+    severity: low
+    describe: The workflow that checks contributed pull requests passed on its last run; amber when it failed, for the owners to judge.
+    request: {repo: wikipathways/wikipathways-database, workflow: 1_on_pull_request.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success, warn: true}
+    inv_ids: [wpdb-pr-workflow]

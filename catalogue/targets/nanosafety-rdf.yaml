@@ -1,0 +1,137 @@
+id: nanosafety-rdf
+name: NanoSafety RDF (SPARQL endpoint and Snorql UI)
+group: Nanosafety and RDF
+class: data
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, bigcat-domain-dns]
+public: true
+public_summary: Nanomaterial, assay and publication data from RiskGONE, NanoSolveIT and SbD4Nano as queryable RDF, with a Snorql query UI.
+links:
+  - https://nanosafety.rdf.bigcat-bioinformatics.org/
+  - https://nanosafety.rdf.bigcat-bioinformatics.org/sparql
+notes: >-
+  The Snorql UI keeps answering 200 while Virtuoso is down, so the store is judged on the
+  triple count, not on the UI (the 2026-09-02 outage went unnoticed for 12 days). The
+  graph only changes on a manual reload; its size is exact.
+checks:
+  - id: nanosafety-ui
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The Snorql query page loads, through public DNS and on each node.
+    request: {url: "https://nanosafety.rdf.bigcat-bioinformatics.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>Nanosafety Snorql UI</title>"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [nanosafety-ui-presence]
+
+  - id: nanosafety-https-redirect
+    kind: http
+    every: 1h
+    describe: Plain HTTP is redirected permanently to HTTPS.
+    request: {url: "http://nanosafety.rdf.bigcat-bioinformatics.org/", follow: false}
+    assert:
+      - {that: status, eq: 301}
+      - {that: headers.location, eq: "https://nanosafety.rdf.bigcat-bioinformatics.org/"}
+    inv_ids: [nanosafety-https-tls]
+
+  - id: nanosafety-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    request: {host: nanosafety.rdf.bigcat-bioinformatics.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [nanosafety-https-tls]
+
+  - id: nanosafety-dns
+    kind: dns
+    every: 1h
+    describe: The name resolves to tgx1 through two public resolvers, and they agree.
+    request: {name: nanosafety.rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
+    assert:
+      - {that: node, eq: tgx1}
+      - {that: consistent, eq: true}
+    inv_ids: [bigcat-explicit-records]
+
+  - id: nanosafety-sd
+    kind: http
+    every: 1d
+    describe: The endpoint publishes a SPARQL service description that names its public HTTPS address.
+    request:
+      url: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"
+      headers: {Accept: text/turtle}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "sd:Service"}
+      - {that: body, matches: '(?s)@prefix (ns\d+):\s*<https://nanosafety\.rdf\.bigcat-bioinformatics\.org/>.*sd:endpoint\s+\1:sparql', label: "sd:endpoint is the public HTTPS URL"}
+    inv_ids: [nanosafety-sd]
+
+  - id: nanosafety-triples
+    kind: sparql
+    every: 15m
+    timeout: 30s
+    describe: The NanoSafety graph holds exactly the triples of the last load, so the store behind the UI is up and complete.
+    request:
+      endpoint: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/nanosafety-triples.rq
+    assert:
+      - {that: status, eq: 200}
+      - {that: first.n, eq: 6353173, label: "graph size of the last manual load"}
+    inv_ids: [nanosafety-triple-count]
+
+  - id: nanosafety-classes
+    kind: sparql
+    every: 1h
+    describe: Ontology classes, assays and nanomaterials are all present in the expected numbers.
+    request:
+      endpoint: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/nanosafety-classes.rq
+      pivot: {key: k, value: n}
+    assert:
+      - {that: by.owlClass, eq: 194235}
+      - {that: by.assay, eq: 8120}
+      - {that: by.material, eq: 1160}
+    inv_ids: [nanosafety-class-shape]
+
+  - id: nanosafety-riskgone-canary
+    kind: sparql
+    every: 1h
+    describe: Three example queries from the RiskGONE query set return the answers the UI release was verified with.
+    request:
+      endpoint: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"
+      file: q/rdf-portals-legacy/nanosafety-riskgone.rq
+    assert:
+      - {that: first.assays, eq: 7}
+      - {that: first.types, eq: 35}
+      - {that: first.names, eq: 83}
+    inv_ids: [nanosafety-canary-riskgone]
+
+  - id: nanosafety-ui-config
+    kind: http
+    every: 1h
+    describe: The query UI is wired to the public endpoint and the NanoSafety graph.
+    request: {url: "https://nanosafety.rdf.bigcat-bioinformatics.org/assets/js/config.js"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: 'endpoint: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"'}
+      - {that: body, contains: 'defaultGraph: "http://nanosafety.org"'}
+    inv_ids: [nanosafety-ui-config]
+
+  - id: nanosafety-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    public: false
+    describe: The Virtuoso and Snorql services both run their one replica.
+    request: {check: replicas, services: ["nanosafety_*"]}
+    assert:
+      - {that: checked, eq: 2}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [nanosafety-swarm-replicas]

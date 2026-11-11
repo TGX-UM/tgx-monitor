@@ -1,0 +1,2 @@
+# The graph group that load.sh re-creates is readable for anonymous users.
+ASK FROM <http://rdf.wikipathways.org/> { ?s a <http://vocabularies.wikipathways.org/wp#Pathway> }

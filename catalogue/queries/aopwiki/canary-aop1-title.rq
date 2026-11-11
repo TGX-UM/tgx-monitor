@@ -1,0 +1,5 @@
+# AOP-Wiki RDF: a known answer that never changes.
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+ASK
+FROM <http://aopwiki.org/>
+{ <https://identifiers.org/aop/1> dc:title "Uncharacterized liver damage leading to hepatocellular carcinoma" }

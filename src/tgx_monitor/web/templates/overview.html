@@ -1,0 +1,36 @@
+{% extends "private.html" %}
+{% from "_macros.html" import pill, probe, ts %}
+{% block main %}
+<ul class="counts" aria-label="Targets by state">
+{% for key in ["down", "degraded", "maintenance", "unknown", "operational"] %}
+  <li>{{ pill(key) }} <strong>{{ counts.get(key, 0) }}</strong></li>
+{% endfor %}
+</ul>
+{% if problems %}<p class="strip strip--amber">The catalogue loaded with {{ problems }} problem(s). See <a href="/catalogue">Catalogue</a>.</p>{% endif %}
+
+<h2>Open incidents</h2>
+{% if incidents %}
+<div class="tbl"><table>
+<thead><tr><th>Target</th><th>Severity</th><th>Opened</th><th>Failing</th><th>Acknowledged</th></tr></thead>
+<tbody>
+{% for i in incidents %}
+<tr><td><a href="/target/{{ i.target_id }}">{{ i.target_id }}</a></td><td>{{ i.severity }}</td><td>{{ ts(i.opened_at) }}</td>
+<td>{% for p in i.failing %}<a href="/check/{{ p }}">{{ p }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+<td>{{ i.acked_by or "no" }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}<p class="muted">None.</p>{% endif %}
+
+{% for group, rows in groups.items() %}
+<h2>{{ group }}</h2>
+<div class="tbl"><table>
+<thead><tr><th>Target</th><th>State</th><th>Probes</th><th>Not OK</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr><td><a href="/target/{{ r.t.id }}">{{ r.t.name }}</a><span class="muted small"> {{ r.t.id }} · {{ r.t.criticality }}</span></td>
+<td>{{ pill(r.state) }}</td><td>{{ r.n }}</td>
+<td>{% for v in r.bad[:4] %}<a href="/check/{{ v.probe_id }}">{{ v.probe_id }}</a> {{ probe(v) }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% if r.bad|length > 4 %}<br><span class="muted">and {{ r.bad|length - 4 }} more</span>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% endfor %}
+{% endblock %}

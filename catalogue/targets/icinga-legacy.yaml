@@ -1,0 +1,49 @@
+id: icinga-legacy
+name: Icinga2 (being retired)
+group: Cluster
+class: infra
+criticality: low
+owners: [egonw, marvinm2]
+depends_on: [edge-tgx1, swarm]
+public: false
+public_summary: The previous monitoring system, kept running until it is retired.
+links: [https://icinga.cloud.vhp4safety.nl/]
+notes: >-
+  Set up by the admin who left. Most of its 31 checks are permanently critical and out of
+  date; it posts about 8,900 Slack messages a day and every one of its mails fails. Its
+  noise is not checkable here (it would need a service-log kind). Lower to muted or remove
+  once it is retired.
+checks:
+  - id: icinga-web
+    kind: http
+    every: 15m
+    describe: The Icinga web interface answers with a redirect to its login page.
+    request: {url: "https://icinga.cloud.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, eq: 302}
+      - {that: headers.location, contains: "/authentication/login"}
+    inv_ids: [ic-web]
+
+  - id: icinga-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes present a trusted certificate for the Icinga name, not close to expiry.
+    request: {host: icinga.cloud.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [ic-web]
+
+  - id: icinga-replicas
+    kind: swarm
+    every: 15m
+    via: [core]
+    describe: All five Icinga services run their replica.
+    request: {check: replicas, services: ["icinga_*"]}
+    assert:
+      - {that: checked, eq: 5}
+      - {that: not_converged_count, eq: 0}
+    inv_ids: [ic-replicas]

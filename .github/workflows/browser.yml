@@ -1,0 +1,69 @@
+name: Browser checks
+
+# Renders the JS-heavy pages in catalogue/browser.yaml with Playwright every 6 h and
+# commits browser/latest.json to the orphan branch `history`, where core's
+# browser_artifact checks read it. Chromium never runs on the cluster.
+on:
+  schedule:
+    - cron: "13 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write  # push to the history branch, nothing else
+
+concurrency:
+  group: history-branch
+  cancel-in-progress: false
+
+jobs:
+  browser:
+    if: github.repository == 'TGX-UM/tgx-monitor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # No token on disk while third-party pages render and pip installs run: the
+      # write token is handed to git in the push step only.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Install Playwright
+        run: |
+          pip install --require-hashes --no-deps -r scripts/browser-requirements.lock
+          python -m playwright install --with-deps chromium
+
+      - name: Render the pages
+        run: python scripts/browser_checks.py --out "$RUNNER_TEMP/out/browser/latest.json"
+
+      # The history branch is shared with core's daily rollups, so this never
+      # force-pushes: it adds one commit and rebases if core pushed in between.
+      - name: Commit to the history branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git config http.https://github.com/.extraheader "AUTHORIZATION: basic $auth"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          wt="$RUNNER_TEMP/history"
+          if git fetch --depth=50 origin history 2>/dev/null; then
+            git worktree add -B history "$wt" FETCH_HEAD
+          else
+            git worktree add --orphan -b history "$wt"
+          fi
+          mkdir -p "$wt/browser"
+          cp "$RUNNER_TEMP/out/browser/latest.json" "$wt/browser/latest.json"
+          python -c "import json,sys; print(json.dumps(json.load(open(sys.argv[1])), sort_keys=True))" \
+            "$wt/browser/latest.json" >> "$wt/browser/$(date -u +%Y-%m).jsonl"
+          cd "$wt" || exit 1
+          git add browser
+          git commit -q -m "browser: $(date -u +%Y-%m-%dT%H:%MZ)" || { echo "nothing changed"; exit 0; }
+          for _ in 1 2 3; do
+            git push origin history && exit 0
+            git fetch --depth=50 origin history && git rebase FETCH_HEAD
+          done
+          exit 1

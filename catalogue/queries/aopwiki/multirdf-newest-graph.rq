@@ -1,0 +1,6 @@
+# AOP-Wiki multi-release: the newest release graph that holds AOPs.
+SELECT (MAX(STR(?g)) AS ?g)
+WHERE {
+  GRAPH ?g { ?a a <http://aopkb.org/aop_ontology#AdverseOutcomePathway> }
+  FILTER(STRSTARTS(STR(?g), "http://aopwiki.org/graph/"))
+}

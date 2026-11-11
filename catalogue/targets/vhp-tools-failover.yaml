@@ -1,0 +1,58 @@
+id: vhp-tools-failover
+name: Failover readiness of the VHP4Safety tools
+group: Cluster
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+# Internal: names services that cannot fail over to the other node.
+public: false
+public_summary: Replicas, crash loops and image placement for the third-party tools on the cluster.
+links: []
+checks:
+  - id: tools-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    alert_after: 5m
+    describe: Every tool service has its replica running; most restart only on failure, so a clean exit after a reboot leaves them stopped.
+    request:
+      check: replicas
+      services: [aopsuite, qsprpred, cdkdepict, cplogd, sombie, flame, mct8-docking, oppbk,
+                 xploreaop, robot, llemy, arrayanalysis, "toxtempass_*", "biodatafuse_*"]
+      ignore: [toxtempass_minio_init]
+    assert:
+      - {that: not_converged_count, eq: 0}
+      - {that: checked, gte: 18}
+    inv_ids: [swarm-replicas]
+
+  - id: tools-crash-loops
+    kind: swarm
+    every: 15m
+    via: [core]
+    describe: No tool service failed more than twice in the last day.
+    request:
+      check: crash_loops
+      window: 24h
+      threshold: 3
+      services: [aopsuite, qsprpred, cdkdepict, cplogd, sombie, flame, mct8-docking, oppbk,
+                 xploreaop, robot, llemy, arrayanalysis, "toxtempass_*", "biodatafuse_*"]
+      ignore: [toxtempass_minio_init]
+    assert:
+      - {that: crash_looping_count, eq: 0}
+      - {that: killed_count, eq: 0, warn: true, label: "no task killed by the kernel (exit 137/139)"}
+    inv_ids: [task-churn]
+
+  - id: tools-local-images
+    kind: swarm
+    every: 1d
+    via: [core]
+    describe: The set of tool services that run images built on one node only does not grow, and no tool image is missing everywhere.
+    request:
+      check: local_images
+      services: [aopsuite, qsprpred, cdkdepict, cplogd, sombie, flame, mct8-docking, oppbk,
+                 xploreaop, robot, llemy, arrayanalysis, "toxtempass_*", "biodatafuse_*"]
+    assert:
+      - {that: local_only_services, eq: [biodatafuse_biodatafuse-backend, biodatafuse_biodatafuse-vue, robot, xploreaop]}
+      - {that: missing_count, eq: 0}
+    inv_ids: [local-only-images]

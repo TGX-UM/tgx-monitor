@@ -1,0 +1,122 @@
+id: vhp-platform
+name: VHP4Safety Virtual Human Platform
+group: VHP4Safety platform
+class: service
+criticality: high
+owners: [ozancinar, egonw, johannehouweling, jmillanacosta, marvinm2]
+depends_on: [edge-tgx1, github-raw]
+public: true
+public_summary: The VHP4Safety platform with its tool catalogue, methods, data, case studies and training pages.
+links: [https://platform.vhp4safety.nl/]
+notes: >-
+  Stateless: every request reads the tool catalogue from GitHub and compound data from
+  CompoundCloud (wikibase.cloud). Main runs a pinned Docker Hub version tag and is promoted by
+  hand; the checks name that tag (1.0-6), so bump it in vhp-image-main and vhp-release-promotion
+  when main is promoted. The platform has no health or version endpoint yet.
+checks:
+  - id: vhp-home
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The platform home page loads through public DNS and on each node.
+    request: {url: "https://platform.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "Virtual Human Platform"}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [vhp-presence-pages]
+  - id: vhp-pages
+    kind: roundtrip
+    every: 30m
+    timeout: 30s
+    describe: The tools, methods, data, case studies and training pages and the sitemap all load.
+    request:
+      base: https://platform.vhp4safety.nl
+      steps:
+        - {url: /tools}
+        - {url: /methods}
+        - {url: /data}
+        - {url: /casestudies}
+        - {url: /training}
+        - {url: /sitemap.xml}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200, label: "/tools answers 200"}
+      - {that: steps.1.status, eq: 200, label: "/methods answers 200"}
+      - {that: steps.2.status, eq: 200, label: "/data answers 200"}
+      - {that: steps.3.status, eq: 200, label: "/casestudies answers 200"}
+      - {that: steps.4.status, eq: 200, label: "/training answers 200"}
+      - {that: steps.5.status, eq: 200, label: "/sitemap.xml answers 200"}
+      - {that: steps.2.latency_ms, lt: 5000, warn: true, label: "/data (the slowest page) under 5 s"}
+    inv_ids: [vhp-presence-pages]
+  - id: vhp-http-redirect
+    kind: http
+    every: 1h
+    describe: Plain http is redirected to https on the same name.
+    request: {url: "http://platform.vhp4safety.nl/", follow: false}
+    assert:
+      - {that: status, in: [301, 308]}
+      - {that: headers.location, eq: "https://platform.vhp4safety.nl/"}
+    inv_ids: [vhp-presence-pages]
+  - id: vhp-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    request: {host: platform.vhp4safety.nl}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: san, has: platform.vhp4safety.nl}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 10}
+    inv_ids: [vhp-presence-pages]
+  - id: vhp-catalogue-rendered
+    kind: compare
+    every: 1h
+    timeout: 30s
+    describe: Every tool in the VHP4Safety cloud catalogue appears on the platform's tools page, and no other.
+    request:
+      left: {http_list: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", re: '"id":\s*"([^"]+)"', pick: all}, on_error: unknown}
+      right: {http_list: {url: "https://platform.vhp4safety.nl/tools", re: "location\\.href='/tools/([^']+)'", pick: all}}
+    assert:
+      - {that: left, len_gte: 45, label: "catalogue has ≥ 45 tools"}
+      - {that: equal, eq: true, label: "tools page lists exactly the catalogue's tools"}
+    inv_ids: [vhp-catalogue-rendered]
+  - id: vhp-compound-cisplatin
+    kind: http
+    every: 1h
+    timeout: 30s
+    describe: The compound lookup returns cisplatin's known identity from CompoundCloud.
+    request: {url: "https://platform.vhp4safety.nl/get_compound_properties/Q5071", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.0.label, eq: Cisplatin}
+      - {that: json.0.formula, eq: "Cl₂H₄N₂Pt"}
+      - {that: json.0.SMILES, contains: Pt}
+      - {that: json.0.inchi, matches: '^InChI=1S/2ClH\.2H3N\.Pt'}
+    inv_ids: [vhp-compound-known-answer]
+  - id: vhp-image-main
+    kind: registry
+    every: 1d
+    via: [core]
+    describe: Main's pinned image tag is on Docker Hub and the copy on the nodes is the same build.
+    request: {image: "vhp4safety/virtual-human-platform:1.0-6"}
+    assert:
+      - {that: reachable, eq: true}
+      - {that: node_digest_match, not_contains: "False", warn: true,
+         label: "every node holding the tag holds the registry's digest"}
+    inv_ids: [vhp-main-version-drift]
+  - id: vhp-release-promotion
+    kind: compare
+    every: 1d
+    severity: low
+    describe: Shows when Docker Hub has a newer platform release than the one main runs.
+    request:
+      left: {http_json: {url: "https://hub.docker.com/v2/repositories/vhp4safety/virtual-human-platform/tags/1.0-6", path: digest}, on_error: unknown}
+      right: {http_json: {url: "https://hub.docker.com/v2/repositories/vhp4safety/virtual-human-platform/tags/latest", path: digest}, on_error: unknown}
+      sources:
+        latest_pushed: {http_json: {url: "https://hub.docker.com/v2/repositories/vhp4safety/virtual-human-platform/tags/latest", path: last_updated}, on_error: unknown}
+    assert:
+      - {that: equal, eq: true, warn: true, label: "main runs the release that :latest points to"}
+    inv_ids: [vhp-main-version-drift, pseudo-vs-latest-and-main]

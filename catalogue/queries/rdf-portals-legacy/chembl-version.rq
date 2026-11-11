@@ -1,0 +1,4 @@
+# The loaded ChEMBL release, from the VoID dataset IRI .../chembl/<version>.rdf
+PREFIX void: <http://rdfs.org/ns/void#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+SELECT ?d WHERE { ?d a void:Dataset ; dcterms:title "The ChEMBL Database" } LIMIT 1

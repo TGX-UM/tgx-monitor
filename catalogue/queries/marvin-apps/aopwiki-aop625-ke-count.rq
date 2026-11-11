@@ -1,0 +1,4 @@
+# Key Events of AOP 625 (a known answer; the Builder once undercounted it).
+PREFIX aopo: <http://aopkb.org/aop_ontology#>
+SELECT (COUNT(DISTINCT ?ke) AS ?n)
+WHERE { <https://identifiers.org/aop/625> aopo:has_key_event ?ke }

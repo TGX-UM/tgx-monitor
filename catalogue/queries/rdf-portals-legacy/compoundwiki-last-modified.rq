@@ -1,0 +1,3 @@
+# The most recent edit to any item.
+PREFIX schema: <http://schema.org/>
+SELECT (MAX(?m) AS ?last) WHERE { ?i schema:dateModified ?m }

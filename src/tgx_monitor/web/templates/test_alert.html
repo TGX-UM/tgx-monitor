@@ -1,0 +1,18 @@
+{% extends "private.html" %}
+{% block main %}
+<p>Sends a test alert through the real channels: an issue labelled <code>test</code>, a mail with <code>[TEST]</code> in the subject, a Slack line. It resolves itself after five minutes; the <a href="/outbox">outbox</a> shows each provider's reply.</p>
+{% if error %}<p class="strip strip--red" role="alert">{{ error }}</p>{% endif %}
+{% if result %}<p class="strip strip--fresh" role="status">Queued: {{ result }}</p>{% endif %}
+<form class="form" method="post" action="/test-alert">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="rc">Recipients <span class="muted">(handles, comma-separated{% if not role.admin %}; you may only send to yourself{% endif %})</span></label>
+  <input id="rc" name="recipients" required maxlength="500" value="{{ role.handle }}" list="people">
+  <datalist id="people">{% for p in people %}<option value="{{ p }}">{% endfor %}</datalist>
+  <fieldset><legend>Channels</legend>
+    <label class="check"><input type="checkbox" name="ch_github" value="1" checked> GitHub issue</label>
+    <label class="check"><input type="checkbox" name="ch_email" value="1" checked> E-mail</label>
+    <label class="check"><input type="checkbox" name="ch_slack" value="1" checked> Slack</label>
+  </fieldset>
+  <button class="btn" type="submit">Send test alert</button>
+</form>
+{% endblock %}

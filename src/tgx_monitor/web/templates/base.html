@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} · {{ site_name }}</title>
+<link rel="stylesheet" href="{{ root }}static/tgx-monitor.css">
+<link rel="icon" type="image/png" href="{{ root }}static/images/tgx-icon.png">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="hdr">
+  <div class="wrap hdr__in">
+    <a class="hdr__brand" href="{{ root }}"><img class="hdr__logo" src="{{ root }}static/images/tgx-logo-white.png" alt="TGX, Department of Translational Genomics" width="500" height="149"><span class="hdr__name">{{ site_name }}</span></a>
+    {% block account %}{% endblock %}
+  </div>
+  {% block nav %}{% endblock %}
+</header>
+<main id="main" class="wrap">
+{% block banner %}{% endblock %}
+<h1>{{ title }}</h1>
+{% block main %}{% endblock %}
+</main>
+<footer class="ftr">
+  <div class="wrap ftr__in">
+    <img class="ftr__um" src="{{ root }}static/images/um-logo-white.svg" alt="Maastricht University" width="475" height="150">
+    <p>{% block footer %}Department of Translational Genomics, Maastricht University.{% endblock %}</p>
+  </div>
+</footer>
+</body>
+</html>

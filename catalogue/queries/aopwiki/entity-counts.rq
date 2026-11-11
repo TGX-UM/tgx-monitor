@@ -1,0 +1,11 @@
+# AOP-Wiki RDF: distinct subjects per core class in the data graph.
+PREFIX aopo: <http://aopkb.org/aop_ontology#>
+SELECT ?t (COUNT(DISTINCT ?s) AS ?n)
+FROM <http://aopwiki.org/>
+WHERE {
+  VALUES ?t { aopo:AdverseOutcomePathway aopo:KeyEvent aopo:KeyEventRelationship
+              <http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C54571>
+              <http://semanticscience.org/resource/CHEMINF_000000> }
+  ?s a ?t
+}
+GROUP BY ?t

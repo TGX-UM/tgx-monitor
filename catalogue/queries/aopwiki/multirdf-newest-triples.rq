@@ -1,0 +1,8 @@
+# AOP-Wiki multi-release: triples in the newest release graph.
+SELECT (COUNT(*) AS ?n)
+WHERE {
+  { SELECT (IRI(MAX(STR(?g))) AS ?ng)
+    WHERE { GRAPH ?g { ?a a <http://aopkb.org/aop_ontology#AdverseOutcomePathway> }
+            FILTER(STRSTARTS(STR(?g), "http://aopwiki.org/graph/")) } }
+  GRAPH ?ng { ?s ?p ?o }
+}

@@ -1,0 +1,51 @@
+# Known problems in the VHP4Safety tools area (live on 2026-11-11). Each one shows on the
+# page without alerting until `until`, then alerts again.
+- target: flame
+  check: flame-models
+  reason: The Flame instance has no models loaded, so nothing can be predicted. The owner decides whether
+    to load models or retire the service.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: cplogd
+  check: cplogd-draw-ui
+  reason: The drawing page promised by the API description answers 404; the upstream image does not ship
+    it.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: biodatafuse
+  check: bdf-openapi
+  reason: The front-end proxy forwards /docs but not /openapi.json, so the interactive API documentation
+    cannot load.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: toxtempassistant-swarm
+  check: toxtemp-dns
+  reason: The DNS cutover from the legacy host to the cluster is pending (Strato panel).
+  owner: egonw
+  until: '2026-12-31'
+- target: toxtempassistant-swarm
+  check: toxtemp-swarm-cert
+  reason: The cluster cannot obtain a certificate while DNS points at the legacy host; clears with the
+    DNS cutover.
+  owner: egonw
+  until: '2026-12-31'
+- target: oppbk
+  check: oppbk-browser
+  reason: The browser run does not publish its results yet and the page is not yet in browser.yaml.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: xploreaop
+  check: xploreaop-browser
+  reason: The browser run does not publish its results yet and the page is not yet in browser.yaml.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: arrayanalysis
+  check: arrayanalysis-browser
+  reason: The browser run does not publish its results yet and the page is not yet in browser.yaml.
+  owner: marvinm2
+  until: '2026-12-31'
+- target: llemy
+  check: llemy-browser
+  reason: The browser run does not publish its results yet and the page is not yet in browser.yaml.
+  owner: marvinm2
+  until: '2026-12-31'

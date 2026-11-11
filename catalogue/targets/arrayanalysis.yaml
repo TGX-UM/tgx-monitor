@@ -1,0 +1,61 @@
+id: arrayanalysis
+name: ArrayAnalysis (Shiny omics QC and DE)
+group: VHP4Safety tools
+class: service
+criticality: medium
+owners: [jarnokoetsier, ozancinar, marvinm2]
+depends_on: [edge-tgx1]
+public: true
+public_summary: An R Shiny app for quality control and differential expression of transcriptomics data.
+links: [https://arrayanalysis.vhp4safety.nl/]
+checks:
+  - id: arrayanalysis-root
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The ArrayAnalysis page loads in full, through public DNS and on each node.
+    request: {url: "https://arrayanalysis.vhp4safety.nl/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "<title>ArrayAnalysis"}
+      - {that: size, gt: 100000}
+      - {that: latency_ms, lt: 5000, warn: true}
+    inv_ids: [arrayanalysis-root]
+
+  - id: arrayanalysis-session
+    kind: shiny
+    every: 30m
+    describe: A Shiny session opens over a websocket.
+    request: {url: "https://arrayanalysis.vhp4safety.nl/"}
+    assert:
+      - {that: page_has_shiny, eq: true}
+      - {that: websocket, eq: true}
+      - {that: ws_open, eq: true}
+      - {that: ws_ms, lt: 10000, warn: true}
+    inv_ids: [arrayanalysis-sockjs]
+
+  - id: arrayanalysis-browser
+    kind: browser_artifact
+    every: 1h
+    via: [core]
+    describe: In a real browser the app connects and binds its inputs and outputs without errors.
+    request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser/latest.json", page: arrayanalysis}
+    assert:
+      - {that: page_found, eq: true}
+      - {that: age_h, lt: 13}
+      - {that: page.ok, eq: true}
+    inv_ids: [arrayanalysis-session]
+
+  - id: arrayanalysis-version
+    kind: compare
+    every: 7d
+    severity: low
+    describe: The deployed release (recorded here) is the newest one published upstream.
+    request:
+      left:
+        http_list: {url: "https://hub.docker.com/v2/repositories/arrayanalysis/arrayanalysis_shiny/tags?page_size=10", re: '"name":\s*"(\d+\.\d+\.\d+)"', pick: newest}
+        on_error: unknown
+      right: {const: 0.1.5}
+    assert:
+      - {that: equal, eq: true, warn: true, label: "deployed 0.1.5 is the newest upstream tag (update after a redeploy)"}
+    inv_ids: [arrayanalysis-version-drift]

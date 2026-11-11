@@ -1,0 +1,74 @@
+id: job-wikipathways-reload
+name: Monthly WikiPathways RDF reload job
+group: Jobs and backups
+class: cron
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm, data-wikipathways, github-raw]
+maintenance: [wp-reload]
+public: true
+public_summary: On the 12th of each month a cluster job loads the new WikiPathways RDF release into the offline copy of the SPARQL endpoint.
+links:
+  - https://data.wikipathways.org/current/rdf/
+  - https://github.com/wikipathways/WikiPathwaysLoader
+# Swarm service cronjobs_wikipathways-reload (0 2 12 * *). It loads the offline
+# instance named by live.state and writes .load-ok only above a 5M-triple gate; the
+# switch job makes it live two hours later. The upstream release being complete is
+# judged by wp-release-rdf-listed (area wikipathways); the markers themselves by
+# wikipathways-virtuoso-bg.
+checks:
+  - id: job-wikipathways-reload-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The monthly reload ran at its slot on the 12th, exited cleanly and wrote its completed-load marker.
+    request:
+      service: cronjobs_wikipathways-reload
+      grace: 30m
+      marker_re: 'Wrote /staging-(ep2?)/\.load-ok'
+    assert:
+      - {that: schedule, eq: "0 2 12 * *", label: "scheduled the 12th, 02:00 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true, label: "log has 'Wrote /staging-<instance>/.load-ok'"}
+    inv_ids: [wp-reload-fired, wp-reload-registered, wpr-last-run, wp-reload-output]
+
+  - id: job-wikipathways-reload-triples
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: The reload counted a normal number of triples in the WikiPathways graph group, not much fewer than last month.
+    request:
+      service: cronjobs_wikipathways-reload
+      grace: 30m
+      marker_re: 'triples in graph group http://rdf\.wikipathways\.org/: (\d+)'
+    assert:
+      - {that: marker_found, eq: true}
+      - {that: marker, gte: 11900000, label: "≥ 11.9 million triples"}
+      - {that: marker, max_drop_pct: 10, window: 70d}
+    inv_ids: [wpr-marker-shape, wp-reload-output]
+
+  - id: job-wikipathways-reload-vocab
+    kind: roundtrip
+    every: 6h
+    describe: The seven vocabulary and ontology files the reload takes from WikiPathwaysLoader are all downloadable and not truncated.
+    request:
+      base: https://raw.githubusercontent.com/wikipathways/WikiPathwaysLoader/master/data
+      steps:
+        - {method: HEAD, url: /wpvocab.ttl, headers: {Accept-Encoding: identity}, capture: {wpvocab: {header: content-length}}}
+        - {method: HEAD, url: /gpmlvocab.ttl, headers: {Accept-Encoding: identity}, capture: {gpmlvocab: {header: content-length}}}
+        - {method: HEAD, url: /PathwayOntology.ttl, headers: {Accept-Encoding: identity}, capture: {pw: {header: content-length}}}
+        - {method: HEAD, url: /DiseaseOntology.ttl, headers: {Accept-Encoding: identity}, capture: {doid: {header: content-length}}}
+        - {method: HEAD, url: /CellOntology.ttl, headers: {Accept-Encoding: identity}, capture: {cl: {header: content-length}}}
+        - {method: HEAD, url: /chebi-slim.ttl, headers: {Accept-Encoding: identity}, capture: {chebi: {header: content-length}}}
+        - {method: HEAD, url: /ontology-void.ttl, headers: {Accept-Encoding: identity}, capture: {void: {header: content-length}}}
+    assert:
+      - {that: completed, eq: true}
+      - {that: captures.wpvocab, gte: 5000, label: "wpvocab ≥ 5 KB"}
+      - {that: captures.gpmlvocab, gte: 5000, label: "gpmlvocab ≥ 5 KB"}
+      - {that: captures.pw, gte: 3000000, label: "PathwayOntology ≥ 3 MB"}
+      - {that: captures.doid, gte: 20000000, label: "DiseaseOntology ≥ 20 MB"}
+      - {that: captures.cl, gte: 50000000, label: "CellOntology ≥ 50 MB"}
+      - {that: captures.chebi, gte: 5000000, label: "chebi-slim ≥ 5 MB"}
+      - {that: captures.void, gte: 5000, label: "ontology-void ≥ 5 KB"}
+    inv_ids: [wp-reload-inputs-ready, loader-vocab-files]

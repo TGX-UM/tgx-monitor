@@ -1,0 +1,157 @@
+id: wikipathways-website
+name: WikiPathways website
+group: WikiPathways
+class: service
+criticality: high
+owners: [AlexanderPico, khanspers, egonw]
+depends_on: []
+public: true
+public_summary: www.wikipathways.org, its pathway pages, client-side search index and the static JSON API used by rWikiPathways and pywikipathways.
+links: [https://www.wikipathways.org/]
+notes: >-
+  GitHub Pages of wikipathways/wikipathways.github.io behind Cloudflare, rebuilt weekly and on
+  every content push. Search runs in the browser over /search.json, so the index is checked
+  server-side. The /json/*.json files are the static web service the R and Python clients read.
+checks:
+  - id: web-home
+    kind: http
+    every: 5m
+    describe: The bare domain redirects to https://www.wikipathways.org/ and the home page loads.
+    request: {url: "http://wikipathways.org/"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: final_url, eq: "https://www.wikipathways.org/"}
+      - {that: redirect_count, lte: 2}
+      - {that: size, gte: 20000}
+    inv_ids: [web-home-redirects]
+
+  - id: web-pathway-page
+    kind: http
+    every: 15m
+    describe: A known pathway page (WP254) is served with its title.
+    request: {url: "https://www.wikipathways.org/pathways/WP254.html"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "Apoptosis (WP254) - Homo sapiens | WikiPathways"}
+    inv_ids: [web-pathway-page]
+
+  - id: web-pathway-404
+    kind: http
+    every: 1h
+    describe: A pathway that does not exist gives 404.
+    request: {url: "https://www.wikipathways.org/pathways/WP99999999.html"}
+    assert:
+      - {that: status, eq: 404}
+    inv_ids: [web-pathway-page]
+
+  - id: web-search-index
+    kind: http
+    every: 1h
+    timeout: 45s
+    describe: The search index holds at least 2,100 pathways with their fields, including a known one (WP554).
+    request: {url: "https://www.wikipathways.org/search.json", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json, len_gte: 2100, label: "search entries ≥ 2100 (2218 on 2026-11-10)"}
+      - {that: json.0.wpid, exists: true}
+      - {that: json.0.title, exists: true}
+      - {that: json.0.organisms, exists: true}
+      - {that: json.0.url, exists: true}
+      - {that: json.0.last-edited, exists: true}
+      - {that: body, matches: '"wpid"\s*:\s*"WP554"'}
+      - {that: body, contains: "ACE inhibitor pathway"}
+      - {that: size, lt: 4000000, warn: true, label: "index under the monitor's 4 MB body cap (3.5 MB on 2026-11-10)"}
+    inv_ids: [web-search-index]
+
+  - id: web-json-counts
+    kind: http
+    every: 1h
+    describe: The static API's counts report at least 2,100 pathways across at least 39 organisms.
+    request: {url: "https://www.wikipathways.org/json/getCounts.json", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.pathways, gte: 2100, label: "pathways ≥ 2100 (2218)"}
+      - {that: json.organisms, gte: 39, label: "organisms ≥ 39 (41)"}
+    inv_ids: [web-json-api]
+
+  - id: web-json-list
+    kind: http
+    every: 1h
+    timeout: 45s
+    describe: The static API's pathway list is grouped by organism with the fields clients read.
+    request: {url: "https://www.wikipathways.org/json/listPathways.json", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.organisms, len_gte: 39}
+      - {that: json.organisms.0.latin, exists: true}
+      - {that: json.organisms.0.pathways.0.id, exists: true}
+      - {that: json.organisms.0.pathways.0.url, exists: true}
+      - {that: json.organisms.0.pathways.0.name, exists: true}
+      - {that: json.organisms.0.pathways.0.species, exists: true}
+      - {that: json.organisms.0.pathways.0.revision, exists: true}
+    inv_ids: [web-json-api]
+
+  - id: web-json-info
+    kind: http
+    every: 1h
+    timeout: 45s
+    describe: The static API's pathway-info file is served in full.
+    request: {url: "https://www.wikipathways.org/json/getPathwayInfo.json"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: '"pathwayInfo"'}
+      - {that: size, gte: 1000000, label: "≥ 1 MB (1.2 MB on 2026-11-10)"}
+    inv_ids: [web-json-api]
+
+  - id: web-assets
+    kind: roundtrip
+    every: 1h
+    describe: The diagram, GPML and data-node table of a known pathway (WP254) are served.
+    request:
+      base: https://www.wikipathways.org/wikipathways-assets/pathways/WP254
+      steps:
+        - {url: WP254.svg}
+        - {url: WP254.gpml}
+        - {url: WP254-datanodes.tsv}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.content_type, contains: image/svg+xml}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.body, contains: 'Version="WP254_r'}
+      - {that: last.status, eq: 200}
+      - {that: last.first_line, matches: '^Label\tType\tIdentifier\t'}
+      - {that: last.lines, gte: 50}
+    inv_ids: [web-assets]
+
+  - id: web-identifiers-org
+    kind: http
+    every: 6h
+    describe: The identifiers.org link for a pathway (wikipathways:WP254) still lands on its page.
+    request: {url: "https://identifiers.org/wikipathways:WP254"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: final_url, eq: "https://www.wikipathways.org/instance/WP254"}
+      - {that: body, contains: "pathways/WP254.html"}
+    inv_ids: [web-legacy-resolution]
+
+  - id: web-legacy-index-php
+    kind: http
+    every: 6h
+    describe: Old wiki-style links (index.php/Pathway:WP254) still lead to the pathway page.
+    request: {url: "https://www.wikipathways.org/index.php/Pathway:WP254"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: body, contains: "pathways/WP254.html"}
+    inv_ids: [web-legacy-resolution]
+
+  - id: web-deploy-workflow
+    kind: gha
+    every: 1h
+    describe: The site's deploy workflow is active and has succeeded within the last week (it runs weekly and on every content push).
+    request: {repo: wikipathways/wikipathways.github.io, workflow: deploy_jekyll_site.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {warn: 8d, crit: 15d}}
+    inv_ids: [web-deploy-workflow, web-search-index]

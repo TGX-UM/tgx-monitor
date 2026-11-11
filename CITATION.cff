@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+title: "tgx-monitor: monitoring and alerting for the TGX web estate"
+message: "If you reuse this, please cite it."
+type: software
+abstract: >-
+  Monitors the web services, SPARQL endpoints, data releases, scheduled jobs, backups
+  and infrastructure of the Department of Translational Genomics at Maastricht
+  University on a two-node Docker Swarm. It checks presence, features, data shapes,
+  API round trips and freshness rather than only whether a port answers, routes
+  alerts to the owner of each service as GitHub issues, e-mail and Slack, and
+  publishes a public status page.
+authors:
+  - given-names: Marvin
+    family-names: Martens
+    orcid: "https://orcid.org/0000-0003-2230-0840"
+    affiliation: "Department of Translational Genomics, Maastricht University"
+repository-code: "https://github.com/TGX-UM/tgx-monitor"
+url: "https://status.cloud.vhp4safety.nl/"
+license: MIT
+version: 0.1.0
+keywords:
+  - monitoring
+  - alerting
+  - SPARQL
+  - research infrastructure
+  - Docker Swarm

@@ -1,0 +1,16 @@
+{% extends "private.html" %}
+{% from "_macros.html" import probe, ts %}
+{% block main %}
+<p>{{ intro }}</p>
+{% if rows %}
+<div class="tbl"><table>
+<thead><tr><th>Target</th><th>Probe</th><th>State</th><th>Last run</th><th>Findings</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr><td><a href="/target/{{ r.t.id }}">{{ r.t.name }}</a></td><td><a href="/check/{{ r.pid }}">{{ r.pid }}</a><br><span class="muted small">{{ r.c.kind }}</span></td>
+<td>{{ probe(r.view) }}</td><td>{{ ts(r.view.last.started_at if r.view.last else None) }}</td>
+<td class="wrapcell">{% for o in r.outcomes %}{{ "✓" if o.status == "ok" else "✕" }} {{ o.assertion }}: {{ o.found }}{% if not loop.last %}<br>{% endif %}{% else %}{{ r.view.last.summary if r.view.last else "not run yet" }}{% endfor %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}<p class="muted">No checks of this kind in the catalogue yet.</p>{% endif %}
+{% endblock %}

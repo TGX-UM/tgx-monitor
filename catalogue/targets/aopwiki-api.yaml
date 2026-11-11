@@ -1,0 +1,141 @@
+id: aopwiki-api
+name: AOP-Wiki REST API
+group: AOP-Wiki RDF
+class: service
+criticality: high
+owners: [marvinm2]
+depends_on: [edge-tgx1, aopwiki-sparql, wikipathways-sparql]
+maintenance: [aopwiki-reload]
+public: true
+public_summary: A JSON and CSV API over the AOP-Wiki RDF, including the legacy query URLs used by older tutorials.
+links:
+  - https://aopwiki.rdf.bigcat-bioinformatics.org/api/docs
+checks:
+  - id: aopwiki-api-ready
+    kind: http
+    every: 5m
+    via: [public, tgx1, tgx2]
+    describe: The API reports itself ready, which it only does when its triple store answers and is not empty.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/health/ready", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: ready}
+      - {that: json.dataset_version, matches: '^\d{4}\.\d{2}\.\d{2}-[0-9a-f]{7}$'}
+      - {that: latency_ms, lt: 3000, warn: true}
+    inv_ids: [api-health-ready]
+
+  - id: aopwiki-api-dataset
+    kind: http
+    every: 1h
+    describe: The API's dataset summary names a release less than eight days old and normal entity counts.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/dataset", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.data.created_on, max_age: {warn: 8d, crit: 15d}}
+      - {that: json.data.generator_commit, matches: '^https://github\.com/marvinm2/AOPWikiRDF/commit/[0-9a-f]{40}$'}
+      - {that: json.data.counts.aops, gte: 590}
+      - {that: json.data.counts.key_events, gte: 1580}
+      - {that: json.data.counts.kers, gte: 2350}
+      - {that: json.data.counts.stressors, gte: 740}
+      - {that: json.data.counts.chemicals, gte: 420}
+      - {that: json.data.counts.genes, gte: 2600}
+      - {that: headers.x-dataset-version, exists: true}
+    inv_ids: [api-dataset-consistency]
+
+  - id: aopwiki-api-matches-endpoint
+    kind: compare
+    every: 1h
+    alert_after: 30m
+    describe: The API serves the same release, generator commit and AOP count as the SPARQL endpoint, so it picked up the last reload.
+    request:
+      endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
+      left: {http_header: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/dataset", header: x-dataset-version, method: GET}}
+      right: {sparql: {file: q/aopwiki/version-commit.rq, value: vc}}
+      sources:
+        api_aops: {http_json: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/dataset", path: data.counts.aops}}
+        sparql_aops: {sparql: {file: q/aopwiki/aop-count.rq, value: n}}
+    assert:
+      - {that: left, eq_path: right, label: "API X-Dataset-Version == endpoint version-commit"}
+      - {that: api_aops, eq_path: sparql_aops, label: "API AOP count == endpoint AOP count"}
+    inv_ids: [api-dataset-consistency]
+
+  - id: aopwiki-api-aop-and-ke
+    kind: roundtrip
+    every: 15m
+    describe: AOP 1, the downstream links of Key Event 18 and the AOP list return their known answers.
+    request:
+      base: "https://aopwiki.rdf.bigcat-bioinformatics.org/api"
+      steps:
+        - {url: /v1/aops/1}
+        - {url: "/v1/key-events/18/downstream", params: {limit: "3"}}
+        - {url: /v1/aops, params: {limit: "1"}}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.json.data.title, eq: "Uncharacterized liver damage leading to hepatocellular carcinoma"}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.body, contains: '"ker_id":19,"from_ke_id":18,"ke_id":80,', label: "KE 18 leads to KE 80 (CYP1A1) via KER 19"}
+      - {that: last.status, eq: 200}
+      - {that: last.headers.x-total-count, gte: 590}
+    inv_ids: [api-aop-and-ke]
+
+  - id: aopwiki-api-chemical
+    kind: http
+    every: 1h
+    describe: Bisphenol A resolves by CAS number with its known InChIKey and CompTox id.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/chemicals/80-05-7", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.data.title, eq: "Bisphenol A"}
+      - {that: json.data.inchikey, eq: IISBACLAFKSPIT-UHFFFAOYSA-N}
+      - {that: json.data.comptox_id, eq: DTXSID7020182}
+    inv_ids: [api-chemical]
+
+  - id: aopwiki-api-search
+    kind: http
+    every: 1h
+    timeout: 60s
+    describe: Free-text search for "estrogen" finds the stressor Estrogen first.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/search", params: {q: estrogen, limit: "2"}, parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.meta.total, gte: 1}
+      - {that: json.data.0.type, eq: stressor}
+      - {that: json.data.0.title, eq: Estrogen}
+      - {that: latency_ms, lt: 10000, warn: true}
+    inv_ids: [api-search]
+
+  - id: aopwiki-api-federation
+    kind: http
+    every: 1h
+    timeout: 60s
+    describe: A chemical's WikiPathways pathways come back through federation, which breaks if the ChEBI identifiers or WikiPathways do.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/chemicals/1746-01-6/pathways", params: {limit: "2"}, parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.meta.total, gte: 1}
+      - {that: body, contains: '"wp_id":"WP2586"', label: "includes WP2586"}
+    inv_ids: [api-federation]
+
+  - id: aopwiki-api-legacy-grlc
+    kind: http
+    every: 1h
+    timeout: 60s
+    describe: The legacy grlc-style query URL used by older tutorials still returns all AOPs as SPARQL JSON.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/api-git/marvinm2/AOPWikiQueries/get-all-aops", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.head.vars, eq: [AOP, AOPTitle, AOPID]}
+      - {that: json.results.bindings, len_gte: 590}
+    inv_ids: [api-legacy-grlc]
+
+  - id: aopwiki-api-csv
+    kind: http
+    every: 1d
+    describe: The AOP list is available as CSV with its documented column header.
+    request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/aops", params: {limit: "2", format: csv}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/csv}
+      - {that: body, matches: '^id,iri,label,title,short_name,oecd_status,created,modified,mie_ids,ao_ids,aopwiki_url\r?$'}
+    inv_ids: [api-csv]

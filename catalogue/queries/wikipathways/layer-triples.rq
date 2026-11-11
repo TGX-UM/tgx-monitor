@@ -1,0 +1,14 @@
+# Per-layer triple counts as recorded by the reload's VoID statistics in the void graph
+# (named-graph layout only; an old single-graph instance returns no rows). Reads stored
+# void:triples values, so it is cheap: it never counts the live graphs.
+PREFIX void: <http://rdfs.org/ns/void#>
+PREFIX sd: <http://www.w3.org/ns/sparql-service-description#>
+SELECT ?g (MAX(?t) AS ?n) WHERE {
+  GRAPH <http://rdf.wikipathways.org/graph/void> {
+    { ?g void:triples ?t }
+    UNION
+    { ?x sd:name ?g ; sd:graph ?gr . ?gr void:triples ?t }
+  }
+  FILTER(STRSTARTS(STR(?g), "http://rdf.wikipathways.org/graph/"))
+}
+GROUP BY ?g

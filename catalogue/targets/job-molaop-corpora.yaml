@@ -1,0 +1,159 @@
+id: job-molaop-corpora
+name: molAOP Builder corpus refresh and apply jobs
+group: Jobs and backups
+class: cron
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [swarm, wikipathways-sparql, aopwiki-sparql]
+maintenance: [molaop-apply-corpus]
+public: true
+public_summary: Every Monday a cluster job rebuilds the Builder's suggestion data for any source (WikiPathways, GO, Reactome, AOP-Wiki) with a new release, and on Tuesday a second job puts it live.
+links:
+  - https://molaop-builder.vhp4safety.nl/get_data_versions
+# cronjobs_molaop-builder-refresh-corpora (0 4 * * 1) logs a SOURCE / DEPLOYED / UPSTREAM
+# table and "Rebuild failed for: ..." on errors; cronjobs_molaop-builder-apply-corpus
+# (0 3 * * 2) restarts the Builder only when the refresh left a marker.
+# The static snapshots and the marker file need a read-only mount of the Builder's
+# data directory (alias molaop-builder-data, not yet in stack.yml): until it exists
+# those checks are unknown.
+checks:
+  - id: corpora-refresh-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The Monday corpus refresh ran at its slot and exited cleanly.
+    request:
+      service: cronjobs_molaop-builder-refresh-corpora
+      grace: 30m
+    assert:
+      - {that: schedule, eq: "0 4 * * 1", label: "scheduled Mondays 04:00 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+    inv_ids: [rc-last-run, corp-refresh-job-state]
+
+  - id: corpora-refresh-errors
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: The last corpus refresh rebuilt every source it found behind, without a failed rebuild.
+    request:
+      service: cronjobs_molaop-builder-refresh-corpora
+      grace: 30m
+      marker_re: 'Rebuild failed for: (.*)'
+    assert:
+      - {that: marker_found, eq: false, label: "no 'Rebuild failed for:' line"}
+    inv_ids: [rc-upstream-errors, corp-refresh-job-state]
+
+  - id: corpora-refresh-upstreams
+    kind: job_run
+    every: 1h
+    via: [core]
+    severity: low
+    describe: The last corpus refresh could read every upstream release; amber when one was unavailable.
+    request:
+      service: cronjobs_molaop-builder-refresh-corpora
+      grace: 30m
+      marker_re: '^.*?\b([a-z_]+)\s+\S+\s+\S+\s+upstream unavailable'
+    assert:
+      - {that: marker_found, eq: false, warn: true, label: "no source logged 'upstream unavailable'"}
+    inv_ids: [rc-upstream-errors]
+
+  - id: corpora-reactome-current
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: At the last refresh the Reactome corpus matched the current Reactome release, or was rebuilt for it.
+    request:
+      service: cronjobs_molaop-builder-refresh-corpora
+      grace: 30m
+      marker_re: '\breactome\s+\S+\s+\S+\s+(current|DRIFTED)\b'
+    assert:
+      - {that: marker_found, eq: true, label: "reactome row says current or DRIFTED (rebuilt), not upstream unavailable"}
+    inv_ids: [corp-reactome-lag]
+
+  - id: corpora-go-current
+    kind: compare
+    every: 6h
+    alert_after: 35d
+    describe: The Gene Ontology release behind the Builder's GO suggestions is the current GO release.
+    request:
+      left: {http_json: {url: "https://molaop-builder.vhp4safety.nl/get_data_versions", path: gene_ontology.version}}
+      right:
+        http_regex: {url: "https://current.geneontology.org/ontology/go-basic.obo", re: 'data-version: releases/(\d{4}-\d{2}-\d{2})', headers: {Range: "bytes=0-400"}}
+        on_error: unknown
+    assert:
+      - {that: relation, eq: equal, label: "deployed GO release == current GO data-version"}
+    inv_ids: [corp-go-lag]
+
+  - id: corpora-wikipathways-current
+    kind: compare
+    every: 6h
+    alert_after: 8d
+    timeout: 30s
+    describe: The WikiPathways release behind the Builder's pathway suggestions is the one the WikiPathways endpoint serves.
+    request:
+      left: {http_json: {url: "https://molaop-builder.vhp4safety.nl/get_data_versions", path: wikipathways.version}}
+      right: {sparql: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/ops-jobs/wp-release.rq, value: dataset}, extract: '(\d{8})'}
+    assert:
+      - {that: relation, eq: equal, label: "Builder WikiPathways release == served release"}
+    inv_ids: [corp-wp-aopwiki-lag]
+
+  - id: corpora-apply-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The Tuesday apply job ran at its slot and either restarted the Builder on a rebuilt corpus or found nothing to apply.
+    request:
+      service: cronjobs_molaop-builder-apply-corpus
+      grace: 30m
+      marker_re: '(Restarted molaop-builder and cleared the marker\.|No corpus rebuild pending)'
+    assert:
+      - {that: schedule, eq: "0 3 * * 2", label: "scheduled Tuesdays 03:00 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true}
+    inv_ids: [ac-last-run, corp-apply-marker]
+
+  - id: corpora-marker-cleared
+    kind: file_age
+    every: 1h
+    via: [core]
+    alert_after: 30h
+    describe: No rebuilt-corpus marker is left waiting, so every rebuild was put live by the apply job.
+    request: {mount: molaop-builder-data, glob: ".corpus-rebuilt"}
+    assert:
+      - {that: count, eq: 0, label: "no .corpus-rebuilt marker pending"}
+    inv_ids: [corp-apply-marker]
+
+  - id: corpora-ker-adjacency-age
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: The precomputed Key Event Relationship adjacency snapshot is less than 60 days old.
+    request: {mount: molaop-builder-data, glob: "ker_adjacency.json"}
+    assert:
+      - {that: count, eq: 1}
+      - {that: newest_age_h, lt: 1440, label: "≤ 60 days old"}
+    inv_ids: [corp-static-snapshots-age]
+
+  - id: corpora-ke-aop-membership-age
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: The precomputed Key Event to AOP membership snapshot is less than 60 days old.
+    request: {mount: molaop-builder-data, glob: "ke_aop_membership.json"}
+    assert:
+      - {that: count, eq: 1}
+      - {that: newest_age_h, lt: 1440, label: "≤ 60 days old"}
+    inv_ids: [corp-static-snapshots-age]
+
+  - id: corpora-oecd-status-age
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: The precomputed OECD status snapshot of the AOPs is less than 60 days old.
+    request: {mount: molaop-builder-data, glob: "aop_oecd_status.json"}
+    assert:
+      - {that: count, eq: 1}
+      - {that: newest_age_h, lt: 1440, label: "≤ 60 days old"}
+    inv_ids: [corp-static-snapshots-age]

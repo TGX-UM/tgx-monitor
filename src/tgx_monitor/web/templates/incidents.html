@@ -1,0 +1,20 @@
+{% extends "private.html" %}
+{% from "_macros.html" import ts %}
+{% macro table(rows) %}
+<div class="tbl"><table>
+<thead><tr><th>#</th><th>Target</th><th>Severity</th><th>Title</th><th>Opened</th><th>Closed</th><th>Failing</th><th>Blocked</th><th>Issue</th><th>Ack</th></tr></thead>
+<tbody>
+{% for i in rows %}
+<tr><td>{{ i.id }}</td><td><a href="/target/{{ i.target_id }}">{{ i.target_id }}</a></td><td>{{ i.severity }}{% if i.private %} (private){% endif %}</td>
+<td class="wrapcell">{{ i.title or "" }}</td><td>{{ ts(i.opened_at) }}</td><td>{{ ts(i.closed_at) }}</td>
+<td>{% for p in i.failing %}<a href="/check/{{ p }}">{{ p }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+<td>{{ i.blocked|join(", ") }}</td><td>{{ ("#" ~ i.issue_number) if i.issue_number else "" }}</td><td>{{ i.acked_by or "" }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% endmacro %}
+{% block main %}
+<h2>Open</h2>
+{% if open %}{{ table(open) }}{% else %}<p class="muted">None.</p>{% endif %}
+<h2>Closed in the last 30 days</h2>
+{% if closed %}{{ table(closed) }}{% else %}<p class="muted">None.</p>{% endif %}
+{% endblock %}

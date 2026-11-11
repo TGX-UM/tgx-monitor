@@ -1,0 +1,50 @@
+id: aopwiki-swarm-infra
+name: Swarm runtime of the AOP-Wiki services
+group: AOP-Wiki RDF
+class: infra
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [swarm]
+public: false
+public_summary: The swarm services behind the AOP-Wiki RDF endpoints, explorer, API and dashboard.
+checks:
+  - id: aopwiki-swarm-replicas
+    kind: swarm
+    every: 5m
+    via: [core]
+    alert_after: 5m
+    describe: Every long-running AOP-Wiki, AOP-DB and dashboard service, and the cron scheduler, runs all its replicas.
+    request:
+      check: replicas
+      services: ["aopwiki-snorql_*", "aopwiki-dashboard_*", "aopdb_*", cronjobs_scheduler]
+    assert:
+      - {that: not_converged_count, eq: 0}
+      - {that: checked, gte: 7, label: "all 7 services found"}
+    inv_ids: [infra-replicas, aopdb-spec]
+
+  - id: aopwiki-swarm-restart-policy
+    kind: swarm
+    every: 1d
+    via: [core]
+    describe: The three Virtuoso stores restart on any exit, so a clean exit cannot leave one down.
+    request:
+      check: restart_policy
+      services: [aopwiki-snorql_virtuoso, aopdb_virtuoso, aopwiki-dashboard_virtuoso]
+    assert:
+      - {that: not_any_count, eq: 0, label: "every Virtuoso store has restart condition any"}
+    inv_ids: [infra-restart-policy, aopdb-spec]
+
+  - id: aopwiki-swarm-crash-loops
+    kind: swarm
+    every: 1h
+    via: [core]
+    describe: No AOP-Wiki, AOP-DB or dashboard service restarted more than once in the last day.
+    request:
+      check: crash_loops
+      services: ["aopwiki-snorql_*", "aopwiki-dashboard_*", "aopdb_*", cronjobs_scheduler]
+      window: 24h
+      threshold: 2
+    assert:
+      - {that: crash_looping_count, eq: 0}
+      - {that: killed_count, eq: 0, warn: true}
+    inv_ids: [infra-task-churn]

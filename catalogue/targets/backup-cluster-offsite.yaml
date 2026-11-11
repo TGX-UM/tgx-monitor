@@ -1,0 +1,22 @@
+id: backup-cluster-offsite
+name: Cluster-wide off-site backup
+group: Jobs and backups
+class: backup
+criticality: medium
+owners: [egonw, marvinm2]
+depends_on: [backup-hidrive]
+public: false
+public_summary: A regular off-site copy of the cluster's service data exists.
+# backup-strategy Tier 1: a periodic copy of the shared service data to the off-cluster
+# drive (strato-cluster-backups/). Only a single one-off copy from May 2026 exists.
+checks:
+  - id: cluster-offsite-fresh
+    kind: file_age
+    every: 1h
+    via: [core]
+    describe: The cluster-wide off-site copy was refreshed within the last eight days.
+    request: {mount: hidrive, glob: "strato-cluster-backups/*", type: dir}
+    assert:
+      - {that: count, gte: 1, label: "a dated copy exists"}
+      - {that: newest_age_h, lt: 192, label: "newest copy ≤ 8 days old"}
+    inv_ids: [hd-stale-dirs]

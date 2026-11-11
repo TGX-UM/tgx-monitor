@@ -1,0 +1,10 @@
+# Instance counts of three classes the NanoSafety UI examples rely on.
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT ?k (COUNT(?s) AS ?n) FROM <http://nanosafety.org> WHERE {
+  VALUES (?c ?k) {
+    (owl:Class "owlClass")
+    (<http://www.bioassayontology.org/bao#BAO_0000015> "assay")
+    (<http://purl.obolibrary.org/obo/CHEBI_59999> "material")
+  }
+  ?s a ?c
+} GROUP BY ?k

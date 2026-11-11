@@ -1,0 +1,158 @@
+id: wikipathways-sparql
+name: WikiPathways SPARQL endpoint
+group: WikiPathways
+class: data
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1]
+maintenance: [wp-reload, wp-switch]
+public: true
+public_summary: WikiPathways as queryable RDF, reloaded from the monthly data release on the 12th.
+links: [https://sparql.wikipathways.org/sparql, https://sparql.wikipathways.org/.well-known/void]
+notes: >-
+  Public DNS points at tgx1 only, so the presence and release checks also run pinned to each
+  node: on 2026-08-12 tgx2 served a month-old store while the public URL looked fine. GET /
+  stays 200 when the backend is gone (the Snorql UI), so presence always runs a real query.
+  Never run a full-store COUNT(*) here. All checks together stay under about 60 requests an
+  hour on the live Virtuoso, including what the IRI resolver sends on our behalf.
+checks:
+  - id: wp-sparql-ask
+    kind: sparql
+    every: 5m
+    via: [public, tgx1, tgx2]
+    timeout: 20s
+    describe: The endpoint answers a real query with CORS open, through public DNS and on each node.
+    request: {endpoint: "https://sparql.wikipathways.org/sparql", ask: "ASK { ?s ?p ?o }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+      - {that: headers.access-control-allow-origin, eq: "*", label: "CORS open (YummyData and browser clients)"}
+      - {that: latency_ms, lt: 3000, warn: true}
+      - {that: latency_ms, lt: 10000}
+    inv_ids: [wp-sparql-per-node-release, wp-sparql-sd-void-cors]
+
+  - id: wp-sparql-nodes-agree
+    kind: compare
+    every: 30m
+    timeout: 30s
+    describe: Both nodes serve the same monthly release, and it is not older than one release cycle.
+    request:
+      endpoint: "https://sparql.wikipathways.org/sparql"
+      left: {sparql: {file: q/wikipathways/release.rq}, via: tgx1, extract: '(\d{8})'}
+      right: {sparql: {file: q/wikipathways/release.rq}, via: tgx2, extract: '(\d{8})'}
+    assert:
+      - {that: equal, eq: true, label: "tgx1 and tgx2 serve the same release (a stale Traefik watcher shows here)"}
+      - {that: left_age_days, lt: 34, warn: true, label: "served release is due to be replaced on the 12th"}
+      - {that: left_age_days, lt: 36}
+    inv_ids: [wp-sparql-per-node-release]
+
+  - id: wp-sparql-release-current
+    kind: compare
+    every: 1h
+    timeout: 30s
+    alert_after: 48h
+    describe: The served release equals the newest complete release on data.wikipathways.org, allowing the two days until the reload on the 12th.
+    request:
+      endpoint: "https://sparql.wikipathways.org/sparql"
+      left: {sparql: {file: q/wikipathways/release.rq}, extract: '(\d{8})'}
+      right:
+        http_regex: {url: "https://data.wikipathways.org/current/rdf/", re: 'wikipathways-(\d{8})-rdf-gpml\.zip'}
+        on_error: unknown
+    assert:
+      - {that: relation, eq: equal, label: "served release == newest complete upstream release (unknown while upstream RDF is incomplete)"}
+    inv_ids: [wp-sparql-release-freshness]
+
+  - id: wp-sparql-pathway-count
+    kind: sparql
+    every: 1h
+    describe: The store holds at least 2,750 real pathways and did not lose more than 5% within a week.
+    request: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/wikipathways/pathway-count.rq}
+    assert:
+      - {that: first.n, gte: 2750, label: "pathways ≥ 2750 (2902 on 2026-11-10)"}
+      - {that: first.n, max_drop_pct: 5, window: 7d}
+    inv_ids: [wp-sparql-pathway-count]
+
+  - id: wp-sparql-wp254
+    kind: sparql
+    every: 1h
+    describe: A known pathway (WP254, Apoptosis) comes back with its organism, its gene products and CASP3.
+    request: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/wikipathways/wp254-canary.rq}
+    assert:
+      - {that: first.title, eq: Apoptosis}
+      - {that: first.org, eq: Homo sapiens}
+      - {that: first.casp3, eq: 1, label: "CASP3 (ncbigene:836) is a gene product of WP254"}
+      - {that: first.genes, gte: 50, label: "gene products ≥ 50 (87 on 2026-11-10)"}
+    inv_ids: [wp-sparql-wp254-canary, snorql-example-canary]
+
+  - id: wp-sparql-ontology-labels
+    kind: sparql
+    every: 6h
+    describe: Every ontology tag on a pathway (CL, DOID, PW and others) has a label, apart from the curation markers.
+    request: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/wikipathways/unlabelled-ontology-tags.rq}
+    assert:
+      - {that: status, eq: 200}
+      - {that: count, eq: 0, label: "no ontology prefix with unlabelled tags (rows name the prefix)"}
+    inv_ids: [wp-sparql-ontology-labels]
+
+  - id: wp-sparql-service-description
+    kind: http
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The endpoint describes itself (SPARQL service description in Turtle) on each node.
+    request: {url: "https://sparql.wikipathways.org/sparql", headers: {Accept: text/turtle}}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/turtle}
+      - {that: body, contains: "sd:endpoint"}
+    inv_ids: [wp-sparql-sd-void-cors]
+
+  - id: wp-sparql-void
+    kind: http
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The VoID dataset description is served at /.well-known/void on each node.
+    request: {url: "https://sparql.wikipathways.org/.well-known/void"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: headers.content-type, contains: text/turtle}
+      - {that: size, gte: 10000, label: "VoID ≥ 10 kB (18 kB on 2026-11-10)"}
+      - {that: body, contains: "void:Dataset"}
+      - {that: body, matches: 'data\.wikipathways\.org/\d{8}/'}
+    inv_ids: [wp-sparql-sd-void-cors]
+
+  - id: wp-sparql-tls
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for the endpoint's name, with time to spare.
+    request: {host: sparql.wikipathways.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 7}
+    inv_ids: [wp-sparql-tls]
+
+  - id: wp-sparql-yummydata
+    kind: compare
+    every: 1d
+    timeout: 45s
+    severity: low
+    describe: The independent YummyData crawler still rates the endpoint A or B with a score of at least 80, and evaluated it recently.
+    request:
+      left:
+        http_regex: {url: "https://yummydata.org/api/endpoint/search", headers: {Accept: application/json}, re: '"id":18,"name":"WikiPathways"[^{]*\{[^}]*?"rank":"([A-Z])"'}
+        on_error: unknown
+      right:
+        http_regex: {url: "https://yummydata.org/api/endpoint/search", headers: {Accept: application/json}, re: '"id":18,"name":"WikiPathways"[^{]*\{[^}]*?"score":(\d+)'}
+        on_error: unknown
+      sources:
+        evaluated:
+          http_regex: {url: "https://yummydata.org/api/endpoint/search", headers: {Accept: application/json}, re: '"id":18,"name":"WikiPathways"[^{]*\{"started_at":"([^"]+)"'}
+          on_error: unknown
+    assert:
+      - {that: left, in: [A, B], label: "YummyData rank A or B"}
+      - {that: right, gte: 80, label: "YummyData score ≥ 80 (90 on 2026-11-10)"}
+      - {that: evaluated_date, max_age: {warn: 3d, crit: 8d}}
+    inv_ids: [wp-sparql-yummydata]

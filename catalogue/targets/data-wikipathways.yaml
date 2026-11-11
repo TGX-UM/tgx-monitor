@@ -1,0 +1,165 @@
+id: data-wikipathways
+name: WikiPathways monthly data release
+group: WikiPathways
+class: data
+criticality: high
+owners: [AlexanderPico, egonw, marvinm2]
+depends_on: []
+public: true
+public_summary: The monthly WikiPathways release (GPML, GMT, SVG and RDF) on data.wikipathways.org, published on the 10th and archived on Zenodo.
+links: [https://data.wikipathways.org/, https://github.com/wikipathways/wikipathways-data-release]
+notes: >-
+  The release workflow publishes GPML, GMT, SVG and the authors RDF on the 10th; the main RDF
+  (rdf-wp, rdf-gpml and the VoID) is added by hand later that day. The endpoint reload on the
+  12th at 02:00 reads the release date from the rdf-gpml file name in the current/rdf/ listing
+  and has no retry, so the listing must be complete by the evening of the 11th. RDF problems
+  go to egonw; the release workflows, index pages and Zenodo to AlexanderPico.
+checks:
+  - id: wp-release-folder
+    kind: compare
+    every: 1h
+    alert_after: 6h
+    describe: A new dated release folder appears each month by the 10th, and current/ mirrors it.
+    request:
+      left: {http_regex: {url: "https://data.wikipathways.org/", re: 'href="current">current</a></td><td>(\d+)<'}}
+      right: {http_regex: {url: "https://data.wikipathways.org/", re: 'href="\d{8}">\d{8}</a></td><td>(\d+)<'}}
+      sources:
+        newest: {http_list: {url: "https://data.wikipathways.org/", re: 'href="(\d{8})/?"', pick: newest}}
+    assert:
+      - {that: equal, eq: true, label: "current/ has as many files as the newest dated folder"}
+      - {that: newest_date, max_age: {warn: 31.5d, crit: 33d}}
+    inv_ids: [wp-release-folder-present]
+
+  - id: wp-release-rdf-listed
+    kind: compare
+    every: 1h
+    alert_after: 36h
+    describe: The current/rdf/ listing names all four RDF files of the newest release, which is what the monthly reload reads.
+    request:
+      left: {http_list: {url: "https://data.wikipathways.org/", re: 'href="(\d{8})/?"', pick: newest}}
+      right: {http_regex: {url: "https://data.wikipathways.org/current/rdf/", re: 'href="wikipathways-(\d{8})-rdf-gpml\.zip"'}}
+      sources:
+        wp: {http_regex: {url: "https://data.wikipathways.org/current/rdf/", re: 'href="wikipathways-(\d{8})-rdf-wp\.zip"'}}
+        authors: {http_regex: {url: "https://data.wikipathways.org/current/rdf/", re: 'href="wikipathways-(\d{8})-rdf-authors\.zip"'}}
+        void: {http_regex: {url: "https://data.wikipathways.org/current/rdf/", re: 'href="(wikipathways-rdf-void\.ttl)"'}}
+    assert:
+      - {that: left, eq_path: right, label: "rdf-gpml listed for the newest release (the reload's date source)"}
+      - {that: left, eq_path: wp, label: "rdf-wp listed for the newest release"}
+      - {that: left, eq_path: authors, label: "rdf-authors listed for the newest release"}
+      - {that: void, eq: wikipathways-rdf-void.ttl}
+    inv_ids: [wp-release-rdf-complete]
+
+  - id: wp-release-rdf-files
+    kind: roundtrip
+    every: 1h
+    timeout: 45s
+    alert_after: 36h
+    describe: The four RDF files of the newest release are downloadable, in the dated folder and in current/, with plausible sizes.
+    request:
+      base: https://data.wikipathways.org
+      steps:
+        - {url: /, capture: {d: {regex: 'href="(\d{8})/?"'}}}
+        - {method: HEAD, url: "/{d}/rdf/wikipathways-{d}-rdf-wp.zip", capture: {wp_len: {header: content-length}}}
+        - {method: HEAD, url: "/{d}/rdf/wikipathways-{d}-rdf-gpml.zip", capture: {gpml_len: {header: content-length}}}
+        - {method: HEAD, url: "/{d}/rdf/wikipathways-{d}-rdf-authors.zip", capture: {authors_len: {header: content-length}}}
+        - {method: HEAD, url: "/{d}/rdf/wikipathways-rdf-void.ttl", capture: {void_len: {header: content-length}}}
+        - {method: HEAD, url: "/current/rdf/wikipathways-{d}-rdf-gpml.zip"}
+        - {method: HEAD, url: "/current/rdf/wikipathways-{d}-rdf-wp.zip"}
+        - {method: HEAD, url: "/current/rdf/wikipathways-rdf-void.ttl"}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.1.status, eq: 200, label: "rdf-wp.zip served"}
+      - {that: steps.2.status, eq: 200, label: "rdf-gpml.zip served"}
+      - {that: steps.3.status, eq: 200, label: "rdf-authors.zip served"}
+      - {that: steps.4.status, eq: 200, label: "VoID served"}
+      - {that: steps.5.status, eq: 200, label: "current/ rdf-gpml.zip served"}
+      - {that: steps.6.status, eq: 200, label: "current/ rdf-wp.zip served"}
+      - {that: steps.7.status, eq: 200, label: "current/ VoID served"}
+      - {that: captures.wp_len, gte: 10000000, label: "rdf-wp ≥ 10 MB (17.9 MB in 20261110)"}
+      - {that: captures.gpml_len, gte: 30000000, label: "rdf-gpml ≥ 30 MB (47 MB in 20261110)"}
+      - {that: captures.authors_len, gte: 1000000, label: "rdf-authors ≥ 1 MB (1.8 MB in 20261110)"}
+      - {that: captures.void_len, gte: 8000, label: "VoID ≥ 8 kB (12.6 kB in 20261110)"}
+    inv_ids: [wp-release-rdf-complete]
+
+  - id: wp-release-file-shape
+    kind: roundtrip
+    every: 6h
+    timeout: 45s
+    describe: The newest release has the usual number of GMT, GPML and SVG files, and the human GMT has close to a thousand well-formed gene sets.
+    request:
+      base: https://data.wikipathways.org
+      steps:
+        - {url: /, capture: {d: {regex: 'href="(\d{8})/?"'}}}
+        - url: "/{d}/"
+          capture:
+            gmt: {regex: 'href="gmt">gmt</a></td><td>(\d+)<'}
+            gpml: {regex: 'href="gpml">gpml</a></td><td>(\d+)<'}
+            svg: {regex: 'href="svg">svg</a></td><td>(\d+)<'}
+        - {url: "/{d}/gmt/wikipathways-{d}-gmt-Homo_sapiens.gmt"}
+    assert:
+      - {that: completed, eq: true}
+      - {that: captures.gmt, gte: 18, label: "GMT files ≥ 18"}
+      - {that: captures.gpml, gte: 41, label: "GPML files ≥ 41"}
+      - {that: captures.svg, gte: 41, label: "SVG files ≥ 41"}
+      - {that: last.status, eq: 200}
+      - {that: last.lines, gte: 940, label: "human gene sets ≥ 940 (991 in 20261110)"}
+      - {that: last.first_line, matches: '%WikiPathways_\d{8}%WP\d+%Homo sapiens\t'}
+      - {that: last.size, gte: 300000}
+    inv_ids: [wp-release-file-shape]
+
+  - id: wp-release-zenodo
+    kind: compare
+    every: 6h
+    timeout: 45s
+    describe: Zenodo holds each release by the 16th of the following month at the latest (the publish workflow runs on the 15th).
+    request:
+      left:
+        http_json: {url: "https://zenodo.org/api/records?communities=wikipathways&sort=mostrecent&size=1", path: hits.hits.0.metadata.version}
+        on_error: unknown
+      right: {http_list: {url: "https://data.wikipathways.org/", re: 'href="(\d{8})/?"', pick: newest}}
+    assert:
+      - {that: relation, in: [equal, right_newer], label: "Zenodo is not ahead of data.wikipathways.org"}
+      - {that: left_age_days, lt: 37.5, label: "newest Zenodo version is at most one cycle old (published on the 15th)"}
+    inv_ids: [wp-release-zenodo]
+
+  - id: wp-release-workflow-states
+    kind: gha
+    every: 1h
+    describe: No workflow of the release repository has been disabled, for example by GitHub after 60 days without activity.
+    request: {repo: wikipathways/wikipathways-data-release}
+    assert:
+      - {that: inactive, len_eq: 0}
+      - {that: disabled, len_eq: 0}
+    inv_ids: [wp-release-workflows]
+
+  - id: wp-release-collection-run
+    kind: gha
+    every: 1h
+    describe: The monthly collection workflow succeeded this month.
+    request: {repo: wikipathways/wikipathways-data-release, workflow: monthly_collection.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {warn: 31.5d, crit: 33d}}
+    inv_ids: [wp-release-workflows]
+
+  - id: wp-release-zenodo-run
+    kind: gha
+    every: 1h
+    describe: The monthly Zenodo publish workflow succeeded on its last run.
+    request: {repo: wikipathways/wikipathways-data-release, workflow: publish_latest_to_zenodo.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {warn: 32d, crit: 36d}}
+    inv_ids: [wp-release-workflows]
+
+  - id: wp-release-pages-build
+    kind: gha
+    every: 1h
+    alert_after: 3h
+    describe: The last GitHub Pages build of data.wikipathways.org succeeded, so the served index pages match the repository.
+    request: {repo: wikipathways/wikipathways-data-release, workflow: "50540825"}
+    assert:
+      - {that: completed_conclusion, eq: success, label: "pages-build-deployment succeeded (a failed build leaves stale listings)"}
+    inv_ids: [wp-release-workflows]

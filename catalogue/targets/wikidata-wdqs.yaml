@@ -1,0 +1,25 @@
+id: wikidata-wdqs
+name: Wikidata Query Service
+group: External upstreams
+class: data
+criticality: low
+owners: [marvinm2]
+depends_on: []
+public: true
+public_summary: The public Wikidata SPARQL endpoint that some department tools query for chemical and gene data.
+links: [https://query.wikidata.org/]
+notes: >-
+  Not ours. Consumers (for example the VHP4Safety platform's compound properties) depend
+  on it, so when it is down their failures are shown as blocked rather than paged. One
+  cheap known-answer query every 15 minutes.
+checks:
+  - id: wdqs-ask
+    kind: sparql
+    every: 15m
+    timeout: 20s
+    describe: The endpoint answers a fixed question (Douglas Adams is a human) within a few seconds.
+    request: {endpoint: "https://query.wikidata.org/sparql", ask: "ASK { <http://www.wikidata.org/entity/Q42> <http://www.wikidata.org/prop/direct/P31> <http://www.wikidata.org/entity/Q5> }"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: boolean, eq: true}
+      - {that: latency_ms, lt: 5000, warn: true}

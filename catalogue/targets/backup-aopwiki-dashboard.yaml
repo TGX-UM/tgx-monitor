@@ -1,0 +1,116 @@
+id: backup-aopwiki-dashboard
+name: AOP-Wiki multi-release store backup and restore check
+group: Jobs and backups
+class: backup
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [swarm, backup-hidrive]
+public: true
+public_summary: The multi-release AOP-Wiki RDF store is backed up off the cluster every night at 01:30 UTC, and every Sunday the newest archive is restored into a scratch database and counted.
+links:
+  - https://aopwiki-multirdf.vhp4safety.nl/sparql
+# cronjobs_aopwiki-dashboard-backup (30 1 * * *) writes virtuoso-<stamp>.tar.gz with a
+# .sha256 and a key: value .manifest to HiDrive (mount hidrive, aopwiki-dashboard/
+# virtuoso/, 14 kept); cronjobs_aopwiki-dashboard-backup-verify (30 2 * * 0) restores
+# the newest one and logs "OK: <g> graphs, <t> triples, as backed up".
+checks:
+  - id: bk-dashboard-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The nightly backup ran at its slot and logged a finished archive.
+    request:
+      service: cronjobs_aopwiki-dashboard-backup
+      grace: 30m
+      marker_re: 'Done: \S*virtuoso-(\d{8})-\d{6}\.tar\.gz'
+    assert:
+      - {that: schedule, eq: "30 1 * * *", label: "scheduled daily 01:30 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true, label: "log has 'Done: …virtuoso-<stamp>.tar.gz'"}
+    inv_ids: [backup-last-task]
+
+  - id: bk-dashboard-archive
+    kind: file_age
+    every: 1h
+    via: [core]
+    timeout: 2m
+    describe: An archive less than 26 hours old is on the off-cluster backup drive, of normal size, with two weeks of archives kept.
+    request: {mount: hidrive, glob: "aopwiki-dashboard/virtuoso/virtuoso-*.tar.gz", small_bytes: 1000000, verify_gzip: false}
+    assert:
+      - {that: count, gte: 12, label: "≥ 12 nightly archives kept"}
+      - {that: count, lte: 16, warn: true, label: "pruning keeps it at about 14"}
+      - {that: newest_age_h, lt: 26}
+      - {that: newest_size, gt: 20000000, label: "newest archive > 20 MB"}
+      - {that: size_change_pct, gte: -5, label: "not 5% smaller than the previous archive"}
+      - {that: small_count, eq: 0}
+    inv_ids: [backup-archive-fresh, bad-fresh]
+
+  - id: bk-dashboard-archive-gzip
+    kind: file_age
+    every: 1d
+    via: [core]
+    timeout: 5m
+    describe: The newest archive decompresses without error, and its checksum file was written with it.
+    request: {mount: hidrive, glob: "aopwiki-dashboard/virtuoso/virtuoso-*.tar.gz", verify_gzip: true}
+    assert:
+      - {that: gzip_ok, eq: true}
+      - {that: newest_age_h, lt: 26}
+    inv_ids: [backup-archive-fresh]
+
+  - id: bk-dashboard-checksum
+    kind: file_age
+    every: 1h
+    via: [core]
+    describe: Each archive is written with its checksum file.
+    request: {mount: hidrive, glob: "aopwiki-dashboard/virtuoso/virtuoso-*.tar.gz.sha256", verify_gzip: false}
+    assert:
+      - {that: count, gte: 12}
+      - {that: newest_age_h, lt: 26}
+      - {that: small_count, eq: 0}
+    inv_ids: [backup-archive-fresh]
+
+  - id: bk-dashboard-manifest
+    kind: restore_marker
+    every: 1h
+    via: [core]
+    describe: The newest archive's manifest records the full set of release graphs and a triple count close to the previous one.
+    request: {mount: hidrive, file: "aopwiki-dashboard/virtuoso/virtuoso-*.manifest", format: kv}
+    assert:
+      - {that: exists, eq: true}
+      - {that: age_h, lt: 26}
+      - {that: graphs, gte: 38, label: "≥ 38 graphs backed up"}
+      - {that: triples, gte: 5600000, label: "≥ 5.6 million triples backed up"}
+      - {that: triples, max_drop_pct: 2, window: 30d}
+    inv_ids: [backup-manifest-vs-live, bad-manifest-shape]
+
+  - id: bk-dashboard-verify
+    kind: job_run
+    every: 1h
+    via: [core]
+    describe: The Sunday restore check restored the newest archive into a scratch database and found every graph and triple that was backed up.
+    request:
+      service: cronjobs_aopwiki-dashboard-backup-verify
+      grace: 30m
+      marker_re: 'OK: (\d+) graphs, \d+ triples, as backed up'
+    assert:
+      - {that: schedule, eq: "30 2 * * 0", label: "scheduled Sundays 02:30 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true, label: "log has 'OK: … as backed up'"}
+      - {that: marker, gte: 38, label: "≥ 38 graphs restored"}
+    inv_ids: [verify-last-task, verify-log-ok, bad-restore-verify]
+
+  - id: bk-dashboard-verify-newest
+    kind: job_run
+    every: 6h
+    via: [core]
+    describe: The restore check tested a recent archive, not an old one left behind.
+    request:
+      service: cronjobs_aopwiki-dashboard-backup-verify
+      grace: 30m
+      marker_re: 'Checking virtuoso-(\d{8})-\d{6}\.tar\.gz'
+    assert:
+      - {that: marker_found, eq: true}
+      - {that: marker, max_age: {crit: 8d}, label: "the restored archive is from the past week, not an old leftover"}
+    inv_ids: [verify-checked-newest]

@@ -1,0 +1,105 @@
+id: wikipathways-iri-resolver
+name: WikiPathways IRI resolver
+group: WikiPathways
+class: service
+criticality: medium
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, wikipathways-sparql]
+maintenance: [wp-switch]
+public: true
+public_summary: Makes every rdf.wikipathways.org IRI resolvable as Turtle, JSON-LD or HTML, answering from the WikiPathways SPARQL endpoint.
+links: [https://rdf.wikipathways.org/]
+notes: >-
+  The public name is behind the Cloudflare proxy; the tgx1 and tgx2 probes reach the origin
+  directly. The resolver queries the public SPARQL endpoint, so an endpoint outage also shows
+  here as 502 or 504 (one incident, grouped through depends_on). IRIs are revision-specific
+  and change when a pathway is edited, so the canary looks one up through SPARQL on every run;
+  404s for old-revision IRIs after a reload are expected. The resolver allows 60 requests a
+  minute per IP; /_health is exempt.
+checks:
+  - id: wpiri-health
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The resolver reports itself healthy, through Cloudflare and at the origin on each node.
+    request: {url: "https://rdf.wikipathways.org/_health", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: ok}
+    inv_ids: [wpiri-health-sparql, wpiri-per-node-origin]
+
+  - id: wpiri-health-sparql
+    kind: http
+    every: 1h
+    describe: The resolver can reach its SPARQL backend.
+    request: {url: "https://rdf.wikipathways.org/_health?check_sparql=1", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: ok}
+      - {that: json.sparql, eq: ok}
+    inv_ids: [wpiri-health-sparql]
+
+  - id: wpiri-resolve
+    kind: roundtrip
+    every: 1h
+    timeout: 45s
+    describe: A current WP254 IRI, looked up through SPARQL, resolves to Turtle, HTML and JSON-LD.
+    request:
+      steps:
+        - url: https://sparql.wikipathways.org/sparql
+          headers: {Accept: application/sparql-results+json}
+          params:
+            query: >-
+              PREFIX dcterms: <http://purl.org/dc/terms/>
+              SELECT ?g WHERE { ?g dcterms:isPartOf ?p . ?p dcterms:identifier "WP254" .
+              FILTER(STRSTARTS(STR(?g), "http://rdf.wikipathways.org/")) } LIMIT 1
+          capture: {path: {regex: '"value"\s*:\s*"http://rdf\.wikipathways\.org/([^"]+)"'}}
+        - {url: "https://rdf.wikipathways.org/{path}", headers: {Accept: text/turtle}}
+        - {url: "https://rdf.wikipathways.org/{path}", headers: {Accept: text/html}}
+        - {url: "https://rdf.wikipathways.org/{path}.jsonld"}
+    assert:
+      - {that: completed, eq: true}
+      - {that: captures.path, matches: '^Pathway/WP254_r\d+/', label: "SPARQL returned a current WP254 IRI"}
+      - {that: steps.1.status, eq: 200}
+      - {that: steps.1.content_type, contains: text/turtle}
+      - {that: steps.1.body, contains: "WP254_r"}
+      - {that: steps.1.body, contains: "wp:"}
+      - {that: steps.2.status, eq: 200}
+      - {that: steps.2.content_type, contains: text/html}
+      - {that: steps.2.body, contains: "<title>http://rdf.wikipathways.org/Pathway/WP254_r"}
+      - {that: steps.3.status, eq: 200}
+      - {that: steps.3.content_type, contains: application/ld+json}
+    inv_ids: [wpiri-resolve-current-iri, wpiri-conneg]
+
+  - id: wpiri-unknown-404
+    kind: http
+    every: 1h
+    describe: An IRI that does not exist gives 404, not a 5xx from a broken backend.
+    request: {url: "https://rdf.wikipathways.org/Pathway/WP0000_r1/Nope/zzz", headers: {Accept: text/turtle}}
+    assert:
+      - {that: status, eq: 404}
+    inv_ids: [wpiri-unknown-404]
+
+  - id: wpiri-root-redirect
+    kind: http
+    every: 1h
+    describe: The bare host redirects to the WikiPathways RDF documentation page.
+    request: {url: "https://rdf.wikipathways.org/", follow: false}
+    assert:
+      - {that: status, eq: 302}
+      - {that: headers.location, eq: "https://www.wikipathways.org/rdf.html"}
+    inv_ids: [wpiri-root-redirect]
+
+  - id: wpiri-tls-origin
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted origin certificate for the resolver's name (it renews behind the Cloudflare proxy, so it is watched).
+    request: {host: rdf.wikipathways.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 7}
+    inv_ids: [wpiri-per-node-origin]

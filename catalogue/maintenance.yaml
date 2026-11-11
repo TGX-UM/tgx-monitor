@@ -1,0 +1,33 @@
+# Scheduled windows (UTC). Results are recorded but nothing is sent; a check still
+# failing when its window closes alerts at once. Taken from the swarm-cronjob schedules
+# in operations/scheduling-cronjobs.md.
+- id: aopwiki-reload
+  describe: Weekly AOP-Wiki RDF reload (cronjobs_aopwiki-snorql-reload, Sun 06:00)
+  rrule: FREQ=WEEKLY;BYDAY=SU
+  start: "05:50"
+  duration: 100m
+- id: wp-reload
+  describe: Monthly WikiPathways offline-instance reload (cronjobs_wikipathways-reload, 12th 02:00)
+  rrule: FREQ=MONTHLY;BYMONTHDAY=12
+  start: "01:50"
+  duration: 100m
+- id: wp-switch
+  describe: Monthly WikiPathways blue-green cutover (cronjobs_wikipathways-switch, 12th 04:00)
+  rrule: FREQ=MONTHLY;BYMONTHDAY=12
+  start: "03:50"
+  duration: 70m
+- id: dashboard-store-build
+  describe: Daily AOP-Wiki dashboard query-store build (04:30)
+  rrule: FREQ=DAILY
+  start: "04:25"
+  duration: 45m
+- id: molaop-apply-corpus
+  describe: Weekly molAOP Builder corpus apply, restarts the service if rebuilt (Tue 03:00)
+  rrule: FREQ=WEEKLY;BYDAY=TU
+  start: "02:55"
+  duration: 20m
+- id: docker-prune
+  describe: Monthly docker system prune on both nodes (1st, 03:00)
+  rrule: FREQ=MONTHLY;BYMONTHDAY=1
+  start: "02:55"
+  duration: 30m

@@ -1,0 +1,140 @@
+id: wikipathways-curation
+name: WikiPathways Curation Portal
+group: WikiPathways
+class: service
+criticality: medium
+owners: [marvinm2, egonw, youphendriks]
+depends_on: [edge-tgx1]
+public: true
+public_summary: The portal where curators review submitted pathways (curation.wikipathways.org, also reachable as upload.wikipathways.org).
+links: [https://curation.wikipathways.org/]
+notes: >-
+  Currently points at the sandbox repository and is used for testing. Only read-only requests
+  are made: the upload validation and webhook smoke tests are left out on purpose. /health
+  does not touch the database, so the published-reviews API is the database round trip.
+checks:
+  - id: cp-health
+    kind: http
+    every: 15m
+    via: [public, tgx1, tgx2]
+    describe: The portal reports itself healthy and sends HSTS, through public DNS and on each node.
+    request: {url: "https://curation.wikipathways.org/health", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: ok}
+      - {that: headers.strict-transport-security, contains: "max-age="}
+    inv_ids: [cp-health-per-node]
+
+  - id: cp-health-upload
+    kind: http
+    every: 1h
+    via: [public, tgx1, tgx2]
+    describe: The upload.wikipathways.org alias reaches the same portal on each node.
+    request: {url: "https://upload.wikipathways.org/health", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json.status, eq: ok}
+    inv_ids: [cp-health-per-node]
+
+  - id: cp-reviews
+    kind: http
+    every: 15m
+    describe: The published-reviews list comes back from the database with its expected fields.
+    request: {url: "https://curation.wikipathways.org/api/reviews?status=published", parse_json: true}
+    assert:
+      - {that: status, eq: 200}
+      - {that: json, len_gte: 5, label: "published reviews ≥ 5 (5 on 2026-11-10)"}
+      - {that: json.0.status, eq: published}
+      - {that: json.0.pr_number, exists: true}
+      - {that: json.0.wpid, exists: true}
+    inv_ids: [cp-db-roundtrip]
+
+  - id: cp-oauth-config
+
+    public: false  # a security property: its regression is not for the public page
+    kind: http
+    every: 1h
+    describe: Login sends the browser to GitHub with the portal's callback and the expected scopes (the redirect is not followed).
+    request: {url: "https://curation.wikipathways.org/auth/login", follow: false}
+    assert:
+      - {that: status, eq: 302}
+      - {that: headers.location, matches: '^https://github\.com/login/oauth/authorize\?'}
+      - {that: headers.location, contains: "redirect_uri=https%3A%2F%2Fcuration.wikipathways.org%2Fauth%2Fcallback"}
+      - {that: headers.location, matches: 'scope=public_repo(\+|%20)read%3Auser'}
+    inv_ids: [cp-oauth-config]
+
+  - id: cp-pages
+    kind: roundtrip
+    every: 15m
+    describe: The curation queue page renders and an anonymous visitor is reported as not signed in.
+    request:
+      base: https://curation.wikipathways.org
+      steps:
+        - {url: /dashboard}
+        - {url: /auth/me}
+    assert:
+      - {that: completed, eq: true}
+      - {that: steps.0.status, eq: 200}
+      - {that: steps.0.body, contains: "Curation queue"}
+      - {that: last.status, eq: 200}
+      - {that: last.json.authenticated, eq: false}
+    inv_ids: [cp-pages]
+
+  - id: cp-tls-curation
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for curation.wikipathways.org, with time to spare.
+    request: {host: curation.wikipathways.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 7}
+    inv_ids: [cp-tls]
+
+  - id: cp-tls-upload
+    kind: tls
+    every: 1d
+    via: [tgx1, tgx2]
+    describe: Both nodes serve a trusted certificate for upload.wikipathways.org; amber when a node still serves the older upload-only certificate.
+    request: {host: upload.wikipathways.org}
+    assert:
+      - {that: verified, eq: true}
+      - {that: is_traefik_default, eq: false}
+      - {that: covers_host, eq: true}
+      - {that: san, has: curation.wikipathways.org, warn: true, label: "same curation+upload certificate as the other node"}
+      - {that: days_left, gte: 21, warn: true}
+      - {that: days_left, gte: 7}
+    inv_ids: [cp-tls]
+
+  - id: cp-sandbox-page
+    kind: http
+    every: 1h
+    describe: The sandbox site the portal publishes to serves a pathway page.
+    request: {url: "https://sandbox.wikipathways.org/pathways/WP5428.html"}
+    assert:
+      - {that: status, eq: 200}
+      - {that: size, gte: 10000}
+    inv_ids: [cp-downstream-sandbox]
+
+  - id: cp-sandbox-workflows
+    kind: gha
+    every: 1h
+    describe: No workflow of the sandbox site has been disabled by GitHub for inactivity.
+    request: {repo: wikipathways/sandbox-wp.gh.io}
+    assert:
+      - {that: inactive, len_eq: 0}
+    inv_ids: [cp-downstream-sandbox]
+
+  - id: cp-sandbox-keepalive
+    kind: gha
+    every: 1h
+    describe: The sandbox site's monthly keep-alive workflow ran successfully within the last five weeks.
+    request: {repo: wikipathways/sandbox-wp.gh.io, workflow: keep_alive.yml}
+    assert:
+      - {that: state, eq: active}
+      - {that: completed_conclusion, eq: success}
+      - {that: last_success_at, max_age: {warn: 35d, crit: 45d}}
+    inv_ids: [cp-downstream-sandbox]

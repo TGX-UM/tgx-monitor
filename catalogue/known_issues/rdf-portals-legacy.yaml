@@ -1,0 +1,26 @@
+# Known problems in the RDF portals and legacy hosts area (found by the live import run
+# on 2026-11-11). They show on the page but do not alert until `until`.
+- target: nsdra
+  check: nsdra-www
+  reason: www.nsdra.org reaches tgx1 but the proxy has no rule for it, so it serves the default self-signed
+    certificate. Add the www name to the router (or a redirect to nsdra.org).
+  owner: marvinm2
+  until: '2026-12-31'
+- target: psnpbind
+  check: psnpbind-www
+  reason: www.psnpbind.org reaches tgx1 but the proxy has no rule for it, so it serves the default self-signed
+    certificate. Add the www name to the router (or a redirect to psnpbind.org).
+  owner: marvinm2
+  until: '2026-12-31'
+- target: rdfied
+  check: rdfied-dns
+  reason: The planned public name has no DNS record yet. Names under rdf.bigcat-bioinformatics.org need
+    an explicit record in the Strato panel; the wildcard does not cover them.
+  owner: egonw
+  until: '2026-12-31'
+- target: enanomapper-purl
+  check: enm-purl-resolves
+  reason: purl.enanomapper.org points at a legacy server whose web server is down, so the ontology PURLs
+    do not resolve. Decide whether to restore the redirects elsewhere or mute the target.
+  owner: egonw
+  until: '2026-12-31'
