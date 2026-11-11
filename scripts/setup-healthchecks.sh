@@ -9,9 +9,11 @@
 # Every check notifies all of the project's integrations (add the e-mail addresses there).
 #
 # Results:
-#   - Docker secret tgxmon_hc_urls_v<n> on the swarm: {name: ping URL} for core, the agents
-#     and the off-site copy job (point stack.yml at the new name afterwards);
-#   - GitHub Actions secret HC_PROBE_URL on TGX-UM/tgx-monitor for the outside probe.
+#   - Docker secret tgxmon_hc_urls_v<n> on the swarm ({name: ping URL}), swapped into
+#     tgx-monitor_core, tgx-monitor_agent and cronjobs_tgx-monitor-offsite (restarts them;
+#     update the secret name in both stack files afterwards);
+#   - GitHub Actions secret HC_PROBE_URL and variable OUTSIDE_PROBE_ENABLED=true on
+#     TGX-UM/tgx-monitor, which starts the outside probe.
 set -euo pipefail
 
 API=https://healthchecks.io/api/v3/checks/
@@ -57,10 +59,25 @@ unset key
 jq -r '."gha-probe"' <<<"$urls" | gh secret set HC_PROBE_URL -R "$REPO" >/dev/null
 echo "  GitHub secret HC_PROBE_URL set on $REPO"
 
-current=$(ssh tgx1 "docker secret ls --format '{{.Name}}' | grep -E '^tgxmon_hc_urls(_v[0-9]+)?\$' | sort -V | tail -1")
-n=$(sed -n 's/^tgxmon_hc_urls_v\([0-9]*\)$/\1/p' <<<"$current")
-next="tgxmon_hc_urls_v$(( ${n:-1} + 1 ))"
-jq 'del(."gha-probe")' <<<"$urls" | ssh tgx1 "docker secret create $next -" >/dev/null
+new=$(jq 'del(."gha-probe")' <<<"$urls")
 unset urls
-echo "  Docker secret $next created (was ${current:-none})"
-echo "Next: point stack.yml (tgxmon_hc_urls) and the off-site job at $next and redeploy."
+# Create the next secret version and swap it into every service that pings, all on tgx1.
+printf '%s' "$new" | ssh tgx1 'set -euo pipefail
+  current=$(docker service inspect tgx-monitor_core --format \
+    "{{range .Spec.TaskTemplate.ContainerSpec.Secrets}}{{if eq .File.Name \"tgxmon_hc_urls\"}}{{.SecretName}}{{end}}{{end}}")
+  n=$(sed -n "s/^tgxmon_hc_urls_v\([0-9]*\)$/\1/p" <<<"$current")
+  next="tgxmon_hc_urls_v$(( ${n:-1} + 1 ))"
+  docker secret create "$next" - >/dev/null
+  for svc in tgx-monitor_core tgx-monitor_agent cronjobs_tgx-monitor-offsite; do
+    docker service update --quiet --detach --secret-rm "$current" \
+      --secret-add "source=$next,target=tgxmon_hc_urls" "$svc" >/dev/null
+    echo "  $svc now reads $next"
+  done
+  echo "  (was ${current:-none}; stack files still say the old name until updated)"'
+unset new
+
+# The outside probe: its schedule starts once this variable is true.
+gh variable set OUTSIDE_PROBE_ENABLED --body true -R "$REPO" >/dev/null
+echo "  GitHub variable OUTSIDE_PROBE_ENABLED=true on $REPO"
+echo "Done. Checks turn green on healthchecks.io within a few minutes (gha-probe within 20,"
+echo "monitor-backup and hidrive-copy after their next nightly run)."

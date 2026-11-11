@@ -336,3 +336,13 @@ def test_offsite_copy_pings_healthchecks(store, tmp_path, monkeypatch):
                  "hidrive-copy"]) == 1
     assert sent[-1] == "https://hc.example/p/abc/fail"
     assert "no URL" in B.hc_ping("other", True, "x")
+
+
+def test_marker_is_replaced_not_overwritten(store, tmp_path):
+    """HiDrive (CIFS) refuses an in-place overwrite of an existing file (ESTALE); the
+    marker is written under .part and renamed over the old one, on every run."""
+    fill(store)
+    m = B.backup(store, tmp_path, now=NOW)
+    assert B.restore_verify(tmp_path / m["file"])["ok"]
+    assert B.restore_verify(tmp_path / m["file"])["ok"]  # a second run replaces it
+    assert not list(tmp_path.glob("*.part"))

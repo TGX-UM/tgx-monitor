@@ -107,6 +107,20 @@ def backup(store: Store, dest_dir: Path, keep: int = KEEP,
     return manifest
 
 
+def _write_replace(path: Path, text: str) -> None:
+    """Write via a temporary name and rename over the old file. Overwriting in place on
+    HiDrive's CIFS mount fails with ESTALE ("Stale file handle") once the file exists;
+    a rename does not, and readers never see half a file either."""
+    part = path.with_name(path.name + ".part")
+    part.unlink(missing_ok=True)
+    part.write_text(text)
+    try:
+        part.replace(path)
+    except OSError:
+        path.unlink(missing_ok=True)  # some CIFS servers refuse rename-over-existing
+        part.replace(path)
+
+
 def restore_verify(file: Path, marker: Path | None = None) -> dict[str, Any]:
     """Open a backup, check it against its manifest, write the marker. Never raises."""
     file = Path(file)
@@ -141,7 +155,7 @@ def restore_verify(file: Path, marker: Path | None = None) -> dict[str, Any]:
     out = {"verified_at": iso(), "ok": not problems, "counts": counts, "file": file.name,
            "integrity": integrity, "backup_at": manifest.get("at"), "problems": problems}
     try:
-        marker.write_text(json.dumps(out, indent=1, sort_keys=True))
+        _write_replace(marker, json.dumps(out, indent=1, sort_keys=True))
         out["marker"] = str(marker)
     except OSError as exc:
         out["ok"] = False
@@ -156,7 +170,11 @@ def _copy(src: Path, dest: Path) -> None:
             fo.write(chunk)
         fo.flush()
         os.fsync(fo.fileno())
-    part.replace(dest)
+    try:
+        part.replace(dest)
+    except OSError:
+        dest.unlink(missing_ok=True)  # see _write_replace: CIFS and existing files
+        part.replace(dest)
 
 
 def offsite_copy(src_dir: Path, dest_dir: Path, keep: int = KEEP) -> dict[str, Any]:
