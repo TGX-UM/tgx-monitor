@@ -51,7 +51,7 @@ from ..catalogue import Check
 from ..http import NODES, Fetched
 from ..model import Call, Observation
 from ..redact import redact_text
-from .base import Context, Kind, register
+from .base import Context, Kind, github_read_token, register
 
 GITHUB_API = "https://api.github.com"
 GH_HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
@@ -200,11 +200,11 @@ async def gh_get(ctx: Context, path: str, params: dict[str, Any] | None = None,
     Returns (fetch, parsed json or None, auth used). A 304 reuses the cached body.
     """
     url = f"{GITHUB_API}{path}" + (f"?{urlencode(params)}" if params else "")
-    token = ctx.secrets("tgxmon_gh_token")
+    token, label = await github_read_token(ctx)
     f: Fetched | None = None
     auth = "anonymous"
     for tok in ([token, None] if token else [None]):
-        auth = "token" if tok else "anonymous"
+        auth = label if tok else "anonymous"
         key = f"{url}|{auth}"
         headers = dict(GH_HEADERS)
         if tok:
@@ -584,7 +584,7 @@ class SelfKind(Kind):
         dns = await tcp_probe("1.1.1.1", 53, timeout=min(5.0, timeout))
         dcall = Call("CONNECT", "tcp://1.1.1.1:53", ok=dns["ok"], ms=dns["ms"],
                      note=dns.get("error", ""))
-        token = ctx.secrets("tgxmon_gh_token")
+        token, _ = await github_read_token(ctx)
         headers = {"Authorization": f"Bearer {token}"} if token else None
         f = await ctx.http.fetch("GET", f"{GITHUB_API}/zen", headers=headers, timeout=timeout)
         # Any HTTP answer (even 403/429) proves the path out works.
@@ -594,9 +594,15 @@ class SelfKind(Kind):
 
     @staticmethod
     async def _token(ctx: Context, secret: str, timeout: float) -> Observation:
-        token = ctx.secrets(secret)
-        if not token:
-            return Observation(unknown=f"secret {secret} is not available")
+        if secret == "app":
+            token = await ctx.gh_app_token() if ctx.gh_app_token is not None else None
+            if not token:
+                return Observation(unknown="the GitHub App is not configured or its key "
+                                           "was refused")
+        else:
+            token = ctx.secrets(secret)
+            if not token:
+                return Observation(unknown=f"secret {secret} is not available")
         f = await ctx.http.fetch("GET", f"{GITHUB_API}/rate_limit", timeout=timeout, headers={
             **GH_HEADERS, "Authorization": f"Bearer {token}"})
         if f.error:

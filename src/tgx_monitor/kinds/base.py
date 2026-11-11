@@ -24,7 +24,7 @@ import datetime as dt
 import json
 import time
 import traceback
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -53,6 +53,25 @@ class Context:
     mounts: dict[str, Path] = dataclasses.field(default_factory=dict)  # alias -> ro path
     now: Callable[[], dt.datetime] = utcnow
     env: dict[str, str] = dataclasses.field(default_factory=dict)
+    # Installation token of the tgx-monitor GitHub App, when it is configured.
+    gh_app_token: Callable[[], Awaitable[str | None]] | None = None
+
+
+async def github_read_token(ctx: Context) -> tuple[str | None, str]:
+    """(token, label) for reading the GitHub API: the tgxmon_gh_token PAT, else the App's
+    installation token (it reads any public repository at 5,000 calls an hour), else
+    anonymous (60 an hour)."""
+    pat = ctx.secrets("tgxmon_gh_token")
+    if pat:
+        return pat, "token"
+    if ctx.gh_app_token is not None:
+        try:
+            tok = await ctx.gh_app_token()
+        except Exception:  # noqa: BLE001 - a broken App key must not break a check
+            tok = None
+        if tok:
+            return tok, "app"
+    return None, "anonymous"
 
 
 class Kind:

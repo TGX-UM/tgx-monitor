@@ -49,14 +49,22 @@ agent-hb, root-status) are created in step 1.
 
 ## 2. GitHub App, tokens, healthchecks.io (Marvin, web UI)
 
-1. **GitHub App** `tgx-monitor` on TGX-UM: permissions Issues read/write, Metadata
-   read; no webhook. Install it on `TGX-UM/tgx-monitor` only. Download a private key.
-   Note the App id and the installation id (`https://github.com/organizations/TGX-UM/settings/installations/<id>`);
-   they go into `stack.yml` (`TGXMON_GH_APP_ID`, `TGXMON_GH_INSTALLATION_ID`), they are
-   not secret. Issues come from the App because GitHub does not notify you about an
-   issue you opened yourself.
-2. **`tgxmon_gh_token`**: a fine-grained PAT with read-only *Actions* and *Metadata* on
-   the repositories whose workflows the catalogue watches, plus *Actions: write* on
+1. **GitHub App** `tgx-monitor` (done 2026-11-11): App id 5712665, owned by the
+   `marvinm2` account (only organisation owners can create an App under TGX-UM, and a
+   repository admin may install one on a repository they administer). Permissions:
+   Issues read/write, Metadata read; no webhook. Installed on `TGX-UM/tgx-monitor`
+   only, installation id 180881279. Both ids are in `stack.yml` and are not secret.
+   The private key is the Docker secret `tgxmon_gh_app_key_v2`, mounted as
+   `tgxmon_gh_app_key`. It was created with the manifest flow, piped straight from
+   `POST /app-manifests/<code>/conversions` into `docker secret create`. Issues come
+   from the App because GitHub does not notify you about an issue you opened yourself.
+   Without `tgxmon_gh_token` the read-only GitHub checks also use the App's
+   installation token: any public repository, 5,000 calls an hour.
+   To rotate the key: generate a new one on the App's settings page, create
+   `tgxmon_gh_app_key_v3`, point `stack.yml` at it, redeploy, then delete the old key.
+2. **`tgxmon_gh_token`** (optional since the App): a fine-grained PAT with read-only
+   *Actions* and *Metadata* on the private repositories whose workflows the catalogue
+   watches (`TGX-UM/cronjobs`), plus *Actions: write* on
    `TGX-UM/tgx-monitor` (the daily keepalive re-enables `probe.yml` and `browser.yml`).
    Expiry: one year; the `self` check warns 30 days ahead.
 3. **`tgxmon_ghcr_read_pat`**: a *classic* PAT with only `read:packages` (GHCR rejects
@@ -88,7 +96,7 @@ ssh tgx1
 umask 077; d=$(mktemp -d)
 
 # GitHub App private key (PEM), PATs
-docker secret create tgxmon_gh_app_key  ~/Downloads/tgx-monitor.<date>.private-key.pem
+# (done: tgxmon_gh_app_key_v2, see section 2)
 read -rs T; printf '%s' "$T" | docker secret create tgxmon_gh_token -;      unset T
 read -rs T; printf '%s' "$T" | docker secret create tgxmon_ghcr_read_pat -; unset T
 

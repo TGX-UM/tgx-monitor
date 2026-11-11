@@ -29,6 +29,7 @@ import contextlib
 import logging
 import os
 import signal
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +90,9 @@ class Service:
         from .alerts.engine import AlertEngine
 
         self.channels = build_channels(secret_reader())
+        gh = self.channels.get("github")
+        if gh is not None and getattr(gh, "app", None):
+            self.ctx.gh_app_token = _app_token_provider(gh)
         self.engine = AlertEngine(self.store, self.catalogue, dry_run=self.dry_run,
                                   private_base_url=env("TGXMON_PRIVATE_URL"),
                                   public_base_url=env("TGXMON_PUBLIC_URL"),
@@ -138,8 +142,14 @@ class Service:
                 out = fn()
                 if asyncio.iscoroutine(out):
                     await asyncio.wait_for(out, timeout=120)
-            except Exception:  # noqa: BLE001 - one hook must never stop the others
-                log.exception("hook %s failed", name)
+            except Exception as exc:  # noqa: BLE001 - one hook must never stop the others
+                from .docker import DockerError
+
+                if isinstance(exc, DockerError):  # the proxy is often still starting
+                    log.warning("hook %s: docker-proxy not ready (%s); next try in %ds",
+                                name, exc, every)
+                else:
+                    log.exception("hook %s failed", name)
 
     def _heartbeat(self) -> None:
         from .agent import write_heartbeat
@@ -263,3 +273,19 @@ def add_commands(sub: Any) -> None:
 
 
 __all__ = ["Service", "add_commands", "cmd_run"]
+
+
+def _app_token_provider(channel: Any) -> Callable[[], Awaitable[str | None]]:
+    """The GitHub App's installation token for read-only API checks. The channel caches it
+    until five minutes before it expires; the lock keeps parallel checks from minting
+    several at once."""
+    import httpx
+
+    lock = asyncio.Lock()
+
+    async def get() -> str | None:
+        async with lock, httpx.AsyncClient(transport=channel.transport, timeout=20) as http:
+            tok = await channel.token(http)
+        return tok if tok and tok != channel.pat else None
+
+    return get

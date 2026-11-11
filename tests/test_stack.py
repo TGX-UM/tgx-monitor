@@ -31,7 +31,10 @@ def test_no_host_ports_no_node_pins_no_root():
 
 
 def test_secrets_are_external_files_and_env_holds_no_credentials():
-    assert all(v == {"external": True} for v in STACK["secrets"].values())
+    for key, v in STACK["secrets"].items():
+        # external only; a rotated secret keeps its mount name via name: <key>_v<n>
+        assert v.get("external") is True and set(v) <= {"external", "name"}, key
+        assert re.fullmatch(rf"{key}(_v\d+)?", v.get("name", key)), key
     for name, svc in SERVICES.items():
         for k, v in (svc.get("environment") or {}).items():
             if re.search(r"(?i)pass|secret|token|key|credential", k):

@@ -379,3 +379,22 @@ async def test_self_vantage(monkeypatch: pytest.MonkeyPatch) -> None:
     o = await KINDS["self"]().observe(check("self", {"signal": "vantage"}, via=["core"]),
                                       "core", ctx(lambda m, u, k: "ConnectError"))
     assert o.values["vantage_ok"] is False
+
+
+async def test_github_reads_prefer_the_pat_then_the_app_then_anonymous() -> None:
+    from tgx_monitor.kinds.base import github_read_token
+
+    async def app() -> str | None:
+        return "app-tok"
+
+    async def broken() -> str | None:
+        raise RuntimeError("key refused")
+
+    def ctx(secrets: dict[str, str], provider: Any) -> Context:
+        return Context(http=None, catalogue=None, secrets=secrets.get,  # type: ignore[arg-type]
+                       gh_app_token=provider)
+
+    assert await github_read_token(ctx({"tgxmon_gh_token": "pat"}, app)) == ("pat", "token")
+    assert await github_read_token(ctx({}, app)) == ("app-tok", "app")
+    assert await github_read_token(ctx({}, broken)) == (None, "anonymous")
+    assert await github_read_token(ctx({}, None)) == (None, "anonymous")

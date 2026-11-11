@@ -27,7 +27,7 @@ networks:
       encrypted: "true"
 
 secrets:
-  tgxmon_gh_app_key: {external: true}
+  tgxmon_gh_app_key: {external: true, name: tgxmon_gh_app_key_v2}  # mounted as tgxmon_gh_app_key
   tgxmon_gh_token: {external: true}
   tgxmon_ghcr_read_pat: {external: true}
   tgxmon_smtp: {external: true}
@@ -68,8 +68,8 @@ services:
       # tgxmon_gh_app_key). Ids are not secret; empty means "App not set up yet" and
       # the channel falls back to tgxmon_gh_token. DEPLOY.md step 2.
       TGXMON_GH_REPO: TGX-UM/tgx-monitor
-      TGXMON_GH_APP_ID: ""
-      TGXMON_GH_INSTALLATION_ID: ""
+      TGXMON_GH_APP_ID: "5712665"            # GitHub App tgx-monitor (owner marvinm2); not secret
+      TGXMON_GH_INSTALLATION_ID: "180881279"  # installed on TGX-UM/tgx-monitor only
     networks: [core, tgxmon_int, tgxmon_dockerapi]
     volumes:
       - {type: bind, source: /mnt/gluster/docker/tgx-monitor/data, target: /data}

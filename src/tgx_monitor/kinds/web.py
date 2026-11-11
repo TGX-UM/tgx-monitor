@@ -25,7 +25,7 @@ from urllib.parse import urlsplit
 
 from ..catalogue import Check
 from ..model import Observation
-from .base import Context, Kind, register
+from .base import Context, Kind, github_read_token, register
 
 
 @register
@@ -38,7 +38,7 @@ class HttpKind(Kind):
         r = check.request
         headers = dict(r.get("headers") or {})
         if r.get("github_token") and urlsplit(str(r["url"])).hostname == "api.github.com":
-            token = ctx.secrets("tgxmon_gh_token")
+            token, _ = await github_read_token(ctx)
             if token:
                 headers["Authorization"] = f"Bearer {token}"
         f = await ctx.http.fetch(

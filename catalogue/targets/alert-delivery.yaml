@@ -30,8 +30,8 @@ checks:
     kind: self
     every: 1h
     via: [core]
-    describe: The GitHub token the monitor opens issues with is valid and has plenty of API calls left this hour.
-    request: {signal: token, secret: tgxmon_gh_token}
+    describe: The GitHub App the monitor opens issues with gets an installation token and has plenty of API calls left this hour.
+    request: {signal: token, secret: app}
     assert:
       - {that: valid, eq: true}
       - {that: rate_remaining, gte: 1000, warn: true}
