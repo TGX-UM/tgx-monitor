@@ -8,7 +8,7 @@
 # mounts by alias only (/mounts/<alias> inside core).
 version: "3.8"
 
-x-image: &image ghcr.io/tgx-um/tgx-monitor:latest   # deploys use sha-<7>; see DEPLOY.md
+x-image: &image ${TGXMON_IMAGE:-ghcr.io/tgx-um/tgx-monitor:latest}   # deploy: TGXMON_IMAGE=ghcr.io/tgx-um/tgx-monitor:sha-<7>
 
 networks:
   core:
