@@ -32,7 +32,7 @@ secrets:
   tgxmon_ghcr_read_pat: {external: true}
   tgxmon_smtp: {external: true}
   tgxmon_contacts: {external: true}
-  tgxmon_users: {external: true, name: tgxmon_users_v2}  # mounted as tgxmon_users
+  tgxmon_users: {external: true, name: tgxmon_users_v3}  # mounted as tgxmon_users (marvinm2, egonw)
   tgxmon_session_key: {external: true}
   tgxmon_push_tokens: {external: true}
   tgxmon_hc_urls: {external: true}
@@ -73,7 +73,7 @@ services:
       TGXMON_GH_APP_ID: "5712665"            # GitHub App tgx-monitor (owner marvinm2); not secret
       TGXMON_GH_INSTALLATION_ID: "180881279"  # installed on TGX-UM/tgx-monitor only
       TGXMON_GH_CLIENT_ID: Iv23lixZJmJoHOB61hnP   # same App, as OAuth client for "Sign in with GitHub"; public
-      TGXMON_GITHUB_ONLY: "0"                  # 1 once GitHub sign-in works: no password form, GitHub (with its 2FA) only
+      TGXMON_GITHUB_ONLY: "1"                  # 1 once GitHub sign-in works: no password form, GitHub (with its 2FA) only
     networks: [core, tgxmon_int, tgxmon_dockerapi]
     volumes:
       - {type: bind, source: /mnt/gluster/docker/tgx-monitor/data, target: /data}
