@@ -275,3 +275,24 @@ def test_unknown_for_too_long_counts_as_failing():
     assert r["state"] == "FAILING"
     r = E.step(r, "ok", ts + dt.timedelta(minutes=5), fast)
     assert r["unknown_since"] is None
+
+
+def test_waiting_never_turns_into_failing():
+    """A job slot from before the monitor recorded runs is 'skipped', not 'unknown':
+    a day of it must neither page nor start the blind clock."""
+    job = Check.model_validate({"id": "chk", "kind": "job_run", "every": "15m",
+                                "assert": [{"that": "ran", "eq": True}]})
+    ts = dt.datetime(2026, 11, 11, 2, 0, tzinfo=dt.UTC)
+    r = E.blank("p")
+    for _ in range(4 * 24):
+        ts += dt.timedelta(minutes=15)
+        r = E.step(r, "skipped", ts, job)
+    assert r["state"] == "UNKNOWN" and r["consecutive_fail"] == 0
+    assert r["unknown_since"] is None
+
+
+def test_no_watchdog_rows_without_a_healthchecks_channel(world: World) -> None:
+    w = world
+    w.engine.watchdog = False
+    w.engine.tick()
+    assert w.store.one("SELECT COUNT(*) AS n FROM outbox WHERE event='watchdog'")["n"] == 0

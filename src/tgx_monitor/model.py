@@ -73,6 +73,9 @@ class Observation:
     calls: list[Call] = dataclasses.field(default_factory=list)
     error: str | None = None  # the target did not answer at all -> failed
     unknown: str | None = None  # could not tell (429, missing secret) -> unknown
+    # nothing to judge yet (a job slot from before the monitor started recording, a job
+    # created after its last slot) -> skipped: neither fails, recovers nor counts as blind
+    waiting: str | None = None
     metrics: dict[str, float] = dataclasses.field(default_factory=dict)  # stored for baselines
     evidence: str = ""  # redacted, capped excerpt kept on failure
 

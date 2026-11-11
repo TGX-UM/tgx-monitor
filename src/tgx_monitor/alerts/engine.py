@@ -169,8 +169,12 @@ def step(row: dict[str, Any], status: str, ts: dt.datetime, check: Check) -> dic
 class AlertEngine:
     def __init__(self, store: Store, catalogue: Catalogue, *,
                  now: Callable[[], dt.datetime] = utcnow, dry_run: bool = True,
-                 private_base_url: str = "", public_base_url: str = "") -> None:
+                 private_base_url: str = "", public_base_url: str = "",
+                 watchdog: bool = True) -> None:
         self.store = store
+        # False while tgxmon_hc_urls is unset: pings with nowhere to go would only pile up
+        # as dead letters and turn delivery-dead-letters red for no reason.
+        self.watchdog = watchdog
         self.catalogue = catalogue
         self.now = now
         self.dry_run = dry_run
@@ -226,7 +230,8 @@ class AlertEngine:
             self._reminders(db, now)
             testing.close_due_tests(db, now, self.private_url)
             digests.enqueue_due(db, self, now)
-            self._watchdog(db, now)
+            if self.watchdog:
+                self._watchdog(db, now)
 
     def evaluate_now(self) -> None:
         with self.store.transaction() as db:

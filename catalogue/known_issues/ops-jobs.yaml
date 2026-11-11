@@ -40,3 +40,9 @@
     the endpoint serves the old single-graph layout.
   owner: marvinm2
   until: '2026-11-14'
+- target: swarm-failover
+  check: swarm-pins
+  reason: tgx-monitor-soak, the 72-hour SQLite-on-Gluster test, is pinned on purpose and moved between
+    nodes every 3.5 hours; it is removed when the test ends.
+  owner: marvinm2
+  until: '2026-11-15'

@@ -294,7 +294,7 @@ async def test_job_run_inside_grace_judges_previous_slot(swarm: FakeSwarm, store
 
 async def test_job_run_not_yet_due_and_missing(swarm: FakeSwarm, store: Store) -> None:
     o = await observe("job_run", ctx_for(swarm, store), service="cronjobs_wikipathways-switch")
-    assert o.unknown and "not yet due" in o.unknown
+    assert o.waiting and "not yet due" in o.waiting and o.unknown is None
     o = await observe("job_run", ctx_for(swarm, store), service="cronjobs_gone")
     assert o.error and "not in the swarm" in o.error
     o = await observe("job_run", ctx_for(swarm, None), service="cronjobs_gone")
@@ -433,4 +433,4 @@ async def test_job_run_slot_before_recording_started_is_unknown(swarm: FakeSwarm
     store.set_meta("job_recorder_started", "2099-01-01T00:00:00+00:00")
     await record_job_runs(store, swarm.api())
     o = await observe("job_run", ctx_for(swarm, store), service="cronjobs_aopwiki-snorql-reload")
-    assert o.unknown and "predates" in o.unknown
+    assert o.waiting and "predates" in o.waiting and o.unknown is None

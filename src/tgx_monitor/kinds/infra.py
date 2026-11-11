@@ -552,7 +552,7 @@ class JobRunKind(Kind):
         except ValueError as exc:
             return Observation(error=str(exc), calls=calls)
         if created is not None and due < created:
-            return Observation(unknown=f"not yet due: {r['service']} was created {iso(created)}, "
+            return Observation(waiting=f"not yet due: {r['service']} was created {iso(created)}, "
                                        f"after its last scheduled slot {iso(due)}", calls=calls)
         q = ("SELECT * FROM job_runs WHERE job=? AND started_at>=? AND started_at<=? "
              "ORDER BY started_at DESC LIMIT 1")
@@ -564,7 +564,7 @@ class JobRunKind(Kind):
         # started recording may simply be invisible: that is "cannot tell", not "missed".
         since = parse_ts(ctx.store.get_meta("job_recorder_started") or "")
         if not run and since is not None and due < since:
-            return Observation(unknown=f"slot {iso(due)} predates the monitor's job record "
+            return Observation(waiting=f"slot {iso(due)} predates the monitor's job record "
                                        f"(since {iso(since)}); judged from the next run",
                                calls=calls)
         values: dict[str, Any] = {

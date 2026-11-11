@@ -128,6 +128,9 @@ async def run_probe(target: Target, check: Check, probe_id: str, via: str,
     elif obs.unknown is not None:
         status = "unknown"
         summary = obs.unknown
+    elif obs.waiting is not None:
+        status = "skipped"
+        summary = obs.waiting
     else:
         now = ctx.now()
         outcomes = [A.evaluate(a, obs.values, now, baseline) for a in check.assert_]
