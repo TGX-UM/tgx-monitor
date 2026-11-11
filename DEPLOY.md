@@ -62,6 +62,14 @@ agent-hb, root-status) are created in step 1.
    installation token: any public repository, 5,000 calls an hour.
    To rotate the key: generate a new one on the App's settings page, create
    `tgxmon_gh_app_key_v3`, point `stack.yml` at it, redeploy, then delete the old key.
+   **Sign in with GitHub** uses the same App as OAuth client (client id in `stack.yml`,
+   `TGXMON_GH_CLIENT_ID`). On the App's settings page set the *Callback URL* to
+   `https://monitor.bigcat-bioinformatics.org/login/github/callback`, generate a client
+   secret and store it without it touching a file:
+   `ssh tgx1 'read -rsp "client secret: " s; echo; printf %s "$s" | docker secret create tgxmon_gh_oauth_secret -'`.
+   Only handles that are keys of `tgxmon_users` get in; the value may be a password hash
+   or the word `github` (GitHub sign-in only). Once it works, `TGXMON_PASSWORD_LOGIN: "0"`
+   turns the password form off.
 2. **`tgxmon_gh_token`** (optional since the App): a fine-grained PAT with read-only
    *Actions* and *Metadata* on the private repositories whose workflows the catalogue
    watches (`TGX-UM/cronjobs`), plus *Actions: write* on

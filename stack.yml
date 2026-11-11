@@ -71,6 +71,8 @@ services:
       TGXMON_GH_REPO: TGX-UM/tgx-monitor
       TGXMON_GH_APP_ID: "5712665"            # GitHub App tgx-monitor (owner marvinm2); not secret
       TGXMON_GH_INSTALLATION_ID: "180881279"  # installed on TGX-UM/tgx-monitor only
+      TGXMON_GH_CLIENT_ID: Iv23lixZJmJoHOB61hnP   # same App, as OAuth client for "Sign in with GitHub"; public
+      TGXMON_PASSWORD_LOGIN: "1"               # 0 once GitHub sign-in works: GitHub (with its 2FA) only
     networks: [core, tgxmon_int, tgxmon_dockerapi]
     volumes:
       - {type: bind, source: /mnt/gluster/docker/tgx-monitor/data, target: /data}

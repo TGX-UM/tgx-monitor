@@ -58,7 +58,7 @@ from ..model import iso, utcnow
 from ..redact import redact_text
 from ..secrets import read_secret_json
 from ..store import Store
-from . import auth
+from . import auth, github_login
 
 log = logging.getLogger("tgx_monitor.web")
 
@@ -77,7 +77,10 @@ NAV = [("/", "Overview"), ("/incidents", "Incidents"), ("/outbox", "Outbox"),
 class WebSettings:
     secrets_dir: Path | None = None  # None: TGXMON_SECRETS_DIR or /run/secrets
     secure_cookies: bool = True  # False only for a local http tunnel
-    base_url: str = ""  # the private UI's public https address, for messages
+    base_url: str = ""  # the private UI's public https address (messages, OAuth callback)
+    gh_client_id: str = ""  # GitHub App client id for "Sign in with GitHub" (not secret)
+    gh_transport: Any = None  # httpx transport override (tests)
+    password_login: bool = True  # TGXMON_PASSWORD_LOGIN=0: GitHub sign-in only
     max_tick_age_s: float = 180.0
     push_max_bytes: int = 65536
     now: Callable[[], dt.datetime] = utcnow
@@ -87,7 +90,7 @@ class WebSettings:
 class Gate(BaseHTTPMiddleware):
     """Session loading and the deny-by-default rule."""
 
-    OPEN = ("/livez", "/login")
+    OPEN = ("/livez", "/login", "/login/github", "/login/github/callback")
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
         st = request.app.state
@@ -97,7 +100,7 @@ class Gate(BaseHTTPMiddleware):
                 auth.session_current, sess, st.settings.secrets_dir):
             sess = None  # user removed or password changed since this session began
         request.state.had_session = sess is not None
-        fresh = sess is None and path == "/login" and st.sessions.enabled
+        fresh = sess is None and path.startswith("/login") and st.sessions.enabled
         if fresh:
             sess = {"csrf": auth.new_csrf()}
         request.state.session = sess or {}
@@ -421,11 +424,12 @@ async def login(request: Request) -> Response:
     if not nxt.startswith("/") or nxt.startswith("//") or "\\" in nxt:
         nxt = "/"
     if request.method == "GET":
-        return _page(request, "login.html", title="Log in", next=nxt, error=None,
-                     disabled=not st.sessions.enabled)
+        return login_page(request, None)
     if not st.sessions.enabled:
-        return _page(request, "login.html", 503, title="Log in", next=nxt, disabled=True,
-                     error="Login is disabled: no session key is configured.")
+        return login_page(request, "Login is disabled: no session key is configured.", 503)
+    if not st.settings.password_login:
+        return login_page(request, "Password login is switched off: sign in with GitHub.",
+                          403)
     raw = await request.form()
     if not auth.csrf_ok(request.state.session, str(raw.get("csrf", ""))):
         # Not an attack worth a bare 403: almost always a browser that did not send the
@@ -437,8 +441,7 @@ async def login(request: Request) -> Response:
                "plain http or a tunnel, allow cookies for this site, and try again."
                if not request.state.had_session else
                "This login form had expired. Please try again.")
-        return _page(request, "login.html", 400, title="Log in", next=nxt, disabled=False,
-                     error=why)
+        return login_page(request, why, 400)
     form = {k: str(v) for k, v in raw.items()}
     user = form.get("username", "").strip()[:64]
     password = form.get("password", "")
@@ -447,20 +450,29 @@ async def login(request: Request) -> Response:
     # where a caller could rotate X-Forwarded-For around the per-address limits.
     if (not st.login_ip_limiter.hit(ip) or not st.login_limiter.hit(f"{ip}|{user.lower()}")
             or not st.login_user_limiter.hit(user.lower())):
-        return _page(request, "login.html", 429, title="Log in", next=nxt, disabled=False,
-                     error="Too many attempts. Wait a minute and try again.")
+        return login_page(request, "Too many attempts. Wait a minute and try again.", 429)
     ok = False
     if len(password) <= auth.MAX_PASSWORD:
         async with st.login_slots:
             ok = await run_in_threadpool(auth.verify_password, user, password,
                                          st.settings.secrets_dir)
     if not ok:
-        return _page(request, "login.html", 401, title="Log in", next=nxt, disabled=False,
-                     error="Wrong username or password.")
+        return login_page(request, "Wrong username or password.", 401)
     fp = await run_in_threadpool(auth.user_fingerprint, user, st.settings.secrets_dir)
     request.state.new_session = {"u": user, "fp": fp, "csrf": auth.new_csrf()}
     await run_in_threadpool(st.store.audit, user, "login", ip)
     return RedirectResponse(nxt, status_code=303)
+
+
+def login_page(request: Request, error: str | None, status: int = 200) -> HTMLResponse:
+    st = request.app.state
+    nxt = request.query_params.get("next", "/")
+    if not nxt.startswith("/") or nxt.startswith("//") or "\\" in nxt:
+        nxt = "/"
+    return _page(request, "login.html", status, title="Log in", next=nxt, error=error,
+                 disabled=not st.sessions.enabled,
+                 github=github_login.configured(st.settings),
+                 password=st.settings.password_login)
 
 
 async def logout(request: Request) -> Response:
@@ -678,6 +690,8 @@ def create_private_app(store: Store, catalogue: Catalogue, *,
     routes = [
         Route("/livez", livez),
         Route("/login", login, methods=["GET", "POST"]),
+        Route("/login/github", github_login.start),
+        Route("/login/github/callback", github_login.callback),
         Route("/logout", logout, methods=["POST"]),
         Route("/api/push/{job}", push, methods=["POST"]),
         Route("/", overview),
