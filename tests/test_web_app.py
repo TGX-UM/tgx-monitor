@@ -245,3 +245,29 @@ def test_push_rate_limit_is_per_caller(tmp_path):
     cron = TestClient(app, base_url="https://testserver", client=("10.0.9.2", 5000))
     r = cron.post("/api/push/wp-reload", json={}, headers={"Authorization": "Bearer wrong"})
     assert r.status_code == 401  # its own budget, untouched by the noisy caller
+
+
+def test_login_without_the_cookie_explains_and_recovers(tmp_path):
+    """A browser that drops the Secure cookie (plain http, a tunnel, cookies blocked) gets
+    a fresh form and a plain explanation, not a bare 403, and the retry works."""
+    from test_web_fixtures import PASSWORDS
+
+    app, _, _ = make_app(tmp_path)
+    c = client(app)
+    tok = csrf_of(c.get("/login").text)
+    c.cookies.clear()
+    r = c.post("/login", data={"csrf": tok, "username": "alice", "password": PASSWORDS["alice"]})
+    assert r.status_code == 400 and "did not send the login cookie" in r.text
+    tok2 = csrf_of(r.text)
+    assert tok2 != tok
+    ok = c.post("/login", data={"csrf": tok2, "username": "alice",
+                                "password": PASSWORDS["alice"]}, follow_redirects=False)
+    assert ok.status_code == 303
+
+
+def test_login_with_a_stale_form_says_so(tmp_path):
+    app, _, _ = make_app(tmp_path)
+    c = client(app)
+    c.get("/login")
+    r = c.post("/login", data={"csrf": "stale", "username": "alice", "password": "x"})
+    assert r.status_code == 400 and "had expired" in r.text

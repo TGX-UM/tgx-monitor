@@ -225,7 +225,8 @@ class Service:
         self.store.set_meta("started_at", iso())
         self.store.set_meta("last_tick", iso())
         app = create_private_app(self.store, self.catalogue, settings=WebSettings(
-            secure_cookies=env("TGXMON_INSECURE_COOKIES") != "1"))
+            secure_cookies=env("TGXMON_INSECURE_COOKIES") != "1",
+            base_url=env("TGXMON_PRIVATE_URL")))
         server = uvicorn.Server(uvicorn.Config(
             app, host="0.0.0.0", port=int(env("TGXMON_PORT", "8000")), log_level="warning",
             proxy_headers=False, access_log=False, lifespan="off"))

@@ -84,10 +84,12 @@ def test_open_routes_stay_narrow(tmp_path):
 def test_csrf_enforced_on_every_post(tmp_path):
     app, _, _ = make_app(tmp_path)
     c = client(app)
-    # Logging in itself needs the token from the login form.
+    # Logging in itself needs the token from the login form: refused (400 with a fresh
+    # form and an explanation), no session, no redirect.
     r = c.post("/login", data={"username": "admin1", "password": "admin-pw"},
                follow_redirects=False)
-    assert r.status_code == 403
+    assert r.status_code == 400 and "location" not in r.headers
+    assert c.get("/", follow_redirects=False).status_code == 303  # still logged out
     login(c, "admin1")
     posts = [r for r in _routes(app) if "POST" in (r.methods or set())
              and r.path not in OPEN_PATHS]

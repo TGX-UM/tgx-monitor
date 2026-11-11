@@ -77,6 +77,7 @@ NAV = [("/", "Overview"), ("/incidents", "Incidents"), ("/outbox", "Outbox"),
 class WebSettings:
     secrets_dir: Path | None = None  # None: TGXMON_SECRETS_DIR or /run/secrets
     secure_cookies: bool = True  # False only for a local http tunnel
+    base_url: str = ""  # the private UI's public https address, for messages
     max_tick_age_s: float = 180.0
     push_max_bytes: int = 65536
     now: Callable[[], dt.datetime] = utcnow
@@ -95,6 +96,7 @@ class Gate(BaseHTTPMiddleware):
         if sess and sess.get("u") and not await run_in_threadpool(
                 auth.session_current, sess, st.settings.secrets_dir):
             sess = None  # user removed or password changed since this session began
+        request.state.had_session = sess is not None
         fresh = sess is None and path == "/login" and st.sessions.enabled
         if fresh:
             sess = {"csrf": auth.new_csrf()}
@@ -424,7 +426,20 @@ async def login(request: Request) -> Response:
     if not st.sessions.enabled:
         return _page(request, "login.html", 503, title="Log in", next=nxt, disabled=True,
                      error="Login is disabled: no session key is configured.")
-    form = await _form(request)
+    raw = await request.form()
+    if not auth.csrf_ok(request.state.session, str(raw.get("csrf", ""))):
+        # Not an attack worth a bare 403: almost always a browser that did not send the
+        # session cookie back (plain http or an SSH tunnel to a Secure cookie, cookies
+        # blocked) or a login page left open across a logout. Show a fresh form (the Gate
+        # has just set a new cookie) and say what to check.
+        why = ("Your browser did not send the login cookie back. Open this page over "
+               f"https ({st.settings.base_url or 'the monitor address'}) rather than "
+               "plain http or a tunnel, allow cookies for this site, and try again."
+               if not request.state.had_session else
+               "This login form had expired. Please try again.")
+        return _page(request, "login.html", 400, title="Log in", next=nxt, disabled=False,
+                     error=why)
+    form = {k: str(v) for k, v in raw.items()}
     user = form.get("username", "").strip()[:64]
     password = form.get("password", "")
     ip = auth.client_ip(request.scope)
