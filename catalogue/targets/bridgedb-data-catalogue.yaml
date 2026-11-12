@@ -19,6 +19,7 @@ checks:
     kind: http
     every: 1d
     describe: gene.json is valid JSON listing at least 36 organism databases with the required fields, at least 34 webservice-tested, and no date defects beyond the known one.
+    purpose: People and the BridgeDb build download mapping files from this list; if it breaks, organisms go missing.
     request: {url: "https://data.bridgedb.org/gene.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -40,6 +41,7 @@ checks:
     kind: http
     every: 1d
     describe: other.json lists the six shared databases (complexes, genes, interactions, metabolites, pathways, publications), each with a DOI and download link.
+    purpose: The shared metabolite, pathway and other mapping files are found through this list.
     request: {url: "https://data.bridgedb.org/other.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -57,6 +59,7 @@ checks:
     kind: compare
     every: 1d
     describe: The metabolite database listed in other.json is the one the webservice serves.
+    purpose: Makes sure the metabolite mappings people can download are the same ones the webservice uses.
     request:
       left: {http_regex: {url: "https://data.bridgedb.org/other.json", re: 'metabolites_(\d{8})\.bridge'}}
       right: {http_regex: {url: "https://webservice.bridgedb.org/Human/properties", re: 'HMDB-CHEBI-WIKIDATA\s+BUILDDATE\t(\d{8})'}}
@@ -67,6 +70,7 @@ checks:
     kind: invariant
     every: 1d
     describe: gene.json.config, which the image build reads, lists exactly the species in gene.json.
+    purpose: The BridgeDb build reads this file; if it disagrees with the catalogue, an organism can silently drop out.
     request:
       left: {http_list: {url: "https://data.bridgedb.org/gene.json", re: '"species":\s*"([^"]+)"', pick: all}}
       right: {http_list: {url: "https://data.bridgedb.org/gene.json.config", re: '^([^\t\n]+)\t', pick: all}}
@@ -78,6 +82,7 @@ checks:
     kind: invariant
     every: 1d
     describe: gene.json.config names exactly the database files listed in gene.json.
+    purpose: The BridgeDb build reads this file; a mismatch means it fetches the wrong or no mapping file.
     request:
       left: {http_list: {url: "https://data.bridgedb.org/gene.json", re: '"file":\s*"([^"]+)"', pick: all}}
       right: {http_list: {url: "https://data.bridgedb.org/gene.json.config", re: '\t(\S+)\s*$', pick: all}}
@@ -88,6 +93,7 @@ checks:
     kind: invariant
     every: 1d
     describe: other.json.config names exactly the six shared database files listed in other.json.
+    purpose: The BridgeDb build reads this file; a mismatch means a shared mapping file is left out.
     request:
       left: {http_list: {url: "https://data.bridgedb.org/other.json", re: '"file":\s*"([^"]+)"', pick: all}}
       right: {http_list: {url: "https://data.bridgedb.org/other.json.config", re: '^\*\t(\S+)', pick: all}}
@@ -99,6 +105,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: The coronavirus catalogue and its build config, also read by the image build, are published and agree on the file.
+    purpose: Coronavirus mappings come from this list; if it breaks, they disappear from the webservice.
     request:
       base: https://data.bridgedb.org
       steps:
@@ -114,6 +121,7 @@ checks:
     every: 7d
     timeout: 60s
     describe: Mapping files download through the figshare download host the image build uses; the catalogue's own links answering with a bot challenge shows amber.
+    purpose: The BridgeDb build downloads the mapping files from here; if downloads fail, the build fails.
     request:
       steps:
         - {method: HEAD, url: "https://ndownloader.figshare.com/files/64770111", follow: false, capture: {gene: {header: location}}}
@@ -131,6 +139,7 @@ checks:
     every: 7d
     timeout: 2m
     describe: Every Zenodo and figshare record the catalogue cites is published and still holds its mapping database file.
+    purpose: The catalogue links to permanent archive copies; this catches a removed or empty record.
     request:
       steps:
         - url: "https://zenodo.org/api/records/14779056"
@@ -185,6 +194,7 @@ checks:
     kind: gha
     every: 1d
     describe: The bridgedb/data workflow that generates the catalogue web pages last completed successfully.
+    purpose: This job builds the catalogue web pages; if it fails, the pages go out of date.
     request: {repo: bridgedb/data, workflow: blank.yml}
     assert:
       - {that: state, eq: active}

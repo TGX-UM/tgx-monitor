@@ -18,6 +18,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: A single-gene lookup returns tab-separated identifier and source lines, not JSON and not bioregistry prefixes (the 2.1.8 regression).
+    purpose: A past release changed the answer format and broke every client; this catches that kind of change.
     request:
       steps: [{url: "https://webservice.bridgedb.org/Human/xrefs/H/TP53"}]
     assert:
@@ -33,6 +34,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: A three-gene batch request returns one row per gene, each with its own mapping set (the 2.1.8 bug returned the union for every gene).
+    purpose: A past release mixed up results when several genes were asked at once; this catches that bug coming back.
     request:
       steps:
         - {method: POST, url: "https://webservice.bridgedb.org/Human/xrefsBatch/H", data: "TP53\nBRCA1\nEGFR\n", headers: {Content-Type: text/plain}}
@@ -59,6 +61,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: The documented batch form with a system code per line also returns one distinct mapping set per input.
+    purpose: Another common way of asking for several genes at once must also keep the results apart.
     request:
       steps:
         - {method: POST, url: "https://webservice.bridgedb.org/Human/xrefsBatch", data: "TP53\tH\nBRCA1\tH\nEGFR\tH\n", headers: {Content-Type: text/plain}}
@@ -79,6 +82,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: A single lookup of BRCA1 returns its usual number of mappings.
+    purpose: A sudden change in how many links a well-known gene gets points to a broken mapping database.
     request:
       steps: [{url: "https://webservice.bridgedb.org/Human/xrefs/H/BRCA1"}]
     assert:
@@ -91,6 +95,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: A single lookup of EGFR returns its usual number of mappings.
+    purpose: A sudden change in how many links a well-known gene gets points to a broken mapping database.
     request:
       steps: [{url: "https://webservice.bridgedb.org/Human/xrefs/H/EGFR"}]
     assert:
@@ -103,6 +108,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: The chemical calls the AOP-Wiki RDF conversion makes (CAS lookups, single and batch) return HMDB, ChEBI and Wikidata mappings.
+    purpose: The weekly AOP-Wiki RDF build makes exactly these chemical lookups; if they break, chemical links vanish from AOP-Wiki RDF.
     request:
       base: https://webservice.bridgedb.org
       steps:
@@ -127,6 +133,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: The Entrez Gene batch call the AOP-Wiki RDF conversion makes maps 7157 to TP53 and 672 to BRCA1, each with its own set.
+    purpose: The weekly AOP-Wiki RDF build makes exactly this gene lookup; if it breaks, gene links vanish from AOP-Wiki RDF.
     request:
       steps:
         - {method: POST, url: "https://webservice.bridgedb.org/Human/xrefsBatch/L", data: "7157\n672\n", headers: {Content-Type: text/plain}}
@@ -146,6 +153,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: A ChEBI metabolite lookup returns HMDB and Wikidata mappings among at least twelve.
+    purpose: Checks that metabolite identifiers still map to other databases, which many pathway tools rely on.
     request:
       steps: [{url: "https://webservice.bridgedb.org/Human/xrefs/Ce/CHEBI:16842"}]
     assert:
@@ -158,6 +166,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: Ensembl lookups for human and mouse, a Wikidata-targeted lookup and an attribute lookup give their known answers.
+    purpose: Quick known-answer lookups across species and lookup types, to catch broken mappings early.
     request:
       base: https://webservice.bridgedb.org
       steps:
@@ -181,6 +190,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: The data-source lists, the free-search flag and a capped identifier search answer as expected.
+    purpose: Clients use these calls to find out what BridgeDb can map; if they break, clients cannot set up.
     request:
       base: https://webservice.bridgedb.org
       steps:

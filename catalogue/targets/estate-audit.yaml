@@ -25,6 +25,7 @@ checks:
     via: [core]
     severity: low
     describe: The nes-smiles data directory, left without a service, has been cleaned up.
+    purpose: Leftover data from a removed service takes up space and should be cleaned up.
     request: {mount: gluster-docker, glob: nes-smiles, type: dir}
     assert:
       - {that: count, eq: 0, warn: true, label: "directory removed or given an owner"}
@@ -38,6 +39,7 @@ checks:
     via: [core]
     severity: low
     describe: The portainer data directory, left without a service, has been cleaned up.
+    purpose: Leftover data from a removed service takes up space and should be cleaned up.
     request: {mount: gluster-docker, glob: portainer, type: dir}
     assert:
       - {that: count, eq: 0, warn: true, label: "directory removed or given an owner"}
@@ -51,6 +53,7 @@ checks:
     via: [core]
     severity: low
     describe: The doi data directory, left without a service, has been cleaned up or given its service.
+    purpose: Leftover data from a removed service takes up space and should be cleaned up or put back to use.
     request: {mount: gluster-docker, glob: doi, type: dir}
     assert:
       - {that: count, eq: 0, warn: true, label: "directory removed or given an owner"}
@@ -60,6 +63,7 @@ checks:
     every: 7d
     severity: low
     describe: www.bigcat-bioinformatics.org points at the cluster; this shows whether a site or redirect has been set up behind it.
+    purpose: This address points at our servers but shows nothing; we track whether it gets a site or redirect.
     request: {url: "https://www.bigcat-bioinformatics.org/", follow: false, verify: false}
     assert:
       - {that: status, ne: 404, warn: true, label: "a route exists for the name (404 means the proxy has none)"}

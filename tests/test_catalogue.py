@@ -39,6 +39,8 @@ def target(tid="svc-a", **over):
         "id": tid, "name": tid.upper(), "class": "service", "owners": ["alice"],
         "public_summary": "A service.",
         "checks": [{"id": f"{tid}-up", "kind": "http", "request": {"url": "https://example.org/"},
+                    "describe": "The front page answers 200.",
+                    "purpose": "Shows that people can open the service.",
                     "assert": [{"that": "status", "eq": 200}]}],
     }
     t.update(over)
@@ -72,6 +74,13 @@ def test_repository_catalogue_is_clean():
     cat = catmod.load(REPO_CATALOGUE)
     assert cat.targets, "catalogue/targets is empty"
     assert problems(cat) == []
+
+
+def test_check_needs_describe_and_purpose(tmp_path):
+    t = target()
+    del t["checks"][0]["purpose"]
+    assert problems(make(tmp_path, [t])) == [
+        "svc-a/svc-a-up: needs describe (what is checked) and purpose (why, in plain words)"]
 
 
 def test_minimal_catalogue_is_clean(tmp_path):

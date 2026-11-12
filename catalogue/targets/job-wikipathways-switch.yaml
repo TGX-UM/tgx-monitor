@@ -21,6 +21,7 @@ checks:
     every: 15m
     via: [core]
     describe: The monthly cutover ran at its slot, after a successful reload that month, and exited cleanly.
+    purpose: This job makes the new month's data live; without it users keep getting last month's data.
     request:
       service: cronjobs_wikipathways-switch
       after_success_of: cronjobs_wikipathways-reload
@@ -38,6 +39,7 @@ checks:
     via: [public, tgx1, tgx2]
     timeout: 30s
     describe: The endpoint serves the six named graphs of the current data layout (pathways, GPML, authors, ontologies, VoID, service description) on both nodes.
+    purpose: Confirms that, after the switch, all parts of the data (pathways, authors, ontologies) are being served.
     request:
       endpoint: https://sparql.wikipathways.org/sparql
       file: q/ops-jobs/wp-named-graphs.rq
@@ -52,6 +54,7 @@ checks:
     via: [public, tgx1, tgx2]
     timeout: 30s
     describe: Anonymous queries on the WikiPathways graph group still find pathways, so the switch kept the read permissions.
+    purpose: Catches a switch that made the data invisible to anonymous users, who would then get empty results.
     request:
       endpoint: https://sparql.wikipathways.org/sparql
       file: q/ops-jobs/wp-graph-group-ask.rq

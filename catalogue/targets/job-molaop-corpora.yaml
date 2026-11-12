@@ -22,6 +22,7 @@ checks:
     every: 15m
     via: [core]
     describe: The Monday corpus refresh ran at its slot and exited cleanly.
+    purpose: This weekly job keeps the Builder's suggestions up to date; if it stops, they go stale.
     request:
       service: cronjobs_molaop-builder-refresh-corpora
       grace: 30m
@@ -36,6 +37,7 @@ checks:
     every: 1h
     via: [core]
     describe: The last corpus refresh rebuilt every source it found behind, without a failed rebuild.
+    purpose: Catches a weekly update that failed for one of the data sources.
     request:
       service: cronjobs_molaop-builder-refresh-corpora
       grace: 30m
@@ -50,6 +52,7 @@ checks:
     via: [core]
     severity: low
     describe: The last corpus refresh could read every upstream release; amber when one was unavailable.
+    purpose: Catches a data source the weekly update could not reach.
     request:
       service: cronjobs_molaop-builder-refresh-corpora
       grace: 30m
@@ -63,6 +66,7 @@ checks:
     every: 1h
     via: [core]
     describe: At the last refresh the Reactome corpus matched the current Reactome release, or was rebuilt for it.
+    purpose: Makes sure Reactome suggestions are based on the current Reactome release.
     request:
       service: cronjobs_molaop-builder-refresh-corpora
       grace: 30m
@@ -76,6 +80,7 @@ checks:
     every: 1h
     via: [core]
     describe: At the last refresh the GO corpus matched the current GO release, or was rebuilt for it.
+    purpose: Makes sure GO suggestions are based on the current GO release.
     # /get_data_versions reports the upstream release since molAOP-builder ab3f518, so it can no
     # longer show what the corpus was built from; the refresh job's own table does.
     request:
@@ -91,6 +96,7 @@ checks:
     every: 1h
     via: [core]
     describe: At the last refresh the WikiPathways corpus matched the release the WikiPathways endpoint serves, or was rebuilt for it.
+    purpose: Makes sure pathway suggestions match the WikiPathways data currently served.
     # Not /get_data_versions: it reports the upstream release, so comparing it with upstream
     # was always equal. The refresh job's table compares deployed with upstream.
     request:
@@ -106,6 +112,7 @@ checks:
     every: 15m
     via: [core]
     describe: The Tuesday apply job ran at its slot and either restarted the Builder on a rebuilt corpus or found nothing to apply.
+    purpose: Rebuilt suggestion data only reaches curators after this job runs.
     request:
       service: cronjobs_molaop-builder-apply-corpus
       grace: 30m
@@ -123,6 +130,7 @@ checks:
     via: [core]
     alert_after: 30h
     describe: No rebuilt-corpus marker is left waiting, so every rebuild was put live by the apply job.
+    purpose: Catches rebuilt suggestion data that was never put live.
     request: {mount: molaop-builder-data, glob: ".corpus-rebuilt"}
     assert:
       - {that: count, eq: 0, label: "no .corpus-rebuilt marker pending"}
@@ -133,6 +141,7 @@ checks:
     every: 6h
     via: [core]
     describe: The precomputed Key Event Relationship adjacency snapshot is less than 60 days old.
+    purpose: Catches the Builder's copy of Key Event links going stale.
     request: {mount: molaop-builder-data, glob: "ker_adjacency.json"}
     assert:
       - {that: count, eq: 1}
@@ -144,6 +153,7 @@ checks:
     every: 6h
     via: [core]
     describe: The precomputed Key Event to AOP membership snapshot is less than 60 days old.
+    purpose: Catches the Builder's copy of which Key Events belong to which AOP going stale.
     request: {mount: molaop-builder-data, glob: "ke_aop_membership.json"}
     assert:
       - {that: count, eq: 1}
@@ -155,6 +165,7 @@ checks:
     every: 6h
     via: [core]
     describe: The precomputed OECD status snapshot of the AOPs is less than 60 days old.
+    purpose: Catches the Builder's copy of the AOPs' OECD status going stale.
     request: {mount: molaop-builder-data, glob: "aop_oecd_status.json"}
     assert:
       - {that: count, eq: 1}

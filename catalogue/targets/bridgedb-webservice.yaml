@@ -21,6 +21,7 @@ checks:
     via: [public, tgx1, tgx2]
     timeout: 30s
     describe: The Swagger UI landing page of webservice.bridgedb.org loads within five seconds, through public DNS and on each node.
+    purpose: Shows that people and tools can reach the BridgeDb webservice.
     request: {url: "https://webservice.bridgedb.org/"}
     assert:
       - {that: status, eq: 200}
@@ -33,6 +34,7 @@ checks:
     kind: http
     every: 15m
     describe: The same service answers under the swagger.bridgedb.org name.
+    purpose: Some users and tools reach BridgeDb through this address; it must keep working.
     request: {url: "https://swagger.bridgedb.org/"}
     assert:
       - {that: status, eq: 200}
@@ -44,6 +46,7 @@ checks:
     kind: http
     every: 15m
     describe: The same service answers under the bridgedb.cloud.vhp4safety.nl name.
+    purpose: Some users and tools reach BridgeDb through this address; it must keep working.
     request: {url: "https://bridgedb.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -56,6 +59,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate that covers all three BridgeDb host names, with time to spare.
+    purpose: Without a valid certificate, scripts and browsers refuse to connect to BridgeDb.
     request: {host: webservice.bridgedb.org}
     assert:
       - {that: verified, eq: true}
@@ -70,6 +74,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: Plain http on each of the three names redirects permanently to https on the same name.
+    purpose: Makes old or typed http links still reach the secure service.
     request:
       steps:
         - {url: "http://webservice.bridgedb.org/", follow: false, capture: {ws: {header: location}}}
@@ -87,6 +92,7 @@ checks:
     kind: dns
     every: 1h
     describe: webservice.bridgedb.org resolves to a cluster node (tgx1 normally) and two public resolvers agree.
+    purpose: The address must point at our servers, or nobody can reach BridgeDb.
     request: {name: webservice.bridgedb.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, in: [tgx1, tgx2]}
@@ -97,6 +103,7 @@ checks:
     kind: dns
     every: 1h
     describe: swagger.bridgedb.org resolves to a cluster node (tgx1 normally).
+    purpose: The address must point at our servers, or users of it cannot reach BridgeDb.
     request: {name: swagger.bridgedb.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, in: [tgx1, tgx2]}
@@ -107,6 +114,7 @@ checks:
     kind: dns
     every: 1h
     describe: bridgedb.cloud.vhp4safety.nl resolves to a cluster node (tgx1 normally).
+    purpose: The address must point at our servers, or users of it cannot reach BridgeDb.
     request: {name: bridgedb.cloud.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, in: [tgx1, tgx2]}
@@ -117,6 +125,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: The service runs the expected BridgeDb 3.0.31 and webservice 2.1.9, the same build behind all three names, and its API description reports the same version.
+    purpose: Catches an unplanned version change, which in the past changed answers and broke clients.
     request:
       steps:
         - url: "https://webservice.bridgedb.org/config"
@@ -140,6 +149,7 @@ checks:
     public: false
     alert_after: 5m
     describe: The bridgedb swarm service has its one replica running.
+    purpose: Shows that the BridgeDb service is actually running.
     request: {check: replicas, services: [bridgedb]}
     assert:
       - {that: not_converged_count, eq: 0}
@@ -151,6 +161,7 @@ checks:
     via: [core]
     public: false
     describe: The bridgedb task is not crash-looping; any failed task in the last day shows amber.
+    purpose: A service that keeps restarting is unstable even if it looks up at the moment we check.
     request: {check: crash_loops, services: [bridgedb], window: 24h, threshold: 3}
     assert:
       - {that: crash_looping_count, eq: 0}
@@ -161,6 +172,7 @@ checks:
     every: 1h
     public: false
     describe: The pinned image tag on Docker Hub still points at the digest production runs, so a re-push under the same tag is noticed.
+    purpose: Catches the image being replaced under the same name, which could change BridgeDb without anyone noticing.
     request: {image: "bigcatum/bridgedb:3.0.31-2.1.9"}
     assert:
       - {that: reachable, eq: true}
@@ -170,6 +182,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: The service lists its loaded organisms (an empty list is the database-driver failure mode), including human, mouse, rat and potato.
+    purpose: Catches the webservice running with no organisms loaded, a known way it fails while still looking up.
     request:
       steps: [{url: "https://webservice.bridgedb.org/contents"}]
     assert:
@@ -185,6 +198,7 @@ checks:
     kind: http
     every: 1d
     describe: An unknown path still answers with the documented 'Unrecognized query' page; the body checks of this target rely on that behaviour.
+    purpose: Several other checks rely on this exact answer; if it changes, those checks can no longer be trusted.
     request: {url: "https://webservice.bridgedb.org/definitely-not-a-real-endpoint-xyz"}
     assert:
       - {that: status, eq: 200}

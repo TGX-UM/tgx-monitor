@@ -17,6 +17,7 @@ checks:
     kind: http
     every: 15m
     describe: A known small file on raw.githubusercontent.com answers 200 to a HEAD request.
+    purpose: Several of our sites load settings and example queries from GitHub; if GitHub is down, those sites break.
     request: {url: "https://raw.githubusercontent.com/marvinm2/AOPWikiRDF/master/README.md", method: HEAD, follow: false}
     assert:
       - {that: status, eq: 200}

@@ -17,6 +17,7 @@ checks:
     kind: http
     every: 15m
     describe: The test instance home page loads.
+    purpose: Shows that the test version of the platform can be opened.
     request: {url: "https://pseudo.platform.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -28,6 +29,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning on the test version.
     request: {host: pseudo.platform.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -41,6 +43,7 @@ checks:
     every: 1d
     timeout: 30s
     describe: Every tool in the VHP4Safety cloud catalogue appears on the test instance's tools page, and no other.
+    purpose: The test version should list exactly the tools in the catalogue, so changes can be checked before going live.
     request:
       left: {http_list: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", re: '"id":\s*"([^"]+)"', pick: all}, on_error: unknown}
       right: {http_list: {url: "https://pseudo.platform.vhp4safety.nl/tools", re: "location\\.href='/tools/([^']+)'", pick: all}}
@@ -53,6 +56,7 @@ checks:
     via: [core]
     severity: low
     describe: Shows when the test instance no longer runs the image that Docker Hub's latest tag points to.
+    purpose: Shows when the test version is not running the newest release it should be testing.
     request: {image: "vhp4safety/virtual-human-platform:latest"}
     assert:
       - {that: reachable, eq: true}
@@ -65,6 +69,7 @@ checks:
     via: [core]
     severity: low
     describe: Shows when the test instance starts running a different build without a deploy.
+    purpose: Shows when the test version changed without a deliberate update.
     request: {services: [vhp-platform-pseudo]}
     assert:
       - {that: changed_count, eq: 0, warn: true}

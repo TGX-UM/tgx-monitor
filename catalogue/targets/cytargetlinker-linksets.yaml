@@ -18,6 +18,7 @@ checks:
     kind: http
     every: 6h
     describe: The newest linkset version on Zenodo is less than 100 days old, complete with its 13 files, and its release label never goes backwards.
+    purpose: Users download the linksets from Zenodo; this makes sure a recent, complete set is there.
     request:
       url: https://zenodo.org/api/records
       params: {q: "conceptrecid:4500957", sort: mostrecent, size: 1, all_versions: "true"}
@@ -33,6 +34,7 @@ checks:
     kind: gha
     every: 1h
     describe: No linkset workflow has been switched off by GitHub for inactivity.
+    purpose: GitHub switches off quiet workflows, which would silently stop new linksets.
     request: {repo: CyTargetLinker/linkset-automation}
     assert:
       - {that: inactive, len_eq: 0, label: "no workflow disabled for inactivity"}
@@ -43,6 +45,7 @@ checks:
     kind: gha
     every: 1h
     describe: The quarterly WikiPathways linkset build succeeded within the past quarter.
+    purpose: This job builds the linksets every quarter; if it fails, they go out of date.
     request: {repo: CyTargetLinker/linkset-automation, workflow: create-linkset-wikipathways.yml}
     assert:
       - {that: completed_conclusion, eq: success}
@@ -53,6 +56,7 @@ checks:
     kind: gha
     every: 1h
     describe: The two-monthly refresh of the BridgeDb cache for the linksets succeeded within the past nine weeks.
+    purpose: The linkset build needs this identifier-mapping data; if it is stale, linksets come out incomplete.
     request: {repo: CyTargetLinker/linkset-automation, workflow: update-bridgedb.yml}
     assert:
       - {that: completed_conclusion, eq: success}

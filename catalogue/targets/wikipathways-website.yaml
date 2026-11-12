@@ -17,6 +17,7 @@ checks:
     kind: http
     every: 5m
     describe: The bare domain redirects to https://www.wikipathways.org/ and the home page loads.
+    purpose: Shows that people can open the WikiPathways website.
     request: {url: "http://wikipathways.org/"}
     assert:
       - {that: status, eq: 200}
@@ -29,6 +30,7 @@ checks:
     kind: http
     every: 15m
     describe: A known pathway page (WP254) is served with its title.
+    purpose: Pathway pages are what most visitors come for; this opens a known one.
     request: {url: "https://www.wikipathways.org/pathways/WP254.html"}
     assert:
       - {that: status, eq: 200}
@@ -39,6 +41,7 @@ checks:
     kind: http
     every: 1h
     describe: A pathway that does not exist gives 404.
+    purpose: A pathway that does not exist should say "not found", not show a broken page.
     request: {url: "https://www.wikipathways.org/pathways/WP99999999.html"}
     assert:
       - {that: status, eq: 404}
@@ -49,6 +52,7 @@ checks:
     every: 1h
     timeout: 45s
     describe: The search index holds at least 2,100 pathways with their fields, including a known one (WP554).
+    purpose: Search on the website uses this index; if it is incomplete, users can't find pathways.
     request: {url: "https://www.wikipathways.org/search.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -67,6 +71,7 @@ checks:
     kind: http
     every: 1h
     describe: The static API's counts report at least 2,100 pathways across at least 39 organisms.
+    purpose: The R and Python packages read these numbers; a drop means data is missing from the site.
     request: {url: "https://www.wikipathways.org/json/getCounts.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -79,6 +84,7 @@ checks:
     every: 1h
     timeout: 45s
     describe: The static API's pathway list is grouped by organism with the fields clients read.
+    purpose: The R and Python packages read this list; if its format changes, they break.
     request: {url: "https://www.wikipathways.org/json/listPathways.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -96,6 +102,7 @@ checks:
     every: 1h
     timeout: 45s
     describe: The static API's pathway-info file is served in full.
+    purpose: The R and Python packages read this file; if it is cut short, they return incomplete data.
     request: {url: "https://www.wikipathways.org/json/getPathwayInfo.json"}
     assert:
       - {that: status, eq: 200}
@@ -107,6 +114,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: The diagram, GPML and data-node table of a known pathway (WP254) are served.
+    purpose: Pathway diagrams and download files must be there, or pathway pages show up empty.
     request:
       base: https://www.wikipathways.org/wikipathways-assets/pathways/WP254
       steps:
@@ -128,6 +136,7 @@ checks:
     kind: http
     every: 6h
     describe: The identifiers.org link for a pathway (wikipathways:WP254) still lands on its page.
+    purpose: Papers and databases link to pathways through identifiers.org; those links must keep working.
     request: {url: "https://identifiers.org/wikipathways:WP254"}
     assert:
       - {that: status, eq: 200}
@@ -139,6 +148,7 @@ checks:
     kind: http
     every: 6h
     describe: Old wiki-style links (index.php/Pathway:WP254) still lead to the pathway page.
+    purpose: Old links from papers and websites still point at the former wiki; they should still work.
     request: {url: "https://www.wikipathways.org/index.php/Pathway:WP254"}
     assert:
       - {that: status, eq: 200}
@@ -149,6 +159,7 @@ checks:
     kind: gha
     every: 1h
     describe: The site's deploy workflow is active and has succeeded within the last week (it runs weekly and on every content push).
+    purpose: This job publishes the website; if it stops, new edits and fixes never go live.
     request: {repo: wikipathways/wikipathways.github.io, workflow: deploy_jekyll_site.yml}
     assert:
       - {that: state, eq: active}

@@ -19,6 +19,7 @@ checks:
     every: 30m
     timeout: 30s
     describe: For Key Event 941 (EGFR activation) the approved pathway WP437 is among the top three WikiPathways suggestions.
+    purpose: Curators rely on the pathway suggestions; this checks the right pathway still comes out near the top.
     request:
       url: "https://molaop-builder.vhp4safety.nl/suggest_pathways/KE%20941?ke_title=Activation%2C%20EGFR&bio_level=Molecular&limit=8"
       parse_json: true
@@ -37,6 +38,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: For Key Event 941 the GO term GO:0038134 (ERBB2-EGFR signaling) is among the top five GO suggestions.
+    purpose: Curators rely on the GO suggestions; this checks the right term still comes out near the top.
     request:
       url: "https://molaop-builder.vhp4safety.nl/suggest_go_terms/KE%20941?ke_title=Activation%2C%20EGFR&limit=20&aspect_filter=all"
       parse_json: true
@@ -52,6 +54,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: For Key Event 941 the Reactome pathway R-HSA-177929 (Signaling by EGFR) is among the top five Reactome suggestions.
+    purpose: Curators rely on the Reactome suggestions; this checks the right pathway still comes out near the top.
     request:
       url: "https://molaop-builder.vhp4safety.nl/suggest_reactome/KE%20941?ke_title=Activation%2C%20EGFR&limit=20"
       parse_json: true
@@ -68,6 +71,7 @@ checks:
     alert_after: 2d
     timeout: 60s
     describe: The Key Event list curators pick from has as many Key Events as AOP-Wiki (within 5) and is at most two weeks old.
+    purpose: Curators pick Key Events from this list; if it is out of date, new Key Events cannot be mapped.
     request:
       left: {http_json: {url: "https://molaop-builder.vhp4safety.nl/api/ke-snapshot", path: key_event_count}}
       right: {sparql: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/marvin-apps/aopwiki-ke-count.rq}}

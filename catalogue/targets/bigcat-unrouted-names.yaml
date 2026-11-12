@@ -19,6 +19,7 @@ checks:
     kind: http
     every: 1d
     describe: The old grlc API name still reaches the cluster proxy and answers 404 (known state).
+    purpose: Tracks an unused address so we notice if something starts answering on it.
     request: {url: "https://aopwiki.api.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 404, label: "known state: no router for the removed grlc service"}
@@ -28,6 +29,7 @@ checks:
     kind: dns
     every: 1h
     describe: The old grlc API name still resolves to tgx1.
+    purpose: Tracks an unused address so we notice if it starts pointing elsewhere.
     request: {name: aopwiki.api.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -37,6 +39,7 @@ checks:
     kind: http
     every: 1d
     describe: An old grlc query link is redirected to the same query on the current AOP-Wiki API (amber until that redirect exists).
+    purpose: Old query links from papers and tutorials should lead to the same query on the current API.
     request: {url: "https://aopwiki.api.bigcat-bioinformatics.org/api-git/marvinm2/AOPWikiQueries/get-all-aops"}
     assert:
       - {that: redirect_count, gte: 1, warn: true, label: "redirected"}
@@ -48,6 +51,7 @@ checks:
     kind: http
     every: 1d
     describe: The DOI service name answers 404 from the proxy until the service is deployed (known state).
+    purpose: Tracks an address reserved for a future service, so we notice when it changes.
     request: {url: "https://doi.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 404, label: "known state: no DOI service deployed"}
@@ -57,6 +61,7 @@ checks:
     kind: http
     every: 1d
     describe: The domain apex has no site and answers 404 with the proxy's default certificate (known state).
+    purpose: The bare domain shows no site yet; this notices when that changes.
     request: {url: "https://bigcat-bioinformatics.org/", verify: false}
     assert:
       - {that: status, eq: 404, label: "known state: no site configured for the apex"}

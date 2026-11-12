@@ -14,6 +14,7 @@ checks:
     kind: http
     every: 1d
     describe: The newest Zenodo version is from the last 35 days, is labelled with its month, and holds all five Turtle files with a full-size main file.
+    purpose: People cite the Zenodo copy; this makes sure a complete, recent version is there.
     request: {url: "https://zenodo.org/api/records/13353286/versions/latest", parse_json: true}
     assert:
       - {that: status, eq: 200}

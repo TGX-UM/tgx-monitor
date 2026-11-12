@@ -14,6 +14,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The ROBOT web interface loads, through public DNS and on each node.
+    purpose: Shows that people can open ROBOT.
     request: {url: "https://robot.vhp4safety.nl/ui"}
     assert:
       - {that: status, eq: 200}
@@ -26,6 +27,7 @@ checks:
     kind: http
     every: 1d
     describe: The API description is the PBPK FAIR Platform API with at least 45 paths.
+    purpose: Developers use this description to call ROBOT; a change could break their code.
     request: {url: "https://robot.vhp4safety.nl/openapi.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -39,6 +41,7 @@ checks:
     kind: http
     every: 1h
     describe: Sign-in uses production ORCID with the right callback address and secure cookies.
+    purpose: Users sign in with ORCID; a wrong setting makes sign-in fail or unsafe.
     request: {url: "https://robot.vhp4safety.nl/v1/auth/config", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -54,6 +57,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: The backend answers an anonymous visitor as signed out and asks for sign-in on protected forms.
+    purpose: Protected forms must stay closed to people who are not signed in.
     request:
       base: https://robot.vhp4safety.nl
       steps:
@@ -72,6 +76,7 @@ checks:
     via: [core]
     public: false
     describe: The user database is in place and not truncated.
+    purpose: Catches the user database going missing or getting damaged.
     request: {mount: robot-data, glob: pbpk.db, verify_gzip: false}
     assert:
       - {that: count, eq: 1}
@@ -84,6 +89,7 @@ checks:
     via: [core]
     public: false
     describe: A copy of the user database less than 26 hours old exists.
+    purpose: Without a recent backup, ROBOT's user data could be lost.
     request: {mount: robot-backups, glob: "*pbpk*"}
     assert:
       - {that: count, gte: 1, label: a backup exists}
@@ -97,6 +103,7 @@ checks:
     via: [core]
     public: false
     describe: The locally built image is still on the node the service is pinned to.
+    purpose: ROBOT can only run on one server; if its program disappears there, it cannot start at all.
     request: {check: local_images, services: [robot]}
     assert:
       - {that: by.robot, has: tgx1}
@@ -107,6 +114,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the name, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of ROBOT.
     request: {host: robot.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}

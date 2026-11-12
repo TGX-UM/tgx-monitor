@@ -16,6 +16,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The API reports itself ready, which it only does when its triple store answers and is not empty.
+    purpose: Tells us the API is up and actually has data behind it, not just running empty.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/health/ready", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -28,6 +29,7 @@ checks:
     kind: http
     every: 1h
     describe: The API's dataset summary names a release less than eight days old and normal entity counts.
+    purpose: Shows the API is serving this week's AOP-Wiki data and not a stale or partial copy.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/dataset", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -47,6 +49,7 @@ checks:
     every: 1h
     alert_after: 30m
     describe: The API serves the same release, generator commit and AOP count as the SPARQL endpoint, so it picked up the last reload.
+    purpose: The API and the SPARQL endpoint should give users the same answers, so they must hold the same release.
     request:
       endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
       left: {http_header: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/dataset", header: x-dataset-version, method: GET}}
@@ -63,6 +66,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: AOP 1, the downstream links of Key Event 18 and the AOP list return their known answers.
+    purpose: Asks questions whose answers we know, to catch the API returning wrong or empty results.
     request:
       base: "https://aopwiki.rdf.bigcat-bioinformatics.org/api"
       steps:
@@ -83,6 +87,7 @@ checks:
     kind: http
     every: 1h
     describe: Bisphenol A resolves by CAS number with its known InChIKey and CompTox id.
+    purpose: Looking up a chemical by CAS number is a common use; this catches broken chemical links.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/chemicals/80-05-7", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -96,6 +101,7 @@ checks:
     every: 1h
     timeout: 60s
     describe: Free-text search for "estrogen" finds the stressor Estrogen first.
+    purpose: Catches a broken search, which users would notice as "nothing found".
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/search", params: {q: estrogen, limit: "2"}, parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -110,6 +116,7 @@ checks:
     every: 1h
     timeout: 60s
     describe: A chemical's WikiPathways pathways come back through federation, which breaks if the ChEBI identifiers or WikiPathways do.
+    purpose: Linking chemicals to WikiPathways pathways depends on two services agreeing; this catches the link breaking.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/chemicals/1746-01-6/pathways", params: {limit: "2"}, parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -122,6 +129,7 @@ checks:
     every: 1h
     timeout: 60s
     describe: The legacy grlc-style query URL used by older tutorials still returns all AOPs as SPARQL JSON.
+    purpose: Older tutorials and scripts still use these URLs, and they should keep working.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/api-git/marvinm2/AOPWikiQueries/get-all-aops", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -133,6 +141,7 @@ checks:
     kind: http
     every: 1d
     describe: The AOP list is available as CSV with its documented column header.
+    purpose: Many users download the AOP list as a spreadsheet; this makes sure that file still comes out right.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/api/v1/aops", params: {limit: "2", format: csv}}
     assert:
       - {that: status, eq: 200}

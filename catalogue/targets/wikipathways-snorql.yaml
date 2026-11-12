@@ -19,6 +19,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The query UI page loads with its configuration script, through public DNS and on each node.
+    purpose: Shows that people can open the WikiPathways query editor.
     request: {url: "https://sparql.wikipathways.org/", headers: {Accept: text/html}}
     assert:
       - {that: status, eq: 200}
@@ -31,6 +32,7 @@ checks:
     kind: http
     every: 1h
     describe: The UI is configured for the WikiPathways endpoint and the SPARQLQueries example repository.
+    purpose: An update can reset the editor's settings, pointing it at the wrong data or losing its examples.
     request: {url: "https://sparql.wikipathways.org/assets/js/config.js"}
     assert:
       - {that: status, eq: 200}
@@ -44,6 +46,7 @@ checks:
     kind: http
     every: 1h
     describe: The published example index the UI reads lists an example it deep-links to, with its parameter.
+    purpose: The editor's example queries come from this list; if it disappears, users see no examples.
     request: {url: "https://raw.githubusercontent.com/wikipathways/SPARQLQueries/examples-index/index.json"}
     assert:
       - {that: status, eq: 200}
@@ -56,6 +59,7 @@ checks:
     every: 1h
     via: [core]
     describe: The pinned UI image can be pulled from the registry, and both nodes have it.
+    purpose: If the server running the editor fails, the other one needs a copy of it to take over.
     request: {image: "ghcr.io/wikipathways/snorql-ui:1.4.1"}
     assert:
       - {that: reachable, eq: true}
@@ -68,6 +72,7 @@ checks:
     via: [core]
     severity: low
     describe: The UI service keeps running the image it was deployed with (a change is shown, for information).
+    purpose: Tells us when the editor changed without a deliberate update.
     request: {services: [wikipathways_wikipathways-snorql]}
     assert:
       - {that: changed_count, eq: 0, warn: true}

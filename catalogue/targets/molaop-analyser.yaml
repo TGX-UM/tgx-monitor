@@ -20,6 +20,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The Analyser home page loads through public DNS and on each node.
+    purpose: Shows that people can open the molAOP Analyser.
     request: {url: "https://molaop-analyser.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -30,6 +31,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain http is redirected to https on the same name.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://molaop-analyser.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -40,6 +42,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of the Analyser.
     request: {host: molaop-analyser.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -52,6 +55,7 @@ checks:
     kind: http
     every: 5m
     describe: The health endpoint reports the app healthy with a working database.
+    purpose: Tells us the Analyser and its database are working, not just the web page.
     request: {url: "https://molaop-analyser.vhp4safety.nl/health", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -65,6 +69,7 @@ checks:
     every: 15m
     timeout: 90s
     describe: The AOP picker lists the full set of mapped AOPs, not the five-AOP emergency fallback.
+    purpose: Users choose AOPs from this list; a short list means the Analyser lost its data and fell back.
     request: {url: "https://molaop-analyser.vhp4safety.nl/api/aops", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -80,6 +85,7 @@ checks:
     every: 1h
     timeout: 120s
     describe: AOP 60 and the demo AOP come back with their known Key Event counts and WikiPathways mappings.
+    purpose: Checks known AOPs give their known answers, to catch wrong or missing analysis data.
     request:
       base: https://molaop-analyser.vhp4safety.nl
       steps:
@@ -100,6 +106,7 @@ checks:
     kind: http
     every: 1h
     describe: The demo page offers both GSE90122 example data sets.
+    purpose: New users start with these example data sets.
     request: {url: "https://molaop-analyser.vhp4safety.nl/demos"}
     assert:
       - {that: status, eq: 200}

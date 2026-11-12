@@ -14,6 +14,7 @@ checks:
     via: [core]
     alert_after: 5m
     describe: Every long-running AOP-Wiki, AOP-DB and dashboard service, and the cron scheduler, runs all its replicas.
+    purpose: Catches any AOP-Wiki service that is not running, even if nobody has visited it yet.
     request:
       check: replicas
       services: ["aopwiki-snorql_*", "aopwiki-dashboard_*", "aopdb_*", cronjobs_scheduler]
@@ -27,6 +28,7 @@ checks:
     every: 1d
     via: [core]
     describe: The three Virtuoso stores restart on any exit, so a clean exit cannot leave one down.
+    purpose: Makes sure a database that stops is restarted automatically instead of staying down.
     request:
       check: restart_policy
       services: [aopwiki-snorql_virtuoso, aopdb_virtuoso, aopwiki-dashboard_virtuoso]
@@ -39,6 +41,7 @@ checks:
     every: 1h
     via: [core]
     describe: No AOP-Wiki, AOP-DB or dashboard service restarted more than once in the last day.
+    purpose: A service that keeps restarting is unstable even if it looks up at the moment we check.
     request:
       check: crash_loops
       services: ["aopwiki-snorql_*", "aopwiki-dashboard_*", "aopdb_*", cronjobs_scheduler]

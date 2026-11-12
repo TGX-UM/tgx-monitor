@@ -20,6 +20,7 @@ checks:
     every: 15m
     via: [core]
     describe: The Sunday reload ran at its slot, exited cleanly and logged its finish line.
+    purpose: The endpoint only gets new AOP-Wiki data if this Sunday job runs and finishes.
     request:
       service: cronjobs_aopwiki-snorql-reload
       grace: 30m
@@ -36,6 +37,7 @@ checks:
     every: 1h
     via: [core]
     describe: The reload's own count of triples in the main graph is in its normal range and did not fall against previous weeks.
+    purpose: Catches a reload that loaded far less data than usual.
     request:
       service: cronjobs_aopwiki-snorql-reload
       grace: 30m
@@ -51,6 +53,7 @@ checks:
     every: 1h
     via: [core]
     describe: Every file the reload registered reached the loaded state without an error.
+    purpose: Catches a reload where some files failed to load, leaving the data incomplete.
     request:
       service: cronjobs_aopwiki-snorql-reload
       grace: 30m
@@ -65,6 +68,7 @@ checks:
     kind: http
     every: 6h
     describe: The main Turtle file the reload downloads from the generator's master branch is there and of normal size.
+    purpose: Catches a missing or cut-short input file before the reload loads it.
     request:
       url: https://raw.githubusercontent.com/marvinm2/AOPWikiRDF/master/data/AOPWikiRDF.ttl
       method: HEAD

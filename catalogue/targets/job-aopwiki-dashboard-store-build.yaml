@@ -18,6 +18,7 @@ checks:
     every: 15m
     via: [core]
     describe: The nightly store build ran at its slot and finished with "Store build complete".
+    purpose: The dashboard shows the results of this nightly job; if it stops, the plots go stale.
     request:
       service: cronjobs_aopwiki-dashboard-store-build
       grace: 30m
@@ -34,6 +35,7 @@ checks:
     every: 1h
     via: [core]
     describe: The build published a manifest with no failed plot queries, covering every release.
+    purpose: Catches a nightly run where some plots failed, which would leave gaps on the dashboard.
     request:
       service: cronjobs_aopwiki-dashboard-store-build
       grace: 30m
@@ -47,6 +49,7 @@ checks:
     kind: http
     every: 1h
     describe: The dashboard's published plot store was built less than 26 hours ago.
+    purpose: Catches the dashboard showing old numbers because the nightly update stopped.
     request: {url: "https://aopwiki-dashboard.vhp4safety.nl/api/v2/manifest", parse_json: true}
     assert:
       - {that: status, eq: 200}

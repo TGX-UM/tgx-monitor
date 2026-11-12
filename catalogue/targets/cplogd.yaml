@@ -13,6 +13,7 @@ checks:
     kind: http
     every: 15m
     describe: The service reports that it is running.
+    purpose: Shows the cpLogD service is running.
     request: {url: "https://cplogd.cloud.vhp4safety.nl/api/v2/health", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -23,6 +24,7 @@ checks:
     kind: http
     every: 1d
     describe: The loaded model is still cpLogD v2 of December 2023, so predictions are reproducible.
+    purpose: Predictions should stay reproducible; a model change would quietly change results.
     request: {url: "https://cplogd.cloud.vhp4safety.nl/api/v2/modelInfo", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -34,6 +36,7 @@ checks:
     kind: http
     every: 30m
     describe: Ethanol gets its known logD prediction and interval at 80% confidence.
+    purpose: Checks a prediction against its known answer, to catch wrong results.
     request:
       url: "https://cplogd.cloud.vhp4safety.nl/api/v2/predict"
       params: {molecule: CCO, confidence: "0.8"}
@@ -54,6 +57,7 @@ checks:
     kind: http
     every: 6h
     describe: Phenol gets its known logD prediction and interval.
+    purpose: Checks a second prediction against its known answer, to catch wrong results.
     request:
       url: "https://cplogd.cloud.vhp4safety.nl/api/v2/predict"
       params: {molecule: c1ccccc1O, confidence: "0.8"}
@@ -72,6 +76,7 @@ checks:
     kind: http
     every: 1h
     describe: The prediction image for ethanol is drawn as a PNG.
+    purpose: Users get a picture with each prediction; this checks it is still drawn.
     request:
       url: "https://cplogd.cloud.vhp4safety.nl/api/v2/predictImage"
       params: {molecule: CCO, confidence: "0.8"}
@@ -85,6 +90,7 @@ checks:
     kind: http
     every: 1d
     describe: The API description is version 2.0.0 and still lists the four endpoints.
+    purpose: Developers use this description to call the service; a change could break their code.
     request: {url: "https://cplogd.cloud.vhp4safety.nl/api/openapi.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -98,6 +104,7 @@ checks:
     every: 1d
     severity: low
     describe: The drawing page that the API description promises is served.
+    purpose: The documentation points users to this drawing page; it should exist.
     request: {url: "https://cplogd.cloud.vhp4safety.nl/draw/"}
     assert:
       - {that: status, eq: 200}
@@ -108,6 +115,7 @@ checks:
     every: 1d
     via: [core]
     describe: The upstream container image can still be pulled.
+    purpose: If the server running cpLogD fails, the other server needs to be able to download it.
     request: {image: "ghcr.io/pharmbio/cplogd-v2.0:latest"}
     assert:
       - {that: reachable, eq: true}

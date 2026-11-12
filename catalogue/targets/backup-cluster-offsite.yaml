@@ -15,6 +15,7 @@ checks:
     every: 1h
     via: [core]
     describe: The cluster-wide off-site copy was refreshed within the last eight days.
+    purpose: Without an off-site copy, a disaster at the hosting company could lose all service data.
     request: {mount: hidrive, glob: "strato-cluster-backups/*", type: dir}
     assert:
       - {that: count, gte: 1, label: "a dated copy exists"}

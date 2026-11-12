@@ -13,6 +13,7 @@ checks:
     kind: http
     every: 15m
     describe: The API answers at its root without a server error (a 404 there is normal, the API has no root page).
+    purpose: Shows that the SOMbie service answers without crashing.
     request: {url: "https://sombie.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, lt: 500}
@@ -23,6 +24,7 @@ checks:
     kind: http
     every: 15m
     describe: The interactive API documentation loads.
+    purpose: Developers try out the API from this documentation page.
     request: {url: "https://sombie.cloud.vhp4safety.nl/ui/"}
     assert:
       - {that: status, eq: 200}
@@ -33,6 +35,7 @@ checks:
     kind: http
     every: 1d
     describe: The API description still lists its nine operations, including SMARTCyp and the site-of-metabolism prediction.
+    purpose: Clients rely on this list of operations; if one disappears, their code breaks.
     request: {url: "https://sombie.cloud.vhp4safety.nl/swagger.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -46,6 +49,7 @@ checks:
     kind: http
     every: 1h
     describe: SMARTCyp is version 2.4.2 with its three CYP models.
+    purpose: Results should be reproducible; a version change would quietly change them.
     request: {url: "https://sombie.cloud.vhp4safety.nl/smartcyp_info", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -58,6 +62,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: SMARTCyp ranks the known site of metabolism of ethanol first, with its known scores, within ten seconds.
+    purpose: Runs a real prediction with a known answer, to catch wrong results.
     request:
       url: "https://sombie.cloud.vhp4safety.nl/smartcyp"
       method: POST
@@ -74,6 +79,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: The docking and ligand preparation tools report their citation and default settings (nothing is docked).
+    purpose: Checks the docking tools are set up as documented, without running a costly docking.
     request:
       base: https://sombie.cloud.vhp4safety.nl
       steps:

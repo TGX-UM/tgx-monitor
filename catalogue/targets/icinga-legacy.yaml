@@ -18,6 +18,7 @@ checks:
     kind: http
     every: 15m
     describe: The Icinga web interface answers with a redirect to its login page.
+    purpose: The old monitoring system still runs until it is retired; this checks it is reachable.
     request: {url: "https://icinga.cloud.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, eq: 302}
@@ -29,6 +30,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for the Icinga name, not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for the old monitoring.
     request: {host: icinga.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -42,6 +44,7 @@ checks:
     every: 15m
     via: [core]
     describe: All five Icinga services run their replica.
+    purpose: The old monitoring system needs all its parts running until it is retired.
     request: {check: replicas, services: ["icinga_*"]}
     assert:
       - {that: checked, eq: 5}

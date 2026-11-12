@@ -20,6 +20,7 @@ checks:
     every: 15m
     via: ["agent:tgx1", "agent:tgx2"]
     describe: Nothing waits to be healed, nothing is in split-brain, and both bricks and the peer are connected.
+    purpose: Service data is copied between both servers; if the copies drift apart, data can be lost or wrong.
     request: {signal: root_status}
     assert:
       - {that: gluster.available, eq: true, label: "the gluster CLI answered"}
@@ -35,6 +36,7 @@ checks:
     every: 5m
     via: ["agent:tgx1"]
     describe: On tgx1 the shared volume shows the heartbeat that tgx2 wrote less than three minutes ago.
+    purpose: Shows that changes made on tgx2 actually arrive on tgx1.
     request: {signal: agent}
     assert:
       - {that: heartbeats.tgx2, lt: 180, label: "tgx2's heartbeat file, as tgx1 sees it, is younger than 180 s"}
@@ -45,6 +47,7 @@ checks:
     every: 5m
     via: ["agent:tgx2"]
     describe: On tgx2 the shared volume shows the heartbeat that tgx1 wrote less than three minutes ago.
+    purpose: Shows that changes made on tgx1 actually arrive on tgx2.
     request: {signal: agent}
     assert:
       - {that: heartbeats.tgx1, lt: 180, label: "tgx1's heartbeat file, as tgx2 sees it, is younger than 180 s"}

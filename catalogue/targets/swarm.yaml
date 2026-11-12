@@ -19,6 +19,7 @@ checks:
     every: 5m
     via: [core]
     describe: The swarm has exactly one leader, two reachable managers and both nodes ready.
+    purpose: The cluster needs both servers healthy and a leader; otherwise nothing can be restarted or moved.
     request: {check: nodes}
     assert:
       - {that: leader_count, eq: 1, label: "exactly one leader (a 503 'no leader' fails the check)"}
@@ -34,6 +35,7 @@ checks:
     every: 5m
     via: ["agent:tgx1", "agent:tgx2"]
     describe: Each node reaches the other on the swarm, gossip, Gluster and HTTPS ports.
+    purpose: The two servers must reach each other, or storage and failover stop working.
     request: {signal: peer}
     assert:
       - {that: peer.all_ok, eq: true, label: "peer ports 2377, 7946, 24007 and 443 all connect"}
@@ -46,6 +48,7 @@ checks:
     every: 5m
     via: ["agent:tgx1", "agent:tgx2"]
     describe: The monitoring agent on each node answers with fresh data and sees the monitor core's heartbeat.
+    purpose: The monitor's helpers on each server must report in, or server problems go unseen.
     request: {signal: agent}
     assert:
       - {that: reachable, eq: true}

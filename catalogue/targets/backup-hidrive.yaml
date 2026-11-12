@@ -16,6 +16,7 @@ checks:
     every: 15m
     via: [agent:tgx1, agent:tgx2]
     describe: Each node sees the backup drive mounted, with last night's off-site archive on it.
+    purpose: Off-site backups are written to this drive; if it is not mounted, they are not saved.
     request: {signal: hidrive}
     assert:
       - {that: hidrive.aopwiki-dashboard.count, gte: 12, label: "the archive directory is listed (mount present)"}
@@ -27,6 +28,7 @@ checks:
     every: 6h
     via: [agent:tgx1, agent:tgx2]
     describe: The backup drive is a network mount, not the node's own disk, and is less than 80% full.
+    purpose: A full backup drive stops new backups, and a missing mount could fill the server's own disk.
     request: {signal: disk}
     assert:
       - {that: disk.hidrive.fstype, eq: cifs, label: "mounted over SMB (else jobs write into the root disk)"}

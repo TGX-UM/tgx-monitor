@@ -20,6 +20,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The assessment page loads on the department name, through public DNS and on each node.
+    purpose: Shows that people can open the NSDRA assessment.
     request: {url: "https://nsdra.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -31,6 +32,7 @@ checks:
     kind: http
     every: 15m
     describe: The same page loads on its own domain, nsdra.org.
+    purpose: Many people use the nsdra.org address; it must show the same assessment.
     request: {url: "https://nsdra.org/"}
     assert:
       - {that: status, eq: 200}
@@ -41,6 +43,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain HTTP on nsdra.org is redirected permanently to HTTPS.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://nsdra.org/", follow: false}
     assert:
       - {that: status, eq: 301}
@@ -52,6 +55,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the department name, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of the assessment.
     request: {host: nsdra.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -66,6 +70,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for nsdra.org, with time to spare.
+    purpose: Without a valid certificate on nsdra.org, browsers show a security warning there.
     request: {host: nsdra.org}
     assert:
       - {that: verified, eq: true}
@@ -79,6 +84,7 @@ checks:
     kind: dns
     every: 1h
     describe: The department name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The address must point at our servers, or nobody can reach NSDRA.
     request: {name: nsdra.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -89,6 +95,7 @@ checks:
     kind: compare
     every: 1h
     describe: The assessment form lists its full set of maturity indicators.
+    purpose: The assessment is incomplete if any of its questions go missing.
     request:
       left: {http_list: {url: "https://nsdra.bigcat-bioinformatics.org/", re: '(w3id\.org/nsdra/maturity-indicator/readme/[^"<>\s]+)', pick: all}}
       right: {const: 256}
@@ -100,6 +107,7 @@ checks:
     kind: http
     every: 15m
     describe: An assessment lookup reaches the database and comes back empty for an unknown id, rather than failing.
+    purpose: Saved assessments live in the database; this checks the site can still reach it.
     request: {url: "https://nsdra.bigcat-bioinformatics.org/assessment/00000000-0000-0000-0000-000000000000"}
     assert:
       - {that: status, eq: 200}
@@ -110,6 +118,7 @@ checks:
     kind: tls
     every: 1d
     describe: www.nsdra.org serves a trusted certificate for its name, not the proxy's default one.
+    purpose: People typing www.nsdra.org should not get a security warning.
     request: {host: www.nsdra.org}
     assert:
       - {that: is_traefik_default, eq: false}
@@ -120,6 +129,7 @@ checks:
     kind: compare
     every: 1d
     describe: The nsdra.org registration does not run out within the next two months.
+    purpose: If the registration lapses, nsdra.org goes offline and someone else could buy the name.
     request:
       left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/nsdra.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
       right: {const: "registration"}
@@ -134,6 +144,7 @@ checks:
     via: [core]
     public: false
     describe: The web app and its database both run their one replica.
+    purpose: Both the web app and its database must be running.
     request: {check: replicas, services: ["nsdra_*"]}
     assert:
       - {that: checked, eq: 2}
@@ -146,6 +157,7 @@ checks:
     via: [core]
     public: false
     describe: The web app has had no failed tasks in the last day.
+    purpose: A web app that keeps crashing gives users errors on and off.
     request: {check: crash_loops, services: ["nsdra_*"], window: 24h, threshold: 3}
     assert:
       - {that: failed_task_count, eq: 0}
@@ -159,6 +171,7 @@ checks:
     timeout: 2m
     public: false
     describe: A fresh, non-empty dump of the NSDRA database exists.
+    purpose: Without a recent backup, users' saved assessments could be lost.
     request: {mount: nsdra-backups, glob: "*.sql.gz", small_bytes: 1000}
     assert:
       - {that: count, gte: 1, label: a backup exists}

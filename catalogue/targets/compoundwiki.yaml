@@ -19,6 +19,7 @@ checks:
     every: 15m
     timeout: 30s
     describe: The wiki's main page loads.
+    purpose: Shows that people can open the CompoundWiki.
     request: {url: "https://compoundcloud.wikibase.cloud/wiki/Main_Page"}
     assert:
       - {that: status, eq: 200}
@@ -29,6 +30,7 @@ checks:
     kind: http
     every: 1h
     describe: The wiki's entity search finds caffeine as its known item.
+    purpose: Checks that searching for a known compound still finds it.
     request:
       url: "https://compoundcloud.wikibase.cloud/w/api.php"
       params: {action: wbsearchentities, search: caffeine, language: en, format: json, limit: "3"}
@@ -43,6 +45,7 @@ checks:
     kind: sparql
     every: 1h
     describe: The query service returns caffeine's known InChIKey and CAS number.
+    purpose: Gives a known answer for a well-known compound, to catch wrong or missing data in the query service.
     request:
       endpoint: "https://compoundcloud.wikibase.cloud/query/sparql"
       file: q/rdf-portals-legacy/compoundwiki-caffeine.rq
@@ -56,6 +59,7 @@ checks:
     kind: sparql
     every: 6h
     describe: The number of items with an English label has not dropped.
+    purpose: Catches compounds disappearing from the wiki.
     request:
       endpoint: "https://compoundcloud.wikibase.cloud/query/sparql"
       file: q/rdf-portals-legacy/compoundwiki-labels.rq
@@ -68,6 +72,7 @@ checks:
     kind: sparql
     every: 6h
     describe: The query service reflects edits; amber when nothing has changed for half a year.
+    purpose: Shows whether the query service still picks up edits; long silence may mean it stopped updating.
     request:
       endpoint: "https://compoundcloud.wikibase.cloud/query/sparql"
       file: q/rdf-portals-legacy/compoundwiki-last-modified.rq

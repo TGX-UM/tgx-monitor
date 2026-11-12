@@ -24,6 +24,7 @@ Shape of a target file::
         every: 5m
         via: [public, tgx1, tgx2]
         describe: The endpoint answers a trivial query in under five seconds.
+        purpose: Shows that people and tools can query AOP-Wiki RDF at all.
         request: {endpoint: https://aopwiki.rdf.bigcat-bioinformatics.org/sparql,
                   ask: "ASK { ?s ?p ?o }"}
         assert:
@@ -69,6 +70,9 @@ class Check(BaseModel):
     every: str = "15m"
     via: list[Via] = Field(default_factory=lambda: ["public"])
     describe: str = ""
+    # One plain sentence for a non-specialist: why the check exists, i.e. what users would
+    # notice or lose if it failed. Shown as "Purpose: ..." on the pages and in alerts.
+    purpose: str = ""
     request: dict[str, Any] = Field(default_factory=dict)
     assert_: list[dict[str, Any]] = Field(default_factory=list, alias="assert")
     severity: Criticality | None = None
@@ -352,6 +356,9 @@ class Catalogue:
                             probs.append(f"{t.id}/{c.id}: {exc}")
                 if c.enabled and not c.assert_:
                     probs.append(f"{t.id}/{c.id}: no assertions")
+                if c.enabled and not (c.describe and c.purpose):
+                    probs.append(f"{t.id}/{c.id}: needs describe (what is checked) and "
+                                 "purpose (why, in plain words)")
                 for a in c.assert_:
                     for p in A.validate(a):
                         probs.append(f"{t.id}/{c.id}: {p}")

@@ -18,6 +18,7 @@ checks:
     kind: compare
     every: 6h
     describe: Every human Ensembl gene database deposited on Zenodo more than 30 days ago is listed in the data.bridgedb.org catalogue.
+    purpose: Catches a new mapping database that was published but never added to the catalogue.
     request:
       left:
         http_list:
@@ -36,6 +37,7 @@ checks:
     every: 6h
     alert_after: 30d
     describe: The webservice serves the human Ensembl database the catalogue lists, allowing 30 days for a new one to be deployed.
+    purpose: Catches the webservice still using an older human mapping database after a new one came out.
     request:
       left: {http_list: {url: "https://data.bridgedb.org/gene.json", re: 'Hs_Derby_Ensembl_(\d+)\.bridge', pick: newest}}
       right: {http_regex: {url: "https://webservice.bridgedb.org/Human/properties", re: 'DATASOURCEVERSION\t(\d+)'}}
@@ -48,6 +50,7 @@ checks:
     every: 1h
     severity: low
     describe: The build of the gene-database creator passed on its last run; information for the database builders.
+    purpose: Tells the database builders whether the tool that makes new mapping databases still works.
     request: {repo: bridgedb/create-bridgedb-genedb, workflow: maven.yml}
     assert:
       - {that: completed_conclusion, eq: success, warn: true}

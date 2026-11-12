@@ -18,6 +18,7 @@ checks:
     every: 15m
     via: [core]
     describe: The nightly backup ran at its slot and logged an integrity-checked copy with the usual number of mappings.
+    purpose: Without this nightly backup, a database failure would lose the curated mappings.
     request:
       service: cronjobs_molaop-builder-backup
       grace: 30m
@@ -37,6 +38,7 @@ checks:
     via: [core]
     timeout: 2m
     describe: A backup copy less than 26 hours old exists, about as large as the previous one, with a week of daily copies and no empty files.
+    purpose: Shows recent, complete backups exist, with a week to go back to.
     request: {mount: backups-molaop-builder, glob: "ke_wp_mapping_*.db", small_bytes: 65536}
     assert:
       - {that: count, gte: 6, label: "≥ 6 daily copies kept"}
@@ -52,6 +54,7 @@ checks:
     via: [core]
     timeout: 5m
     describe: The newest backup copy opens as a sound SQLite database and holds the mappings table with its usual rows.
+    purpose: A backup is only useful if it opens; this checks it is not damaged and has the mappings.
     request: {mount: backups-molaop-builder, glob: "ke_wp_mapping_*.db", tables: [mappings]}
     assert:
       - {that: integrity, eq: ok}
@@ -63,6 +66,7 @@ checks:
     every: 6h
     via: [core]
     describe: The live database is not in write-ahead-log mode, which is unsafe on the shared cluster file system.
+    purpose: A database setting that is unsafe on our shared storage could corrupt the mappings; this makes sure it stays off.
     request: {mount: molaop-builder-data, glob: "*.db-[sw][ha][ml]", verify_gzip: false}
     assert:
       - {that: count, eq: 0, label: "no -wal or -shm file next to the live database"}
@@ -74,6 +78,7 @@ checks:
     via: [core]
     public: false
     describe: A copy of the Builder database less than eight days old exists outside the cluster file system.
+    purpose: A backup on the same storage as the live data is lost with it; this checks there is a copy elsewhere.
     request: {mount: hidrive, glob: "molaop-builder/*.db*", verify_gzip: false}
     assert:
       - {that: count, gte: 1, label: "an off-cluster copy exists"}

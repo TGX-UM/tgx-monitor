@@ -13,6 +13,7 @@ checks:
     kind: http
     every: 15m
     describe: The Flame web interface shell loads.
+    purpose: Shows that people can open Flame.
     request: {url: "https://flame.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -24,6 +25,7 @@ checks:
     kind: http
     every: 15m
     describe: The Flame API reports that it is ready.
+    purpose: Flame can look up but not be ready to work; this checks it is.
     request: {url: "https://flame.cloud.vhp4safety.nl/api/v1/ready"}
     assert:
       - {that: status, eq: 200}
@@ -34,6 +36,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: The application script and stylesheet named in the page are served (checked by HEAD, the script is 14 MB).
+    purpose: Without these files the Flame page opens but stays blank.
     request:
       base: https://flame.cloud.vhp4safety.nl
       steps:
@@ -55,6 +58,7 @@ checks:
     kind: http
     every: 1d
     describe: At least one model is loaded, so predictions are possible.
+    purpose: Flame is useless without at least one model to predict with.
     request: {url: "https://flame.cloud.vhp4safety.nl/api/v1/manage/models", parse_json: true}
     assert:
       - {that: status, eq: 200}

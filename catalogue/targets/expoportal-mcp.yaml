@@ -19,6 +19,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The MCP server lists its four tools, through public DNS and on each node.
+    purpose: Shows that AI assistants can connect to ExpoPortal and see what they can do.
     request:
       steps:
         - method: POST
@@ -38,6 +39,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: A full MCP handshake works, the server names itself, and the session it hands out can list the tools.
+    purpose: AI assistants must be able to start a session, or they cannot use ExpoPortal at all.
     request:
       steps:
         - method: POST
@@ -61,6 +63,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: The run_sparql tool executes a count of ontologies and returns the portal's full number.
+    purpose: Runs a real query through the AI connector and checks the answer is complete.
     request:
       steps:
         - method: POST
@@ -86,6 +89,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: The read-only guard rejects a query that uses a Virtuoso extension function.
+    purpose: The AI connector must only read data; this checks it still blocks risky query types.
     request:
       steps:
         - method: POST
@@ -109,6 +113,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: The resolve_ontology tool finds AOPO, the Adverse Outcome Pathways Ontology.
+    purpose: Checks the AI connector can still look up a known ontology by name.
     request:
       steps:
         - method: POST
@@ -125,6 +130,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: Requests from a foreign web origin are refused, while the old ontoportal name still serves registered clients.
+    purpose: Stops other websites from using the AI connector through visitors' browsers.
     request:
       steps:
         - method: POST
@@ -144,6 +150,7 @@ checks:
     kind: http
     every: 1h
     describe: A browser opening the MCP address gets a page about the server, not an error.
+    purpose: Someone opening the connector's address in a browser should see an explanation, not an error.
     request:
       url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/mcp"
       headers: {Accept: text/html}

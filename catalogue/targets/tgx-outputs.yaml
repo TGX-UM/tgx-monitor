@@ -16,6 +16,7 @@ checks:
     kind: http
     every: 15m
     describe: The site's front page loads with its project table.
+    purpose: Shows that people can open the TGX outputs site.
     request: {url: "https://tgx-um.github.io/tgx-outputs/"}
     assert:
       - {that: status, eq: 200}
@@ -26,6 +27,7 @@ checks:
     kind: compare
     every: 1h
     describe: The site says it was refreshed less than nine days ago, and its data files carry the same date.
+    purpose: Catches the site showing old numbers because its weekly update stopped.
     request:
       left: {http_regex: {url: "https://tgx-um.github.io/tgx-outputs/", re: 'sources refreshed (\d{4}-\d{2}-\d{2})'}}
       right: {http_regex: {url: "https://tgx-um.github.io/tgx-outputs/data/releases_by_year.csv", re: ',(\d{4}-\d{2}-\d{2})\s*$'}}
@@ -38,6 +40,7 @@ checks:
     kind: http
     every: 6h
     describe: Every source was collected completely at the last refresh; amber when the site reports incomplete sources.
+    purpose: Catches an update that silently missed some sources, leaving numbers too low.
     request: {url: "https://tgx-um.github.io/tgx-outputs/"}
     assert:
       - {that: status, eq: 200}
@@ -49,6 +52,7 @@ checks:
     kind: roundtrip
     every: 6h
     describe: The published data files keep their documented columns and the release table its usual length.
+    purpose: People reuse these data files; a format change would break their scripts.
     request:
       base: https://tgx-um.github.io/tgx-outputs/data
       steps:
@@ -70,6 +74,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekly refresh workflow is enabled and its last scheduled run, less than nine days ago, succeeded.
+    purpose: This weekly job updates the site; if it stops, the site goes stale.
     request: {repo: TGX-UM/tgx-outputs, workflow: refresh.yml, event: schedule}
     assert:
       - {that: state, eq: active}

@@ -17,6 +17,7 @@ checks:
     kind: http
     every: 1h
     describe: A substance search for benzene still returns JSON results in the shape the workflow expects.
+    purpose: A Galaxy workflow depends on this OECD search; if its answer format changes, the workflow breaks.
     request:
       url: "https://www.echemportal.org/echemportal/api/substance-search"
       params: {query_term: benzene}

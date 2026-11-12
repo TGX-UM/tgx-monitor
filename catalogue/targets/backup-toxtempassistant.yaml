@@ -19,6 +19,7 @@ checks:
     every: 15m
     via: [core]
     describe: The backup sidecar service is running its one replica.
+    purpose: The ToxTempAssistant backups are made by this helper; if it is not running, no backups are made.
     request: {check: replicas, services: [toxtempass_backup]}
     assert:
       - {that: by.toxtempass_backup.running, eq: 1}
@@ -31,6 +32,7 @@ checks:
     via: [core]
     timeout: 2m
     describe: Last night's database dump exists, is a complete gzip of normal size and holds the full schema up to pg_dump's closing line.
+    purpose: Shows last night's database backup is complete and not cut short.
     request:
       mount: backups-toxtempassistant
       glob: "*/postgres_toxtempass.sql.gz"
@@ -50,6 +52,7 @@ checks:
     every: 6h
     via: [core]
     describe: None of the kept nightly dumps is empty, so no night in the past month failed silently.
+    purpose: Catches a night where the backup silently produced an empty file.
     request: {mount: backups-toxtempassistant, glob: "*/postgres_toxtempass.sql.gz", small_bytes: 1000, verify_gzip: false}
     assert:
       - {that: small_count, eq: 0, label: "no empty dump among the kept nights"}
@@ -60,6 +63,7 @@ checks:
     every: 6h
     via: [core]
     describe: About a month of nightly backup directories is kept, and the newest has its uploaded-files copy.
+    purpose: A month of backups lets us go back to before a problem started.
     request: {mount: backups-toxtempassistant, glob: "20??-??-??_??????", type: dir}
     assert:
       - {that: count, gte: 28, label: "≥ 28 nights kept"}
@@ -72,6 +76,7 @@ checks:
     every: 1h
     via: [core]
     describe: Last night's backup includes the copy of the uploaded files.
+    purpose: Users' uploaded documents must be backed up too, not just the database.
     request: {mount: backups-toxtempassistant, glob: "*/minio", type: dir}
     assert:
       - {that: newest_age_h, lt: 26}
@@ -83,6 +88,7 @@ checks:
     via: [core]
     public: false
     describe: Last night's backup manifest names the right database and its own timestamp.
+    purpose: Catches a backup of the wrong database or one with a wrong date.
     request: {mount: backups-toxtempassistant, file: "*/manifest.txt", format: kv}
     assert:
       - {that: exists, eq: true}
@@ -98,6 +104,7 @@ checks:
     via: [core]
     public: false
     describe: A copy of the backup less than eight days old exists outside the cluster file system.
+    purpose: A backup on the same storage as the live data is lost with it; this checks there is a copy elsewhere.
     request: {mount: hidrive, glob: "toxtempassistant/*", verify_gzip: false}
     assert:
       - {that: count, gte: 1, label: "an off-cluster copy exists"}

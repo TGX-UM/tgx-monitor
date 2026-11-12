@@ -18,6 +18,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekly RDF generation workflow is enabled and its last run, less than eight days ago, succeeded.
+    purpose: This Saturday job builds the weekly AOP-Wiki RDF; if it stops, the endpoint keeps serving old data.
     request: {repo: marvinm2/AOPWikiRDF, workflow: rdfgeneration.yml}
     assert:
       - {that: state, eq: active}
@@ -29,6 +30,7 @@ checks:
     kind: gha
     every: 1h
     describe: The Turtle quality-control run on the newly generated files succeeded within the past eight days.
+    purpose: Catches broken RDF files before they are loaded into the endpoint.
     request: {repo: marvinm2/AOPWikiRDF, workflow: Turtle_File_Quality_Control.yml}
     assert:
       - {that: state, eq: active}
@@ -40,6 +42,7 @@ checks:
     kind: gha
     every: 1h
     describe: The SHACL validation of the newly generated files succeeded within the past eight days.
+    purpose: Catches RDF that does not follow the agreed data rules before it reaches users.
     request: {repo: marvinm2/AOPWikiRDF, workflow: shacl-validation.yml}
     assert:
       - {that: state, eq: active}
@@ -51,6 +54,7 @@ checks:
     kind: gha
     every: 1h
     describe: The test of the conversion script passed on its last run.
+    purpose: The conversion code must pass its tests, or the weekly build may produce wrong data.
     request: {repo: marvinm2/AOPWikiRDF, workflow: test-python-conversion.yml}
     assert:
       - {that: state, eq: active}
@@ -62,6 +66,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekly check that the IRIs in the RDF resolve succeeded within the past eight days.
+    purpose: The links inside the data should open in a browser; this catches ones that stopped working.
     request: {repo: marvinm2/AOPWikiRDF, workflow: uri-resolvability-check.yml}
     assert:
       - {that: state, eq: active}
@@ -73,6 +78,7 @@ checks:
     kind: gha
     every: 1h
     describe: The monthly Zenodo deposit of the RDF succeeded within the past month.
+    purpose: The monthly citable copy on Zenodo depends on this job succeeding.
     request: {repo: marvinm2/AOPWikiRDF, workflow: upload-to-zenodo.yml}
     assert:
       - {that: state, eq: active}
@@ -84,6 +90,7 @@ checks:
     kind: http
     every: 6h
     describe: The newest generation left its RDF files as a downloadable artifact of normal size that has not expired.
+    purpose: The Sunday reload needs these files; if they are missing or too small, it has nothing correct to load.
     request:
       url: https://api.github.com/repos/marvinm2/AOPWikiRDF/actions/artifacts
       params: {name: rdf-files, per_page: 1}

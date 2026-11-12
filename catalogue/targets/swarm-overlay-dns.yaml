@@ -22,6 +22,7 @@ checks:
     every: 15m
     via: [core]
     describe: The AOP-Wiki Virtuoso answers by its swarm service name on the overlay network.
+    purpose: The AOP-Wiki sites find their database by name; if that name stops working, they all show errors.
     request: {endpoint: "http://aopwiki-snorql_virtuoso:8890/sparql", ask: "ASK { ?s ?p ?o }"}
     assert:
       - {that: status, eq: 200}
@@ -33,6 +34,7 @@ checks:
     every: 15m
     via: [core]
     describe: The AOP-DB Virtuoso answers by its swarm service name on the overlay network.
+    purpose: The AOP-DB site finds its database by name; if that name stops working, it shows errors.
     request: {endpoint: "http://aopdb_virtuoso:8890/sparql", ask: "ASK { ?s ?p ?o }"}
     assert:
       - {that: status, eq: 200}
@@ -44,6 +46,7 @@ checks:
     every: 15m
     via: [core]
     describe: The WikiPathways Virtuoso answers by the alias the proxy's dynamic file routes to.
+    purpose: The WikiPathways endpoint finds its database by name; if that name stops working, queries fail.
     request: {endpoint: "http://wikipathways-ep:8890/sparql", ask: "ASK { ?s ?p ?o }"}
     assert:
       - {that: status, eq: 200}
@@ -55,6 +58,7 @@ checks:
     every: 15m
     via: [core]
     describe: The standby WikiPathways Virtuoso answers by its alias, so a blue-green switch has somewhere to go.
+    purpose: The monthly switch needs the second WikiPathways database reachable by name.
     request: {endpoint: "http://wikipathways-ep2:8890/sparql", ask: "ASK { ?s ?p ?o }"}
     assert:
       - {that: status, eq: 200}

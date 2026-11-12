@@ -22,6 +22,7 @@ checks:
     every: 15m
     via: [core]
     describe: The monthly reload ran at its slot on the 12th, exited cleanly and wrote its completed-load marker.
+    purpose: The WikiPathways endpoint only gets the new month's data if this job runs and finishes.
     request:
       service: cronjobs_wikipathways-reload
       grace: 30m
@@ -38,6 +39,7 @@ checks:
     every: 1h
     via: [core]
     describe: The reload counted a normal number of triples in the WikiPathways graph group, not much fewer than last month.
+    purpose: Catches a reload that loaded far less data than usual, so it is not switched live.
     request:
       service: cronjobs_wikipathways-reload
       grace: 30m
@@ -52,6 +54,7 @@ checks:
     kind: roundtrip
     every: 6h
     describe: The seven vocabulary and ontology files the reload takes from WikiPathwaysLoader are all downloadable and not truncated.
+    purpose: The reload also loads these ontology files; missing or cut-short ones would leave labels and terms out.
     request:
       base: https://raw.githubusercontent.com/wikipathways/WikiPathwaysLoader/master/data
       steps:

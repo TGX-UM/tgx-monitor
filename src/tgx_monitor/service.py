@@ -29,6 +29,7 @@ import contextlib
 import logging
 import os
 import signal
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -136,11 +137,19 @@ class Service:
             ("nightly", 3600, self._nightly),
             ("hc-cycle", 120, self._hc_cycle),
         ]
+        # Hooks that only read the store and write files run in a worker thread: on the
+        # Gluster mount they can take long enough to stall the event loop, which made every
+        # probe in flight time out and let /livez miss the container health check.
+        threaded = {"heartbeat", "snapshot"}
         for name, every, fn in jobs:
             if not self._due(name, every):
                 continue
+            started = time.monotonic()
             try:
-                out = fn()
+                if name in threaded:
+                    out = asyncio.wait_for(asyncio.to_thread(fn), timeout=120)
+                else:
+                    out = fn()
                 if asyncio.iscoroutine(out):
                     await asyncio.wait_for(out, timeout=120)
             except Exception as exc:  # noqa: BLE001 - one hook must never stop the others
@@ -151,6 +160,10 @@ class Service:
                                 name, exc, every)
                 else:
                     log.exception("hook %s failed", name)
+            took = time.monotonic() - started
+            if took > 2:
+                log.warning("hook %s took %.1fs%s", name, took,
+                            "" if name in threaded else " on the event loop")
 
     def _heartbeat(self) -> None:
         from .agent import write_heartbeat

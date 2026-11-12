@@ -15,6 +15,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: Asking the endpoint for Turtle returns a non-empty SPARQL service description at /sparql, /sparql/ and /.
+    purpose: Tools read this description to discover what the endpoint offers; it must not be missing.
     request:
       base: "https://aopwiki.rdf.bigcat-bioinformatics.org"
       steps:
@@ -40,6 +41,7 @@ checks:
     every: 1h
     via: [tgx1, tgx2]
     describe: Each node serves the full VoID description at /.well-known/void, so a routing file that did not reach one node shows up.
+    purpose: Each server must publish the dataset description, so it doesn't vanish when traffic moves to the other one.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/.well-known/void", headers: {Accept: text/html}}
     assert:
       - {that: status, eq: 200}
@@ -51,6 +53,7 @@ checks:
     kind: http
     every: 1d
     describe: The VoID description is also served as RDF/XML when a client asks for it.
+    purpose: Some tools only read RDF/XML; this keeps the dataset description usable for them.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/.well-known/void", headers: {Accept: application/rdf+xml}}
     assert:
       - {that: status, eq: 200}
@@ -62,6 +65,7 @@ checks:
     kind: http
     every: 1d
     describe: A query without an Origin header gets exactly one Access-Control-Allow-Origin "*" header, as strict CORS checkers expect.
+    purpose: Web pages on other sites query this endpoint; a wrong header makes their browser block the answers.
     request:
       url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
       params: {query: "ASK { ?s ?p ?o }"}

@@ -152,6 +152,7 @@ def check_lines(checks: list[tuple[str, Check]]) -> list[str]:
         via = pid.split("@", 1)[1] if "@" in pid else c.via[0]
         by.setdefault(c.id, (c, []))[1].append(via)
     return [f"{c.describe or c.id} (via {', '.join(sorted(vias))})"
+            + (f" Purpose: {c.purpose}" if c.purpose else "")
             for c, vias in by.values()]
 
 

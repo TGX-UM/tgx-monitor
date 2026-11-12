@@ -19,6 +19,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The platform home page loads through public DNS and on each node.
+    purpose: Shows that people can open the VHP4Safety platform.
     request: {url: "https://platform.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -30,6 +31,7 @@ checks:
     every: 30m
     timeout: 30s
     describe: The tools, methods, data, case studies and training pages and the sitemap all load.
+    purpose: Checks that the platform's main sections all open.
     request:
       base: https://platform.vhp4safety.nl
       steps:
@@ -53,6 +55,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain http is redirected to https on the same name.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://platform.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -63,6 +66,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of the platform.
     request: {host: platform.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -76,6 +80,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: Every tool in the VHP4Safety cloud catalogue appears on the platform's tools page, and no other.
+    purpose: The platform should list exactly the tools in the catalogue, no missing or extra ones.
     request:
       left: {http_list: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", re: '"id":\s*"([^"]+)"', pick: all}, on_error: unknown}
       right: {http_list: {url: "https://platform.vhp4safety.nl/tools", re: "location\\.href='/tools/([^']+)'", pick: all}}
@@ -88,6 +93,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: The compound lookup returns cisplatin's known identity from CompoundCloud.
+    purpose: The chemical lookup is a platform feature; this checks it with a known chemical.
     request: {url: "https://platform.vhp4safety.nl/get_compound_properties/Q5071", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -101,6 +107,7 @@ checks:
     every: 1d
     via: [core]
     describe: Main's pinned image tag is on Docker Hub and the copy on the nodes is the same build.
+    purpose: Makes sure the live platform runs the version it is supposed to run.
     request: {image: "vhp4safety/virtual-human-platform:1.0-6"}
     assert:
       - {that: reachable, eq: true}
@@ -112,6 +119,7 @@ checks:
     every: 1d
     severity: low
     describe: Shows when Docker Hub has a newer platform release than the one main runs.
+    purpose: Shows when a newer platform release is ready to be put live.
     request:
       left: {http_json: {url: "https://hub.docker.com/v2/repositories/vhp4safety/virtual-human-platform/tags/1.0-6", path: digest}, on_error: unknown}
       right: {http_json: {url: "https://hub.docker.com/v2/repositories/vhp4safety/virtual-human-platform/tags/latest", path: digest}, on_error: unknown}

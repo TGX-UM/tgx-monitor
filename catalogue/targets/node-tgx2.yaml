@@ -19,6 +19,7 @@ checks:
     every: 5m
     via: ["agent:tgx2"]
     describe: Every software RAID array on tgx2 has all its disks.
+    purpose: tgx2's system disks are mirrored; with one disk gone, the next disk failure takes the server down.
     request: {signal: mdstat}
     assert:
       - {that: degraded_count, eq: 0, label: "no degraded md array"}
@@ -30,6 +31,7 @@ checks:
     every: 5m
     via: ["agent:tgx2"]
     describe: The root filesystem and the Gluster brick on tgx2 have space and inodes to spare.
+    purpose: A full disk stops databases and uploads on tgx2 from writing anything.
     request: {signal: disk}
     assert:
       - {that: disk.rootfs.used_pct, lt: 80, warn: true}
@@ -45,6 +47,7 @@ checks:
     every: 5m
     via: ["agent:tgx2"]
     describe: "tgx2 has at least 4 GB of memory available and swap is not exhausted."
+    purpose: When memory runs out, the server kills services to survive, which looks like random outages.
     request: {signal: memory}
     assert:
       - {that: mem.available_gb, gte: 4}
@@ -57,6 +60,7 @@ checks:
     every: 5m
     via: ["agent:tgx2"]
     describe: The 15-minute load on tgx2 stays within what its CPUs can carry.
+    purpose: A server that is overloaded makes every service on it slow.
     request: {signal: load}
     assert:
       - {that: load.per_cpu15, lt: 1.5, warn: true}
@@ -68,6 +72,7 @@ checks:
     every: 5m
     via: ["agent:tgx2"]
     describe: "tgx2 has not rebooted in the last hour."
+    purpose: An unplanned restart briefly takes down everything on tgx2 and should be looked into.
     request: {signal: boot}
     assert:
       - {that: boot.uptime_h, gt: 1, label: "up for more than an hour (an unexpected reboot stays red for an hour)"}
@@ -78,6 +83,7 @@ checks:
     every: 5m
     via: ["agent:tgx2"]
     describe: The root status file for tgx2 is fresh and shows the clock in sync, Docker running and systemd responsive.
+    purpose: Catches problems only an administrator can see, like a wrong clock or a stuck Docker on tgx2.
     request: {signal: root_status}
     assert:
       - {that: present, eq: true, label: "the root cron writes its status file"}

@@ -20,6 +20,7 @@ checks:
     every: 1h
     alert_after: 6h
     describe: A new dated release folder appears each month by the 10th, and current/ mirrors it.
+    purpose: Shows that WikiPathways published its monthly data release, which everything downstream waits for.
     request:
       left: {http_regex: {url: "https://data.wikipathways.org/", re: 'href="current">current</a></td><td>(\d+)<'}}
       right: {http_regex: {url: "https://data.wikipathways.org/", re: 'href="\d{8}">\d{8}</a></td><td>(\d+)<'}}
@@ -35,6 +36,7 @@ checks:
     every: 1h
     alert_after: 36h
     describe: The current/rdf/ listing names all four RDF files of the newest release, which is what the monthly reload reads.
+    purpose: The monthly reload finds the RDF files through this listing; if they are not listed, the reload stops.
     request:
       left: {http_list: {url: "https://data.wikipathways.org/", re: 'href="(\d{8})/?"', pick: newest}}
       right: {http_regex: {url: "https://data.wikipathways.org/current/rdf/", re: 'href="wikipathways-(\d{8})-rdf-gpml\.zip"'}}
@@ -55,6 +57,7 @@ checks:
     timeout: 45s
     alert_after: 36h
     describe: The four RDF files of the newest release are downloadable, in the dated folder and in current/, with plausible sizes.
+    purpose: The monthly reload downloads these files; this catches missing or cut-short ones before it runs.
     request:
       base: https://data.wikipathways.org
       steps:
@@ -86,6 +89,7 @@ checks:
     every: 6h
     timeout: 45s
     describe: The newest release has the usual number of GMT, GPML and SVG files, and the human GMT has close to a thousand well-formed gene sets.
+    purpose: Catches a release that came out with far fewer pathways or broken gene sets than usual.
     request:
       base: https://data.wikipathways.org
       steps:
@@ -112,6 +116,7 @@ checks:
     every: 6h
     timeout: 45s
     describe: Zenodo holds each release by the 16th of the following month at the latest (the publish workflow runs on the 15th).
+    purpose: People cite the Zenodo copy of each release; this makes sure it gets there.
     request:
       left:
         http_json: {url: "https://zenodo.org/api/records?communities=wikipathways&sort=mostrecent&size=1", path: hits.hits.0.metadata.version}
@@ -126,6 +131,7 @@ checks:
     kind: gha
     every: 1h
     describe: No workflow of the release repository has been disabled, for example by GitHub after 60 days without activity.
+    purpose: GitHub switches off quiet workflows after 60 days, which would silently stop the releases.
     request: {repo: wikipathways/wikipathways-data-release}
     assert:
       - {that: inactive, len_eq: 0}
@@ -136,6 +142,7 @@ checks:
     kind: gha
     every: 1h
     describe: The monthly collection workflow succeeded this month.
+    purpose: This job gathers each month's release; if it fails, there is no new release.
     request: {repo: wikipathways/wikipathways-data-release, workflow: monthly_collection.yml}
     assert:
       - {that: state, eq: active}
@@ -147,6 +154,7 @@ checks:
     kind: gha
     every: 1h
     describe: The monthly Zenodo publish workflow succeeded on its last run.
+    purpose: This job puts each release on Zenodo; if it fails, the citable copy is missing.
     request: {repo: wikipathways/wikipathways-data-release, workflow: publish_latest_to_zenodo.yml}
     assert:
       - {that: state, eq: active}
@@ -159,6 +167,7 @@ checks:
     every: 1h
     alert_after: 3h
     describe: The last GitHub Pages build of data.wikipathways.org succeeded, so the served index pages match the repository.
+    purpose: If this build fails, the website shows outdated file lists and the reload cannot find new files.
     request: {repo: wikipathways/wikipathways-data-release, workflow: "50540825"}
     assert:
       - {that: completed_conclusion, eq: success, label: "pages-build-deployment succeeded (a failed build leaves stale listings)"}

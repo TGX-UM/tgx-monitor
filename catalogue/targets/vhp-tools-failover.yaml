@@ -16,6 +16,7 @@ checks:
     via: [core]
     alert_after: 5m
     describe: Every tool service has its replica running; most restart only on failure, so a clean exit after a reboot leaves them stopped.
+    purpose: Catches tools that stopped and did not come back, for example after a server restart.
     request:
       check: replicas
       services: [aopsuite, qsprpred, cdkdepict, cplogd, sombie, flame, mct8-docking, oppbk,
@@ -31,6 +32,7 @@ checks:
     every: 15m
     via: [core]
     describe: No tool service failed more than twice in the last day.
+    purpose: A tool that keeps crashing is unusable even when it looks up at times.
     request:
       check: crash_loops
       window: 24h
@@ -48,6 +50,7 @@ checks:
     every: 1d
     via: [core]
     describe: The set of tool services that run images built on one node only does not grow, and no tool image is missing everywhere.
+    purpose: A tool whose program exists on only one server cannot move if that server fails.
     request:
       check: local_images
       services: [aopsuite, qsprpred, cdkdepict, cplogd, sombie, flame, mct8-docking, oppbk,

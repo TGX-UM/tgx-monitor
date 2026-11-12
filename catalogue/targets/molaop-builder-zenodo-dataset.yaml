@@ -16,6 +16,7 @@ checks:
     every: 6h
     timeout: 30s
     describe: The newest Zenodo version holds the three mapping archives and the README; an old deposit shows amber.
+    purpose: People cite and download the curated mappings from Zenodo; a complete, recent copy should be there.
     request: {url: "https://zenodo.org/api/records/20184643/versions/latest", parse_json: true}
     assert:
       - {that: status, eq: 200}

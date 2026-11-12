@@ -17,6 +17,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The endpoint's home page and its query form both load, through public DNS and on each node.
+    purpose: Shows that people can open AOP-DB and run queries on it at all.
     request:
       base: "https://aopdb.rdf.bigcat-bioinformatics.org"
       steps:
@@ -34,6 +35,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the endpoint name, not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning and scripts refuse to connect.
     request: {host: aopdb.rdf.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -47,6 +49,7 @@ checks:
     kind: http
     every: 1d
     describe: Plain http on the endpoint name redirects permanently to https.
+    purpose: Makes old or typed http links still land on the secure site instead of failing.
     request: {url: "http://aopdb.rdf.bigcat-bioinformatics.org/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -57,6 +60,7 @@ checks:
     kind: sparql
     every: 1h
     describe: The store holds exactly the triples of the AOP-DB load, so nothing was lost or half-loaded.
+    purpose: AOP-DB never changes, so any difference in size means data went missing or a load broke.
     request: {endpoint: "https://aopdb.rdf.bigcat-bioinformatics.org/sparql", file: q/aopwiki/aopdb-triple-count.rq}
     assert:
       - {that: status, eq: 200}
@@ -67,6 +71,7 @@ checks:
     kind: sparql
     every: 1d
     describe: Two class sizes in the static load (Key Events and protein interactions) have their known values.
+    purpose: A quick spot check that the contents are still the right data, not just that the server answers.
     request:
       endpoint: "https://aopdb.rdf.bigcat-bioinformatics.org/sparql"
       file: q/aopwiki/aopdb-class-canary.rq

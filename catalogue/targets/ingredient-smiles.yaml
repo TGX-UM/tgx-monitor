@@ -17,6 +17,7 @@ checks:
     kind: http
     every: 15m
     describe: The converter's search page loads.
+    purpose: Shows that people can open the ingredient converter.
     request: {url: "https://ingredient-smiles.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -26,6 +27,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain http is redirected to https on the same name.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://ingredient-smiles.cloud.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -36,6 +38,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of the converter.
     request: {host: ingredient-smiles.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -48,6 +51,7 @@ checks:
     kind: http
     every: 15m
     describe: The health endpoint reports the lookup cache loaded with its full set of ingredients.
+    purpose: The converter looks ingredients up in a list it loads at start; if that list is incomplete, lookups fail.
     request: {url: "https://ingredient-smiles.cloud.vhp4safety.nl/healthz", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -60,6 +64,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: Looking up "mariadistel" returns the milk thistle constituents as CSV, each with a SMILES.
+    purpose: Converts a known ingredient and checks the answer, which is what users come for.
     request:
       steps: [{url: "https://ingredient-smiles.cloud.vhp4safety.nl/download.csv?q=mariadistel"}]
     assert:
@@ -76,6 +81,7 @@ checks:
     every: 5m
     via: [core]
     describe: The swarm runs the converter's one replica.
+    purpose: Shows the converter is actually running.
     request: {check: replicas, services: [ingredient-smiles]}
     assert:
       - {that: checked, eq: 1, label: "the service exists"}

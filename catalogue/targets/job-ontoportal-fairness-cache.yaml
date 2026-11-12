@@ -19,6 +19,7 @@ checks:
     every: 15m
     via: [core]
     describe: The nightly score-cache rebuild ran at its slot and exited cleanly.
+    purpose: ExpoPortal shows FAIRness scores from this nightly job; if it stops, the scores go stale.
     request:
       service: ontoportal_fairness-cache
       grace: 30m
@@ -33,6 +34,7 @@ checks:
     every: 1h
     via: [core]
     describe: The score cache was rewritten in the last 26 hours and is not empty.
+    purpose: Catches the nightly score update producing an empty or old result.
     request: {mount: ontoportal-fairness, glob: "save.json", verify_gzip: false}
     assert:
       - {that: count, eq: 1}
@@ -44,6 +46,7 @@ checks:
     kind: http
     every: 1h
     describe: The FAIRness scores are served from the rebuilt cache, shown here for the AOP Ontology.
+    purpose: Checks that users actually see the updated FAIRness scores.
     # The all-ontologies answer (about 6 MB) is larger than the 4 MiB the HTTP client
     # keeps, so coverage of every ontology cannot be counted from it.
     request: {url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/ofaire?ontologies=AOPO", parse_json: true}

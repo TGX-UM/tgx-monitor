@@ -19,6 +19,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The API catalogue record answers with JSON and lists all ontologies, through public DNS and on each node.
+    purpose: Shows that the ExpoPortal API is up and knows all its ontologies.
     request: {url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -33,6 +34,7 @@ checks:
     kind: security
     every: 1h
     describe: Protected API resources still refuse anonymous callers.
+    purpose: Protected parts of the API must stay closed to people who are not logged in.
     request:
       url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/ontologies"
       expect_status: [401]
@@ -47,6 +49,7 @@ checks:
     timeout: 1m
     public: false
     describe: O'FAIRe computes FAIRness scores for two reference ontologies (AOPO and STY).
+    purpose: Checks that the FAIRness scores ExpoPortal shows for ontologies can still be computed.
     request: {url: "https://data.expoportal.biohackeu.bigcat-bioinformatics.org/ofaire", params: {ontologies: "STY,AOPO"}, parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -61,6 +64,7 @@ checks:
     kind: http
     every: 1h
     describe: The API also answers on the old ontoportal name, which older submissions store in their dump links.
+    purpose: Older ontology submissions still link to this address; those links must keep working.
     request: {url: "https://data.ontoportal.biohackeu.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -70,6 +74,7 @@ checks:
     kind: dns
     every: 1h
     describe: The API name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The API address must point at our servers, or nobody can reach it.
     request: {name: data.expoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}

@@ -20,6 +20,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The Snorql query page loads, through public DNS and on each node.
+    purpose: Shows that people can open the ChEMBL query page.
     request: {url: "https://chemblmirror.rdf.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -31,6 +32,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain HTTP is redirected permanently to HTTPS.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://chemblmirror.rdf.bigcat-bioinformatics.org/", follow: false}
     assert:
       - {that: status, eq: 301}
@@ -42,6 +44,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    purpose: Without a valid certificate, browsers and scripts refuse to connect.
     request: {host: chemblmirror.rdf.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -54,6 +57,7 @@ checks:
     kind: dns
     every: 1h
     describe: The name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The address must point at our servers, or nobody can reach the mirror.
     request: {name: chemblmirror.rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -64,6 +68,7 @@ checks:
     kind: http
     every: 1d
     describe: The endpoint publishes a SPARQL service description that names its public HTTPS address.
+    purpose: Tools read this description to find and use the endpoint.
     request:
       url: "https://chemblmirror.rdf.bigcat-bioinformatics.org/sparql"
       headers: {Accept: text/turtle}
@@ -77,6 +82,7 @@ checks:
     kind: sparql
     every: 15m
     describe: The store answers a known-IRI lookup, CHEMBL25 is aspirin, so it is up and loaded.
+    purpose: A fixed answer that shows the ChEMBL data is loaded, not just that the server answers.
     request:
       endpoint: "https://chemblmirror.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/chembl-aspirin.rq
@@ -92,6 +98,7 @@ checks:
     kind: sparql
     every: 1h
     describe: Aspirin's mechanism of action and its target come back as a known answer.
+    purpose: Asks a known, more involved question to catch partly loaded data.
     request:
       endpoint: "https://chemblmirror.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/chembl-mechanism.rq
@@ -105,6 +112,7 @@ checks:
     kind: sparql
     every: 1h
     describe: Single proteins and documents, two single-class counts, match the loaded release.
+    purpose: Catches parts of the ChEMBL data going missing.
     request:
       endpoint: "https://chemblmirror.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/chembl-classes.rq
@@ -119,6 +127,7 @@ checks:
     every: 6h
     timeout: 1m
     describe: The loaded ChEMBL release is the expected one; an amber note shows while EBI has published newer releases.
+    purpose: Shows which ChEMBL release is loaded and when a newer one is available.
     request:
       endpoint: "https://chemblmirror.rdf.bigcat-bioinformatics.org/sparql"
       left: {sparql: {file: q/rdf-portals-legacy/chembl-version.rq, value: d}, extract: '/chembl/(\d+\.\d+)\.rdf'}
@@ -134,6 +143,7 @@ checks:
     via: [core]
     public: false
     describe: The Virtuoso and Snorql services both run their one replica.
+    purpose: Both the database and the query page must be running.
     request: {check: replicas, services: ["chembl_*"]}
     assert:
       - {that: checked, eq: 2}
@@ -146,6 +156,7 @@ checks:
     via: [core]
     public: false
     describe: Virtuoso has not crashed (segfault, exit 139) or crash-looped in the last day.
+    purpose: This database has crashed before; repeated crashes mean users get errors.
     request: {check: crash_loops, services: ["chembl_*"], window: 24h, threshold: 3}
     assert:
       - {that: crash_looping_count, eq: 0}

@@ -19,6 +19,7 @@ checks:
     kind: http
     every: 1d
     describe: The old AOP-Wiki SNORQL UI still loads (known state).
+    purpose: Tracks the old server's pages so we notice changes while it is being retired.
     request: {url: "https://aopwiki.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -29,6 +30,7 @@ checks:
     kind: http
     every: 1d
     describe: The old AOP-Wiki SPARQL address still answers 502 (known state; the current endpoint is on the cluster).
+    purpose: Tracks the old server's endpoint so we notice changes while it is being retired.
     request: {url: "https://aopwiki.cloud.vhp4safety.nl/sparql"}
     assert:
       - {that: status, eq: 502, label: "known state: backend gone"}
@@ -38,6 +40,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: The old grlc API page loads but its queries fail (known state; old tutorials still link here).
+    purpose: Old tutorials still link here; we track it until those links are redirected.
     request:
       base: "https://aopwiki-api.cloud.vhp4safety.nl"
       steps:
@@ -53,6 +56,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: Three retired app names on the legacy server still answer 502 (known state).
+    purpose: Tracks retired apps on the old server so we notice if they come back.
     request:
       steps:
         - {url: "https://o-qt-oecd.vhp4safety.nl/"}

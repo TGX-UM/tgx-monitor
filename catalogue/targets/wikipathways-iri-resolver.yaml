@@ -22,6 +22,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The resolver reports itself healthy, through Cloudflare and at the origin on each node.
+    purpose: Shows that WikiPathways data links (rdf.wikipathways.org) can be opened.
     request: {url: "https://rdf.wikipathways.org/_health", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -32,6 +33,7 @@ checks:
     kind: http
     every: 1h
     describe: The resolver can reach its SPARQL backend.
+    purpose: The link resolver gets its answers from the SPARQL endpoint; without it, every link fails.
     request: {url: "https://rdf.wikipathways.org/_health?check_sparql=1", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -44,6 +46,7 @@ checks:
     every: 1h
     timeout: 45s
     describe: A current WP254 IRI, looked up through SPARQL, resolves to Turtle, HTML and JSON-LD.
+    purpose: Opens a real data link in each format, the way people and tools use it.
     request:
       steps:
         - url: https://sparql.wikipathways.org/sparql
@@ -75,6 +78,7 @@ checks:
     kind: http
     every: 1h
     describe: An IRI that does not exist gives 404, not a 5xx from a broken backend.
+    purpose: A wrong link should say "not found", not look like a server crash.
     request: {url: "https://rdf.wikipathways.org/Pathway/WP0000_r1/Nope/zzz", headers: {Accept: text/turtle}}
     assert:
       - {that: status, eq: 404}
@@ -84,6 +88,7 @@ checks:
     kind: http
     every: 1h
     describe: The bare host redirects to the WikiPathways RDF documentation page.
+    purpose: People who open the bare address should land on the documentation, not an error.
     request: {url: "https://rdf.wikipathways.org/", follow: false}
     assert:
       - {that: status, eq: 302}
@@ -95,6 +100,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted origin certificate for the resolver's name (it renews behind the Cloudflare proxy, so it is watched).
+    purpose: This certificate renews in a less common way, so we watch it to avoid a sudden outage.
     request: {host: rdf.wikipathways.org}
     assert:
       - {that: verified, eq: true}

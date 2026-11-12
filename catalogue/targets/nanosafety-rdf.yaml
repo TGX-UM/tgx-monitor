@@ -20,6 +20,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The Snorql query page loads, through public DNS and on each node.
+    purpose: Shows that people can open the NanoSafety query page.
     request: {url: "https://nanosafety.rdf.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -31,6 +32,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain HTTP is redirected permanently to HTTPS.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://nanosafety.rdf.bigcat-bioinformatics.org/", follow: false}
     assert:
       - {that: status, eq: 301}
@@ -42,6 +44,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    purpose: Without a valid certificate, browsers and scripts refuse to connect.
     request: {host: nanosafety.rdf.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -54,6 +57,7 @@ checks:
     kind: dns
     every: 1h
     describe: The name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The address must point at our servers, or nobody can reach it.
     request: {name: nanosafety.rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -64,6 +68,7 @@ checks:
     kind: http
     every: 1d
     describe: The endpoint publishes a SPARQL service description that names its public HTTPS address.
+    purpose: Tools read this description to find and use the endpoint.
     request:
       url: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"
       headers: {Accept: text/turtle}
@@ -78,6 +83,7 @@ checks:
     every: 15m
     timeout: 30s
     describe: The NanoSafety graph holds exactly the triples of the last load, so the store behind the UI is up and complete.
+    purpose: The data never changes, so any difference in size means data was lost or the database is down.
     request:
       endpoint: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/nanosafety-triples.rq
@@ -90,6 +96,7 @@ checks:
     kind: sparql
     every: 1h
     describe: Ontology classes, assays and nanomaterials are all present in the expected numbers.
+    purpose: Catches parts of the NanoSafety data going missing.
     request:
       endpoint: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/nanosafety-classes.rq
@@ -104,6 +111,7 @@ checks:
     kind: sparql
     every: 1h
     describe: Three example queries from the RiskGONE query set return the answers the UI release was verified with.
+    purpose: Runs published example queries with known answers, to catch wrong or missing data.
     request:
       endpoint: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/nanosafety-riskgone.rq
@@ -117,6 +125,7 @@ checks:
     kind: http
     every: 1h
     describe: The query UI is wired to the public endpoint and the NanoSafety graph.
+    purpose: An update can reset the query page's settings, leaving it pointed at the wrong data.
     request: {url: "https://nanosafety.rdf.bigcat-bioinformatics.org/assets/js/config.js"}
     assert:
       - {that: status, eq: 200}
@@ -130,6 +139,7 @@ checks:
     via: [core]
     public: false
     describe: The Virtuoso and Snorql services both run their one replica.
+    purpose: Both the database and the query page must be running.
     request: {check: replicas, services: ["nanosafety_*"]}
     assert:
       - {that: checked, eq: 2}

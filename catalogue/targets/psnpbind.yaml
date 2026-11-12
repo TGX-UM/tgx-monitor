@@ -20,6 +20,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The PSnpBind home page loads on the department name, through public DNS and on each node.
+    purpose: Shows that people can open PSnpBind.
     request: {url: "https://psnpbind.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -31,6 +32,7 @@ checks:
     kind: http
     every: 15m
     describe: The same page loads on its own domain, psnpbind.org.
+    purpose: Many people use the psnpbind.org address; it must show the same site.
     request: {url: "https://psnpbind.org/"}
     assert:
       - {that: status, eq: 200}
@@ -42,6 +44,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the department name, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of PSnpBind.
     request: {host: psnpbind.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -56,6 +59,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for psnpbind.org, with time to spare.
+    purpose: Without a valid certificate on psnpbind.org, browsers show a security warning there.
     request: {host: psnpbind.org}
     assert:
       - {that: verified, eq: true}
@@ -69,6 +73,7 @@ checks:
     kind: dns
     every: 1h
     describe: The department name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The address must point at our servers, or nobody can reach PSnpBind.
     request: {name: psnpbind.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -80,6 +85,7 @@ checks:
     every: 1h
     timeout: 1m
     describe: The REST API reports the full number of proteins, ligands, mutated proteins and their ligand pairs.
+    purpose: Catches proteins, ligands or docking pairs going missing from PSnpBind.
     request:
       base: "https://psnpbind.bigcat-bioinformatics.org"
       steps:
@@ -99,6 +105,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: A known protein (1OWH, urokinase) comes back from the API and its web page renders.
+    purpose: Opens a known protein the way a user would, through the API and the web page.
     request:
       base: "https://psnpbind.bigcat-bioinformatics.org"
       steps:
@@ -115,6 +122,7 @@ checks:
     kind: http
     every: 1h
     describe: A known docking result file is served whole, so the docking-files volume is mounted.
+    purpose: Users download docking results; this checks the files are there and complete.
     request: {url: "https://psnpbind.bigcat-bioinformatics.org/files/1owh/proteins/1owh_protein_Repair_20/vina/1c5z_ligand_similar_11/1c5z_ligand_similar_11_min_docking.pdbqt"}
     assert:
       - {that: status, eq: 200}
@@ -125,6 +133,7 @@ checks:
     kind: tls
     every: 1d
     describe: www.psnpbind.org serves a trusted certificate for its name, not the proxy's default one.
+    purpose: People typing www.psnpbind.org should not get a security warning.
     request: {host: www.psnpbind.org}
     assert:
       - {that: is_traefik_default, eq: false}
@@ -135,6 +144,7 @@ checks:
     kind: compare
     every: 1d
     describe: The psnpbind.org registration does not run out within the next two months.
+    purpose: If the registration lapses, psnpbind.org goes offline and someone else could buy the name.
     request:
       left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/psnpbind.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
       right: {const: "registration"}
@@ -149,6 +159,7 @@ checks:
     via: [core]
     public: false
     describe: The web app and its database both run their one replica.
+    purpose: Both the web app and its database must be running.
     request: {check: replicas, services: ["psnpbind_*"]}
     assert:
       - {that: checked, eq: 2}

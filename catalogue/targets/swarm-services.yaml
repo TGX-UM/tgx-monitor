@@ -21,6 +21,7 @@ checks:
     via: [core]
     alert_after: 5m
     describe: Every long-running service that has no target of its own runs all its replicas.
+    purpose: Catches any service on the cluster that is not running, even ones without their own checks.
     request:
       check: replicas
       ignore: &covered
@@ -65,6 +66,7 @@ checks:
     every: 5m
     via: [core]
     describe: No service without a target of its own failed three or more times in the last hour.
+    purpose: Catches a service that keeps crashing and restarting, which users notice as on-and-off outages.
     request:
       check: crash_loops
       window: 1h
@@ -80,6 +82,7 @@ checks:
     via: [core]
     severity: low
     describe: Shows any task on the whole cluster killed by the kernel (out of memory) or by a segfault in the last day.
+    purpose: Shows services killed for using too much memory, a sign a service needs more room or has a leak.
     request: {check: crash_loops, window: 24h, threshold: 3, ignore: [toxtempass_minio_init]}
     assert:
       - {that: killed_count, eq: 0, warn: true, label: "no exit 137 or 139 in 24 h"}
@@ -92,6 +95,7 @@ checks:
     via: [core]
     severity: low
     describe: The number of long-running services that stay down after a clean exit (restart only on failure) does not grow.
+    purpose: Services that don't restart after a clean stop stay down until someone notices; this keeps that number from growing.
     request: {check: restart_policy, ignore: [toxtempass_minio_init]}
     assert:
       - {that: not_any_count, lte: 48, warn: true, label: "no more than the 2026-11-10 count (about 45) restart only on failure"}
@@ -103,6 +107,7 @@ checks:
     via: [core]
     severity: low
     describe: The cluster's service registry and the services' owner labels agree with what actually runs.
+    purpose: The cluster documentation should describe what really runs, so people fixing things are not misled.
     request:
       mount: docs
       aliases: {toxtempassistant: toxtempass}

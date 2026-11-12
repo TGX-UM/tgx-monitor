@@ -14,6 +14,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The ArrayAnalysis page loads in full, through public DNS and on each node.
+    purpose: Shows that people can open ArrayAnalysis.
     request: {url: "https://arrayanalysis.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -26,6 +27,7 @@ checks:
     kind: shiny
     every: 30m
     describe: A Shiny session opens over a websocket.
+    purpose: The app only works if this live connection opens; without it the page loads but does nothing.
     request: {url: "https://arrayanalysis.vhp4safety.nl/"}
     assert:
       - {that: page_has_shiny, eq: true}
@@ -39,6 +41,7 @@ checks:
     every: 1h
     via: [core]
     describe: In a real browser the app connects and binds its inputs and outputs without errors.
+    purpose: Opens the app in a real browser, the way a user does, to catch problems a simple page load misses.
     request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser/latest.json", page: arrayanalysis}
     assert:
       - {that: page_found, eq: true}
@@ -51,6 +54,7 @@ checks:
     every: 7d
     severity: low
     describe: The deployed release (recorded here) is the newest one published upstream.
+    purpose: Shows when a newer ArrayAnalysis release is available to install.
     request:
       left:
         http_list: {url: "https://hub.docker.com/v2/repositories/arrayanalysis/arrayanalysis_shiny/tags?page_size=10", re: '"name":\s*"(\d+\.\d+\.\d+)"', pick: newest}

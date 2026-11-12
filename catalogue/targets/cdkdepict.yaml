@@ -14,6 +14,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The front page ends on the depiction form over HTTPS, through public DNS and on each node.
+    purpose: Shows that people can open CDK Depict.
     request: {url: "https://cdkdepict.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -28,6 +29,7 @@ checks:
     kind: http
     every: 15m
     describe: Ethanol is drawn as a small, well-formed SVG image within three seconds.
+    purpose: Drawing a molecule is the main job of CDK Depict, and other tools rely on it.
     request:
       url: "https://cdkdepict.cloud.vhp4safety.nl/depict/bow/svg"
       params: {smi: CCO, abbr: "on", hdisp: bridgehead, showtitle: "false", zoom: "1.6"}
@@ -46,6 +48,7 @@ checks:
     kind: http
     every: 1h
     describe: Phenol is drawn as a PNG image.
+    purpose: Some tools ask for PNG pictures instead of SVG; those must work too.
     request:
       url: "https://cdkdepict.cloud.vhp4safety.nl/depict/bow/png"
       params: {smi: c1ccccc1O}
@@ -60,6 +63,7 @@ checks:
     kind: http
     every: 1h
     describe: A broken SMILES gets the parser's own error message, so the parser is alive and not hidden behind a generic error page.
+    purpose: A bad input should get a helpful message, which also shows the chemistry part is running.
     request:
       url: "https://cdkdepict.cloud.vhp4safety.nl/depict/bow/svg"
       params: {smi: C1CC}
@@ -73,6 +77,7 @@ checks:
     every: 7d
     severity: low
     describe: The deployed CDK version is the one recorded here, and an upstream image push is flagged for review.
+    purpose: Shows when CDK Depict changed version, which can change how molecules are drawn.
     request:
       left: {http_regex: {url: "https://cdkdepict.cloud.vhp4safety.nl/depict.html", re: 'CDK (v\d+(?:\.\d+)+)'}}
       right: {const: v2.12}

@@ -18,6 +18,7 @@ checks:
     every: 15m
     timeout: 20s
     describe: The endpoint answers a fixed question (Douglas Adams is a human) within a few seconds.
+    purpose: Some of our tools get data from Wikidata; when it is down, those tools fail through no fault of ours.
     request: {endpoint: "https://query.wikidata.org/sparql", ask: "ASK { <http://www.wikidata.org/entity/Q42> <http://www.wikidata.org/prop/direct/P31> <http://www.wikidata.org/entity/Q5> }"}
     assert:
       - {that: status, eq: 200}

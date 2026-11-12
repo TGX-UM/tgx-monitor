@@ -14,6 +14,7 @@ checks:
     kind: gha
     every: 1h
     describe: The daily live-trends workflow succeeded within the past two days.
+    purpose: This daily job tests the dashboard's plots against live data; if it stops, problems go unnoticed.
     request: {repo: marvinm2/AOP-Wiki-RDF-dashboard, workflow: live-trends.yml}
     assert:
       - {that: state, eq: active}
@@ -25,6 +26,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekly database canary workflow succeeded within the past eight days.
+    purpose: This weekly job catches database errors that would make dashboard numbers wrong.
     request: {repo: marvinm2/AOP-Wiki-RDF-dashboard, workflow: virtuoso-canary.yml}
     assert:
       - {that: state, eq: active}
@@ -36,6 +38,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekday methodology lint of every plot query succeeded within the past four days.
+    purpose: Checks that every plot's query still runs and gives sensible numbers, so the plots stay trustworthy.
     request: {repo: marvinm2/AOP-Wiki-RDF-dashboard, workflow: methodology-lint.yml}
     assert:
       - {that: state, eq: active}
@@ -47,6 +50,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekly download audit succeeded within the past eight days.
+    purpose: Makes sure the data files users can download from the dashboard are complete and correct.
     request: {repo: marvinm2/AOP-Wiki-RDF-dashboard, workflow: download-audit.yml, event: schedule}
     assert:
       - {that: state, eq: active}

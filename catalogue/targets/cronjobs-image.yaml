@@ -14,6 +14,7 @@ checks:
     kind: gha
     every: 1h
     describe: The last build of the job image succeeded.
+    purpose: The cluster's reload jobs run from this build; if it breaks, fixes to those jobs cannot be shipped.
     request: {repo: TGX-UM/cronjobs, workflow: docker-publish.yml}
     assert:
       - {that: state, eq: active}

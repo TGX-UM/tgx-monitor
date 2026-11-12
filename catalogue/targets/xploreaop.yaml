@@ -13,6 +13,7 @@ checks:
     kind: http
     every: 15m
     describe: The explorer page loads.
+    purpose: Shows that people can open xploreAOP.
     request: {url: "https://xploreaop.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -23,6 +24,7 @@ checks:
     kind: shiny
     every: 30m
     describe: A Shiny session opens over a websocket.
+    purpose: The app only works if this live connection opens; without it the page loads but does nothing.
     request: {url: "https://xploreaop.cloud.vhp4safety.nl/"}
     assert:
       - {that: page_has_shiny, eq: true}
@@ -36,6 +38,7 @@ checks:
     every: 1h
     via: [core]
     describe: In a real browser the chemical network is drawn and every output fills without errors.
+    purpose: Opens the app in a real browser, the way a user does, to catch problems a simple page load misses.
     request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser/latest.json", page: xploreaop}
     assert:
       - {that: page_found, eq: true}
@@ -49,6 +52,7 @@ checks:
     via: [core]
     public: false
     describe: The locally built image is still on the node the service is pinned to.
+    purpose: xploreAOP can only run on one server; if its program disappears there, it cannot start at all.
     request: {check: local_images, services: [xploreaop]}
     assert:
       - {that: by.xploreaop, has: tgx1}

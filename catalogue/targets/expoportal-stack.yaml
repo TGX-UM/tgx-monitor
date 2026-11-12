@@ -18,6 +18,7 @@ checks:
     every: 5m
     via: [core]
     describe: Every long-running service of the ExpoPortal stack runs its desired replicas.
+    purpose: ExpoPortal needs all its parts running; one missing part can break pages in confusing ways.
     request: {check: replicas, services: ["ontoportal_*"]}
     assert:
       - {that: checked, gte: 12}
@@ -30,6 +31,7 @@ checks:
     via: [core]
     severity: low
     describe: The images behind the moving `master` tag have not changed under a running service.
+    purpose: Shows when ExpoPortal's parts changed version without a deliberate update.
     request: {services: [ontoportal_api, ontoportal_ui, ontoportal_ncbo_cron]}
     assert:
       - {that: changed_count, eq: 0, warn: true, label: "no silent image change (re-run the branding and security canaries if there was)"}
@@ -41,6 +43,7 @@ checks:
     via: [core]
     timeout: 2m
     describe: A fresh, non-empty backup of the ExpoPortal database, repository and Redis data exists.
+    purpose: Without recent backups, ExpoPortal's ontologies and settings could be lost.
     request: {mount: ontoportal-backups, glob: "*/*.gz", recursive: true, small_bytes: 1000}
     assert:
       - {that: count, gte: 1, label: a backup exists}

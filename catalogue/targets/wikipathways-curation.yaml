@@ -18,6 +18,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The portal reports itself healthy and sends HSTS, through public DNS and on each node.
+    purpose: Shows that curators can reach the Curation Portal.
     request: {url: "https://curation.wikipathways.org/health", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -30,6 +31,7 @@ checks:
     every: 1h
     via: [public, tgx1, tgx2]
     describe: The upload.wikipathways.org alias reaches the same portal on each node.
+    purpose: The upload address is also used to submit pathways, so it must reach the portal too.
     request: {url: "https://upload.wikipathways.org/health", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -40,6 +42,7 @@ checks:
     kind: http
     every: 15m
     describe: The published-reviews list comes back from the database with its expected fields.
+    purpose: Catches the portal losing its connection to its database, which holds all the reviews.
     request: {url: "https://curation.wikipathways.org/api/reviews?status=published", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -55,6 +58,7 @@ checks:
     kind: http
     every: 1h
     describe: Login sends the browser to GitHub with the portal's callback and the expected scopes (the redirect is not followed).
+    purpose: Curators sign in with GitHub; this catches login being misconfigured.
     request: {url: "https://curation.wikipathways.org/auth/login", follow: false}
     assert:
       - {that: status, eq: 302}
@@ -67,6 +71,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: The curation queue page renders and an anonymous visitor is reported as not signed in.
+    purpose: Shows that the review queue opens, which is the main page curators use.
     request:
       base: https://curation.wikipathways.org
       steps:
@@ -85,6 +90,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for curation.wikipathways.org, with time to spare.
+    purpose: Without a valid certificate, curators get a security warning instead of the portal.
     request: {host: curation.wikipathways.org}
     assert:
       - {that: verified, eq: true}
@@ -99,6 +105,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for upload.wikipathways.org; amber when a node still serves the older upload-only certificate.
+    purpose: Without a valid certificate on the upload address, submissions through it fail with a warning.
     request: {host: upload.wikipathways.org}
     assert:
       - {that: verified, eq: true}
@@ -113,6 +120,7 @@ checks:
     kind: http
     every: 1h
     describe: The sandbox site the portal publishes to serves a pathway page.
+    purpose: The portal publishes previews to this sandbox site; this checks it is still up.
     request: {url: "https://sandbox.wikipathways.org/pathways/WP5428.html"}
     assert:
       - {that: status, eq: 200}
@@ -123,6 +131,7 @@ checks:
     kind: gha
     every: 1h
     describe: No workflow of the sandbox site has been disabled by GitHub for inactivity.
+    purpose: GitHub switches off quiet workflows, which would stop the sandbox site from updating.
     request: {repo: wikipathways/sandbox-wp.gh.io}
     assert:
       - {that: inactive, len_eq: 0}
@@ -132,6 +141,7 @@ checks:
     kind: gha
     every: 1h
     describe: The sandbox site's monthly keep-alive workflow ran successfully within the last five weeks.
+    purpose: This monthly job keeps GitHub from switching the sandbox workflows off.
     request: {repo: wikipathways/sandbox-wp.gh.io, workflow: keep_alive.yml}
     assert:
       - {that: state, eq: active}

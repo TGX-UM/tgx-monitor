@@ -14,6 +14,7 @@ checks:
     kind: gha
     every: 1h
     describe: No workflow has been switched off by GitHub for inactivity; only the retired classic-site sync is disabled.
+    purpose: GitHub switches off quiet workflows, which would silently stop pathway edits from reaching the website.
     request: {repo: wikipathways/wikipathways-database}
     assert:
       - {that: inactive, len_eq: 0, label: "no workflow disabled for inactivity"}
@@ -24,6 +25,7 @@ checks:
     kind: gha
     every: 1h
     describe: The last run of the pipeline that publishes edited pathways succeeded.
+    purpose: This job turns each pathway edit into the website pages; if it fails, edits don't show up.
     request: {repo: wikipathways/wikipathways-database, workflow: on_gpml_change.yml}
     assert:
       - {that: state, eq: active}
@@ -34,6 +36,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekly cache of identifier mappings and metadata succeeded within the past eight days.
+    purpose: Keeps the gene and metabolite links on pathway pages up to date.
     request: {repo: wikipathways/wikipathways-database, workflow: scheduled_bridge_cache.yml}
     assert:
       - {that: state, eq: active}
@@ -45,6 +48,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekly fetch of pathway citations succeeded within the past eight days.
+    purpose: Keeps the "cited in" lists on pathway pages up to date.
     request: {repo: wikipathways/wikipathways-database, workflow: scheduled_citedin_update.yml}
     assert:
       - {that: state, eq: active}
@@ -57,6 +61,7 @@ checks:
     every: 1h
     severity: low
     describe: The workflow that checks contributed pull requests passed on its last run; amber when it failed, for the owners to judge.
+    purpose: Checks contributed pathway changes before they are merged; a failure may be the contribution or the check itself.
     request: {repo: wikipathways/wikipathways-database, workflow: 1_on_pull_request.yml}
     assert:
       - {that: state, eq: active}

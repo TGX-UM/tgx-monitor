@@ -19,6 +19,7 @@ checks:
     every: 5m
     via: [tgx1]
     describe: The proxy on tgx1 answers HTTPS for a routed name within a few seconds.
+    purpose: All websites go through this web proxy on tgx1; if it fails, every site is down.
     request: {url: "https://platform.vhp4safety.nl/", follow: false, verify: false}
     assert:
       - {that: status, exists: true, label: "the proxy answered"}
@@ -33,6 +34,7 @@ checks:
     every: 15m
     via: [tgx1]
     describe: Plain HTTP on tgx1 is redirected permanently to HTTPS on the same name.
+    purpose: Makes old or typed http links still reach the secure sites.
     request: {url: "http://platform.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -44,6 +46,7 @@ checks:
     every: 1h
     via: [tgx1]
     describe: The proxy's admin dashboard on tgx1 asks for a password and shows nothing without one.
+    purpose: The proxy's admin page shows how all sites are set up; it must not be open to the public.
     timeout: 10s
     request: {url: "http://{node_ip}:8080/dashboard/", expect_status: [401]}
     assert:

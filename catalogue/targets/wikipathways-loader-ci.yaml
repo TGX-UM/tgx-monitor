@@ -18,6 +18,7 @@ checks:
     kind: gha
     every: 1h
     describe: The three-hourly check that the endpoint answers and serves the current release passed on its last run.
+    purpose: This outside check tells the WikiPathways team when the endpoint is down or behind; it should itself keep running.
     request: {repo: wikipathways/WikiPathwaysLoader, workflow: check-endpoint.yml}
     assert:
       - {that: state, eq: active}
@@ -29,6 +30,7 @@ checks:
     kind: gha
     every: 1h
     describe: The monthly rebuild of the ontology import files (run on the 10th, before the reload) succeeded within the past five weeks.
+    purpose: Prepares the ontology files for each monthly reload; if it fails, the reload uses old files.
     request: {repo: wikipathways/WikiPathwaysLoader, workflow: build-imports.yml}
     assert:
       - {that: state, eq: active}
@@ -41,6 +43,7 @@ checks:
     every: 1h
     severity: low
     describe: The monthly collection of WikiPathways counts succeeded within the past five weeks.
+    purpose: Collects the monthly WikiPathways statistics; if it fails, the numbers stop updating.
     request: {repo: wikipathways/WikiPathwaysLoader, workflow: collect-counts.yml}
     assert:
       - {that: state, eq: active}

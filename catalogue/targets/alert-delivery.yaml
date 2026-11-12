@@ -20,6 +20,7 @@ checks:
     every: 5m
     via: [core]
     describe: No alert was given up on because a channel kept refusing it.
+    purpose: Catches alerts that could not be delivered, so nobody was told about a problem.
     request: {signal: outbox}
     assert:
       - {that: dead_letters, eq: 0}
@@ -31,6 +32,7 @@ checks:
     every: 1h
     via: [core]
     describe: The GitHub App the monitor opens issues with gets an installation token and has plenty of API calls left this hour.
+    purpose: The monitor opens GitHub issues for alerts; this checks it is still allowed to.
     request: {signal: token, secret: app}
     assert:
       - {that: valid, eq: true}

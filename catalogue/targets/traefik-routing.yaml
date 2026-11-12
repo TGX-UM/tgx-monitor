@@ -22,6 +22,7 @@ checks:
     every: 5m
     via: [core]
     describe: The proxy runs on both nodes.
+    purpose: The web proxy must run on both servers so the sites can move if one fails.
     request: {check: replicas, services: [traefik]}
     assert:
       - {that: by.traefik.running, eq: 2, label: "two proxy tasks running"}
@@ -32,6 +33,7 @@ checks:
     kind: compare
     every: 15m
     describe: Both nodes route the WikiPathways endpoint to a store serving the same release.
+    purpose: Users should get the same WikiPathways data whichever server answers.
     request:
       endpoint: "https://sparql.wikipathways.org/sparql"
       left: {sparql: {file: q/ops-infra/wp-release-dataset.rq, value: d}, via: tgx1, extract: '(\d{8})'}
@@ -45,6 +47,7 @@ checks:
     kind: compare
     every: 1h
     describe: Both nodes serve the same WikiPathways VoID description (same modification date and size).
+    purpose: Both servers should describe the WikiPathways data the same way.
     request:
       left: {http_regex: {url: "https://sparql.wikipathways.org/.well-known/void", re: 'dcterms:modified\s+"([^"]+)"'}, via: tgx1}
       right: {http_regex: {url: "https://sparql.wikipathways.org/.well-known/void", re: 'dcterms:modified\s+"([^"]+)"'}, via: tgx2}
@@ -61,6 +64,7 @@ checks:
     kind: compare
     every: 1h
     describe: Both nodes serve the same AOP-Wiki RDF service description (same modification date and size).
+    purpose: Both servers should describe the AOP-Wiki endpoint the same way.
     request:
       left: {http_regex: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", re: 'dcterms:modified\s+"([^"]+)"', headers: {Accept: text/turtle}}, via: tgx1}
       right: {http_regex: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", re: 'dcterms:modified\s+"([^"]+)"', headers: {Accept: text/turtle}}, via: tgx2}

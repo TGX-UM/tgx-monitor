@@ -17,6 +17,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The prediction form loads through public DNS and on each node.
+    purpose: Shows that people can open the qAOP prediction form.
     request: {url: "https://qaop.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -28,6 +29,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain http is redirected to https on the same name.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://qaop.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -38,6 +40,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of qAOP.
     request: {host: qaop.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -50,6 +53,7 @@ checks:
     kind: http
     every: 5m
     describe: The health endpoint reports both models and all their parameter sets loaded.
+    purpose: Predictions need all models loaded; this catches a model that failed to load.
     request: {url: "https://qaop.vhp4safety.nl/api/health", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -66,6 +70,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: An in vitro prediction at 1 and 100 µM cisplatin gives DNA damage and necrosis in the known ranges.
+    purpose: Runs a real prediction and checks the result is in the known range, to catch wrong answers.
     request:
       base: https://qaop.vhp4safety.nl
       steps:
@@ -90,6 +95,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: The model list and the in vitro parameter ranges have their documented shape.
+    purpose: Clients rely on this list's format; a change could break them.
     request:
       base: https://qaop.vhp4safety.nl
       steps:

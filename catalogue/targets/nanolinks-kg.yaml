@@ -20,6 +20,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The Snorql query page loads, through public DNS and on each node.
+    purpose: Shows that people can open the NanoLinks query page.
     request: {url: "https://nanolinks.rdf.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -31,6 +32,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain HTTP is redirected permanently to HTTPS.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://nanolinks.rdf.bigcat-bioinformatics.org/", follow: false}
     assert:
       - {that: status, eq: 301}
@@ -42,6 +44,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    purpose: Without a valid certificate, browsers and scripts refuse to connect.
     request: {host: nanolinks.rdf.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -54,6 +57,7 @@ checks:
     kind: dns
     every: 1h
     describe: The name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The address must point at our servers, or nobody can reach NanoLinks.
     request: {name: nanolinks.rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -64,6 +68,7 @@ checks:
     kind: http
     every: 1h
     describe: The query UI is wired to the public endpoint and the NanoLinks example queries.
+    purpose: An update can reset the query page's settings, leaving it pointed at the wrong data or without examples.
     request: {url: "https://nanolinks.rdf.bigcat-bioinformatics.org/assets/js/snorql.js"}
     assert:
       - {that: status, eq: 200}
@@ -74,6 +79,7 @@ checks:
     kind: http
     every: 1d
     describe: The endpoint publishes a SPARQL service description that names its public HTTPS address.
+    purpose: Tools read this description to find and use the endpoint.
     request:
       url: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
       headers: {Accept: text/turtle}
@@ -87,6 +93,7 @@ checks:
     kind: invariant
     every: 1h
     describe: The live size of the NanoLinks graph equals the size its own VoID description declares.
+    purpose: The data should match its own published description; a difference means data was lost.
     request:
       endpoint: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
       left: q/rdf-portals-legacy/nanolinks-triples.rq
@@ -101,6 +108,7 @@ checks:
     every: 1d
     public: false
     describe: The VoID description advertises the public HTTPS endpoint, not the old host.
+    purpose: The data's description should point people to the current address, not an old one.
     request:
       endpoint: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/nanolinks-void-endpoint.rq
@@ -112,6 +120,7 @@ checks:
     kind: sparql
     every: 1h
     describe: The four named graphs (NanoLinks, BAO, eNanoMapper, NPO) hold the triples of the one-off load.
+    purpose: Catches parts of the NanoLinks data going missing.
     request:
       endpoint: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/nanolinks-graphs.rq
@@ -127,6 +136,7 @@ checks:
     kind: sparql
     every: 1h
     describe: The published "materials per dataset" statistics query returns its known answer for all five datasets.
+    purpose: Runs a published query with a known answer, to catch wrong or missing data.
     request:
       endpoint: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/nanolinks-materials.rq
@@ -146,6 +156,7 @@ checks:
     via: [core]
     public: false
     describe: The Virtuoso and Snorql services both run their one replica (a completed task is never rescheduled under restart on-failure).
+    purpose: Both the database and the query page must be running.
     request: {check: replicas, services: ["nanolinks_*"]}
     assert:
       - {that: checked, eq: 2}

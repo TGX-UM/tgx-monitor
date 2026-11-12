@@ -18,6 +18,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The endpoint answers a trivial query within five seconds, through public DNS and on each node.
+    purpose: Shows that the main AOP-Wiki RDF endpoint is up and answering queries.
     request: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", ask: "ASK { ?s ?p ?o }"}
     assert:
       - {that: status, eq: 200}
@@ -30,6 +31,7 @@ checks:
     kind: sparql
     every: 15m
     describe: The same endpoint also answers under its VHP4Safety name.
+    purpose: Many tools use the VHP4Safety address for this endpoint; it must keep answering too.
     request: {endpoint: "https://aopwiki-rdf.vhp4safety.nl/sparql", ask: "ASK { ?s ?p ?o }"}
     assert:
       - {that: status, eq: 200}
@@ -41,6 +43,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the endpoint name that covers both of its names and is not close to expiry.
+    purpose: Without a valid certificate, browsers and scripts refuse to connect to the endpoint.
     request: {host: aopwiki.rdf.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -55,6 +58,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the VHP4Safety name of the endpoint, not close to expiry.
+    purpose: The VHP4Safety address needs its own valid certificate, or tools using it fail to connect.
     request: {host: aopwiki-rdf.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -68,6 +72,7 @@ checks:
     kind: http
     every: 1d
     describe: Plain http on the endpoint name redirects permanently to https.
+    purpose: Makes old or typed http links still reach the secure endpoint.
     request: {url: "http://aopwiki.rdf.bigcat-bioinformatics.org/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -78,6 +83,7 @@ checks:
     kind: sparql
     every: 1h
     describe: The data, VoID and service-description graphs all hold triples, and the data graph did not shrink (an empty store answers 200 too).
+    purpose: An empty database still answers normally, so we check it actually holds data; this once went unnoticed for two days.
     request:
       endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
       file: q/aopwiki/graph-sizes.rq
@@ -94,6 +100,7 @@ checks:
     every: 1h
     alert_after: 24h
     describe: The release loaded in the endpoint is the one on the generator's master branch, and it and the served service description are less than eight days old.
+    purpose: Makes sure the Sunday reload actually brought in this week's AOP-Wiki data.
     request:
       endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
       left: {sparql: {file: q/aopwiki/pav-version.rq, value: v}}
@@ -115,6 +122,7 @@ checks:
     every: 6h
     timeout: 60s
     describe: Every subject the generator described in VoID was loaded, so no load was partial.
+    purpose: Catches a reload that only partly loaded the data, which would give incomplete answers.
     request:
       endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
       left: q/aopwiki/distinct-subjects.rq
@@ -128,6 +136,7 @@ checks:
     kind: sparql
     every: 1h
     describe: AOPs, Key Events, KERs, stressors and chemicals are all present and did not shrink.
+    purpose: Catches AOPs, key events or chemicals going missing after a reload.
     request:
       endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
       file: q/aopwiki/entity-counts.rq
@@ -147,6 +156,7 @@ checks:
     kind: sparql
     every: 1h
     describe: AOP 1 still carries its known title, a fixed answer.
+    purpose: A fixed answer that should never change; if it does, the data or the server is broken.
     request: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/aopwiki/canary-aop1-title.rq}
     assert:
       - {that: boolean, eq: true}
@@ -156,6 +166,7 @@ checks:
     kind: sparql
     every: 1h
     describe: Every ChEBI cross-reference uses the identifiers.org form that WikiPathways federation relies on.
+    purpose: Links between AOP-Wiki and WikiPathways only work if chemical identifiers keep this exact form.
     request: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/aopwiki/canary-chebi-iri.rq}
     assert:
       - {that: first.good, eq_path: first.all, label: "all ChEBI IRIs in identifiers.org CHEBI: form"}
@@ -166,6 +177,7 @@ checks:
     kind: sparql
     every: 6h
     describe: Gene cross-references written through BridgeDb (HGNC, Ensembl, UniProt, NCBI Gene) are all there in normal numbers.
+    purpose: Gene links to other databases come from BridgeDb; this catches a weekly build where that mapping failed.
     request:
       endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
       file: q/aopwiki/bridgedb-xrefs.rq
@@ -181,6 +193,7 @@ checks:
     kind: security
     every: 1h
     describe: The database admin interface is not reachable from the internet under either name.
+    purpose: The admin interface must never be public, because it controls the whole database.
     request:
       url: "https://aopwiki.rdf.bigcat-bioinformatics.org/conductor/"
       expect_status: [403, 404]

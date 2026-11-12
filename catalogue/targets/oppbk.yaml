@@ -15,6 +15,7 @@ checks:
     via: [public, tgx1, tgx2]
     timeout: 30s
     describe: The model page loads with the pinned Shiny version, through public DNS and on each node.
+    purpose: Shows that people can open the OPPBK model.
     request: {url: "https://oppbk.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -28,6 +29,7 @@ checks:
     kind: shiny
     every: 30m
     describe: A Shiny session opens over a websocket, so the model is usable and not only the page.
+    purpose: The model only works if this live connection opens; without it the page loads but does nothing.
     request: {url: "https://oppbk.cloud.vhp4safety.nl/"}
     assert:
       - {that: page_has_shiny, eq: true}
@@ -41,6 +43,7 @@ checks:
     every: 1h
     via: [core]
     describe: In a real browser the model connects and draws its inputs and outputs without errors.
+    purpose: Opens the model in a real browser, the way a user does, to catch problems a simple page load misses.
     request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser/latest.json", page: oppbk}
     assert:
       - {that: page_found, eq: true}
@@ -53,6 +56,7 @@ checks:
     every: 1d
     via: [core]
     describe: The private image can still be pulled with the read credential, which a reschedule needs.
+    purpose: The app's program is private; if the server fails, the other one must still be able to download it.
     request: {image: "ghcr.io/vhp4safety/oppbk:latest"}
     assert:
       - {that: reachable, eq: true}

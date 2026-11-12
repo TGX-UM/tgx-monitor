@@ -14,6 +14,7 @@ checks:
     kind: http
     every: 1d
     describe: The nightly AOP-Wiki XML export is downloadable and full size.
+    purpose: Our RDF is built from this AOP-Wiki export; if it is missing or cut short, the weekly build fails.
     request: {url: "https://aopwiki.org/downloads/aop-wiki-xml.gz", method: HEAD}
     assert:
       - {that: status, eq: 200}
@@ -25,6 +26,7 @@ checks:
     kind: compare
     every: 1d
     describe: The downloads page lists a quarterly export from the current or the previous quarter.
+    purpose: Shows that AOP-Wiki is still publishing quarterly releases for the trend data.
     request:
       left: {http_list: {url: "https://aopwiki.org/downloads", re: 'aop-wiki-xml-(\d{4}-\d{2}-\d{2})\.gz', pick: newest}}
       right: {const: quarterly}
@@ -36,6 +38,7 @@ checks:
     kind: roundtrip
     every: 7d
     describe: The newest quarterly export on the downloads page is downloadable and full size.
+    purpose: The newest quarterly release must actually be downloadable, or it cannot be added to the trends.
     request:
       base: "https://aopwiki.org"
       steps:

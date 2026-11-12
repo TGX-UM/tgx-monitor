@@ -19,6 +19,7 @@ checks:
     every: 15m
     via: [core]
     describe: The nightly backup ran at its slot and logged a finished archive.
+    purpose: Without this nightly backup, a database failure would lose the multi-release AOP-Wiki data.
     request:
       service: cronjobs_aopwiki-dashboard-backup
       grace: 30m
@@ -36,6 +37,7 @@ checks:
     via: [core]
     timeout: 2m
     describe: An archive less than 26 hours old is on the off-cluster backup drive, of normal size, with two weeks of archives kept.
+    purpose: Shows a recent, complete backup is stored safely off the cluster.
     request: {mount: hidrive, glob: "aopwiki-dashboard/virtuoso/virtuoso-*.tar.gz", small_bytes: 1000000, verify_gzip: false}
     assert:
       - {that: count, gte: 12, label: "≥ 12 nightly archives kept"}
@@ -52,6 +54,7 @@ checks:
     via: [core]
     timeout: 5m
     describe: The newest archive decompresses without error, and its checksum file was written with it.
+    purpose: A backup file that is damaged is useless when we need it; this catches that early.
     request: {mount: hidrive, glob: "aopwiki-dashboard/virtuoso/virtuoso-*.tar.gz", verify_gzip: true}
     assert:
       - {that: gzip_ok, eq: true}
@@ -63,6 +66,7 @@ checks:
     every: 1h
     via: [core]
     describe: Each archive is written with its checksum file.
+    purpose: The checksum lets us prove later that a backup was not damaged.
     request: {mount: hidrive, glob: "aopwiki-dashboard/virtuoso/virtuoso-*.tar.gz.sha256", verify_gzip: false}
     assert:
       - {that: count, gte: 12}
@@ -75,6 +79,7 @@ checks:
     every: 1h
     via: [core]
     describe: The newest archive's manifest records the full set of release graphs and a triple count close to the previous one.
+    purpose: Catches a backup that left out part of the data.
     request: {mount: hidrive, file: "aopwiki-dashboard/virtuoso/virtuoso-*.manifest", format: kv}
     assert:
       - {that: exists, eq: true}
@@ -89,6 +94,7 @@ checks:
     every: 1h
     via: [core]
     describe: The Sunday restore check restored the newest archive into a scratch database and found every graph and triple that was backed up.
+    purpose: A backup is only proven when it can be restored; this weekly test actually does that.
     request:
       service: cronjobs_aopwiki-dashboard-backup-verify
       grace: 30m
@@ -106,6 +112,7 @@ checks:
     every: 6h
     via: [core]
     describe: The restore check tested a recent archive, not an old one left behind.
+    purpose: Makes sure the restore test uses a recent backup, not an old one.
     request:
       service: cronjobs_aopwiki-dashboard-backup-verify
       grace: 30m

@@ -16,6 +16,7 @@ checks:
     every: 15m
     via: [core]
     describe: The nightly off-cluster copy ran at its slot and verified the copy.
+    purpose: Keeps a safe copy of the monitor's history outside the cluster.
     request:
       service: cronjobs_tgx-monitor-offsite
       grace: 30m
@@ -31,6 +32,7 @@ checks:
     every: 1h
     via: [core]
     describe: A copy less than 26 hours old is on the off-cluster drive and is not suspiciously small.
+    purpose: Shows a recent copy of the monitor's history is stored off the cluster.
     request: {mount: hidrive, glob: "tgx-monitor/monitor-*.db", small_bytes: 100000, verify_gzip: false}
     assert:
       - {that: count, gte: 1}
@@ -43,6 +45,7 @@ checks:
     every: 1h
     via: [core]
     describe: The newest copy was opened on the drive, passed integrity_check and matched its manifest.
+    purpose: A copy is only useful if it opens; this checks it is not damaged.
     request: {mount: hidrive, file: "tgx-monitor/monitor-*.verified.json", format: json}
     assert:
       - {that: exists, eq: true}

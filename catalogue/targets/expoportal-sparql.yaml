@@ -18,6 +18,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The endpoint answers and its ontology metadata graph lists every ontology, through public DNS and on each node.
+    purpose: Shows the ExpoPortal SPARQL endpoint is up and lists every ontology.
     request:
       endpoint: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/expoportal-ontology-count.rq
@@ -32,6 +33,7 @@ checks:
     kind: invariant
     every: 1h
     describe: The triple store and the REST API agree on the number of ontologies.
+    purpose: The SPARQL endpoint and the API should give the same answer; a difference means one fell behind.
     request:
       endpoint: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
       left: q/rdf-portals-legacy/expoportal-ontology-count.rq
@@ -44,6 +46,7 @@ checks:
     kind: http
     every: 1h
     describe: The bare host redirects to the HTTPS SPARQL page on the same name, not to an internal port.
+    purpose: People opening the bare address should land on the query page, not a broken internal link.
     request: {url: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/", follow: false}
     assert:
       - {that: status, eq: 302}
@@ -54,6 +57,7 @@ checks:
     kind: http
     every: 1d
     describe: Browser clients on other sites may query the endpoint (CORS allows any origin).
+    purpose: Web pages on other sites query this endpoint; without this setting, browsers block them.
     request:
       url: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
       params: {query: "ASK {}"}
@@ -67,6 +71,7 @@ checks:
     kind: http
     every: 1d
     describe: The endpoint publishes a SPARQL service description; amber while it names an internal address instead of the public one.
+    purpose: Tools read this description to find the endpoint; it should name the public address.
     request:
       url: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
       headers: {Accept: text/turtle}
@@ -82,6 +87,7 @@ checks:
     kind: sparql
     every: 1h
     describe: No ontology submission record carries an API key in a URL (imported pull locations must be cleared).
+    purpose: Makes sure no secret access keys are published in the public data.
     request:
       endpoint: "https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/expoportal-submission-keys.rq
@@ -93,6 +99,7 @@ checks:
     kind: dns
     every: 1h
     describe: The SPARQL name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The SPARQL address must point at our servers, or nobody can reach it.
     request: {name: sparql.expoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}

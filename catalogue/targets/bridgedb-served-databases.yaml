@@ -19,6 +19,7 @@ checks:
     kind: invariant
     every: 1d
     describe: The organisms the webservice serves are exactly the webservice-tested species in the data.bridgedb.org catalogue (Fusarium graminearum allowlisted as unparseable).
+    purpose: Catches an organism that is listed as available but not actually served, or the other way round.
     request:
       left: {http_list: {url: "https://webservice.bridgedb.org/contents", re: '^[^\t\n]*\t([^\t\r\n]+)', pick: all}}
       right: {http_list: {url: "https://data.bridgedb.org/gene.json", re: '"species":\s*"(?!Fusarium graminearum")([^"]+)"[^}]*"WS"', pick: all}}
@@ -32,6 +33,7 @@ checks:
     every: 1d
     timeout: 3m
     describe: Every served organism has a gene database with a readable build date, none older than three years (Bacillus subtilis allowlisted at its 2018 build).
+    purpose: Catches organisms whose mapping data is very old or failed to load.
     request:
       base: https://webservice.bridgedb.org
       steps:
@@ -107,6 +109,7 @@ checks:
     kind: http
     every: 1d
     describe: The human organism loads all eight databases (Ensembl genes, corona, complexes, Wikidata genes, interactions, metabolites, pathways, publications); the AOP-Wiki RDF records this in its metadata.
+    purpose: Human is the most used organism; all its mapping databases must be loaded.
     request: {url: "https://webservice.bridgedb.org/Human/properties"}
     assert:
       - {that: status, eq: 200}
@@ -127,6 +130,7 @@ checks:
     severity: low
     alert_after: 21d
     describe: The served metabolite database is the newest one published on figshare, allowing three weeks for a new release to be deployed, and is under a year old.
+    purpose: Catches the webservice using an outdated metabolite mapping database.
     request:
       steps:
         - {url: "https://webservice.bridgedb.org/Human/properties", capture: {served: {regex: 'HMDB-CHEBI-WIKIDATA\s+BUILDDATE\t(\d{8})'}}}
@@ -142,6 +146,7 @@ checks:
     kind: compare
     every: 1d
     describe: The served human Ensembl release is not behind any Zenodo gene-database deposit older than 45 days (the reload window); a newer, younger deposit shows amber.
+    purpose: Catches the webservice using an outdated human gene mapping database.
     request:
       left: {http_regex: {url: "https://webservice.bridgedb.org/Human/properties", re: "DATASOURCENAME\tEnsembl\\s+BUILDDATE\t\\d+\\s+SERIES\tHomo sapiens genes and proteins\\s+DATATYPE\t\\S+\\s+DATASOURCEVERSION\t(\\d+)"}}
       right:

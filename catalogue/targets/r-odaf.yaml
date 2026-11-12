@@ -19,6 +19,7 @@ checks:
     via: [public, tgx1, tgx2]
     timeout: 30s
     describe: The app answers through public DNS and on each node.
+    purpose: Shows that people can reach R-ODAF.
     request: {url: "https://r-odaf.nl/", method: HEAD}
     assert:
       - {that: status, eq: 200}
@@ -29,6 +30,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: The www name serves the R-ODAF app page.
+    purpose: People typing www.r-odaf.nl should see the app.
     request: {url: "https://www.r-odaf.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -38,6 +40,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain http is redirected to https on the bare name.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://r-odaf.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -47,6 +50,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain http is redirected to https on the www name.
+    purpose: Makes old or typed http links to the www address land on the secure site.
     request: {url: "http://www.r-odaf.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -57,6 +61,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve one trusted certificate covering the bare and www names, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of R-ODAF.
     request: {host: r-odaf.nl}
     assert:
       - {that: verified, eq: true}
@@ -70,6 +75,7 @@ checks:
     kind: http
     every: 15m
     describe: Shiny Server's SockJS endpoint is up and offers websockets.
+    purpose: The app needs this live connection to work; without it the page loads but does nothing.
     request: {url: "https://r-odaf.nl/__sockjs__/info", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -80,6 +86,7 @@ checks:
     every: 30m
     timeout: 45s
     describe: A Shiny session opens over a websocket, so the R side of the app is alive.
+    purpose: Opens a real app session, to catch the app looking up while its analysis side is dead.
     request: {url: "https://r-odaf.nl/", robust: true, ws_wait: 20}
     assert:
       - {that: page_status, eq: 200}
@@ -93,6 +100,7 @@ checks:
     every: 5m
     via: [core]
     describe: The swarm runs the app's one replica.
+    purpose: Shows R-ODAF is actually running.
     request: {check: replicas, services: [r-odaf]}
     assert:
       - {that: checked, eq: 1, label: "the service exists"}
@@ -103,6 +111,7 @@ checks:
     every: 15m
     via: [core]
     describe: No app container was killed (out of memory or crashed) in the last day.
+    purpose: R-ODAF analyses need a lot of memory; this catches runs killed for using too much.
     request: {check: crash_loops, services: [r-odaf], window: 24h, threshold: 3}
     assert:
       - {that: killed_count, eq: 0, label: "no exit 137/139 in 24 h (an out-of-memory kill on a large upload)"}
@@ -113,6 +122,7 @@ checks:
     every: 7d
     severity: low
     describe: Shows when the R-ODAF repository has commits that are not in the deployed release tag.
+    purpose: Shows when the R-ODAF code has changes that are not deployed yet.
     request:
       left: {http_json: {url: "https://api.github.com/repos/TGX-UM/R-ODAF-Shiny/compare/v1.0.0...main", path: ahead_by}, on_error: unknown}
       right: {const: 0}

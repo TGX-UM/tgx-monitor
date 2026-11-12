@@ -16,6 +16,7 @@ checks:
     every: 1h
     via: [core]
     describe: A dump of the Curation Portal database less than 26 hours old exists off the cluster.
+    purpose: Without a backup, curators' reviews would be lost if the database broke.
     request: {mount: hidrive, glob: "wikipathways-submit/*.sql.gz", small_bytes: 10000}
     assert:
       - {that: count, gte: 1, label: "a backup exists"}
@@ -29,6 +30,7 @@ checks:
     every: 15m
     via: [core]
     describe: The Curation Portal database service runs its one replica and has not been failing.
+    purpose: The Curation Portal's database must be running for curators to work.
     request: {check: replicas, services: [wikipathways-submit-db]}
     assert:
       - {that: by.wikipathways-submit-db.running, eq: 1}

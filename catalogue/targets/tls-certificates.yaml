@@ -21,6 +21,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for aopsuite.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for aopsuite.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: aopsuite.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -35,6 +36,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for qsprpred.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for qsprpred.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: qsprpred.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -49,6 +51,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for cdkdepict.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for cdkdepict.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: cdkdepict.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -63,6 +66,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for cplogd.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for cplogd.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: cplogd.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -77,6 +81,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for sombie.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for sombie.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: sombie.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -91,6 +96,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for flame.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for flame.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: flame.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -105,6 +111,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for oppbk.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for oppbk.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: oppbk.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -119,6 +126,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for xploreaop.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for xploreaop.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: xploreaop.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -133,6 +141,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for llemy.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for llemy.vhp4safety.nl and scripts refuse to connect.
     request: {host: llemy.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -147,6 +156,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for mct8-docking.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for mct8-docking.vhp4safety.nl and scripts refuse to connect.
     request: {host: mct8-docking.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -161,6 +171,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for arrayanalysis.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for arrayanalysis.vhp4safety.nl and scripts refuse to connect.
     request: {host: arrayanalysis.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -175,6 +186,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for biodatafuse.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for biodatafuse.bigcat-bioinformatics.org and scripts refuse to connect.
     request: {host: biodatafuse.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -189,6 +201,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for bridgedb.cloud.vhp4safety.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for bridgedb.cloud.vhp4safety.nl and scripts refuse to connect.
     request: {host: bridgedb.cloud.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -203,6 +216,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for swagger.bridgedb.org that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for swagger.bridgedb.org and scripts refuse to connect.
     request: {host: swagger.bridgedb.org}
     assert:
       - {that: verified, eq: true}
@@ -217,6 +231,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for sparql.expoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for sparql.expoportal.biohackeu.bigcat-bioinformatics.org and scripts refuse to connect.
     request: {host: sparql.expoportal.biohackeu.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -231,6 +246,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for data.expoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for data.expoportal.biohackeu.bigcat-bioinformatics.org and scripts refuse to connect.
     request: {host: data.expoportal.biohackeu.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -245,6 +261,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for ontoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for ontoportal.biohackeu.bigcat-bioinformatics.org and scripts refuse to connect.
     request: {host: ontoportal.biohackeu.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -259,6 +276,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for data.ontoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for data.ontoportal.biohackeu.bigcat-bioinformatics.org and scripts refuse to connect.
     request: {host: data.ontoportal.biohackeu.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -273,6 +291,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for sparql.ontoportal.biohackeu.bigcat-bioinformatics.org that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for sparql.ontoportal.biohackeu.bigcat-bioinformatics.org and scripts refuse to connect.
     request: {host: sparql.ontoportal.biohackeu.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -287,6 +306,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes present a trusted certificate for www.r-odaf.nl that covers the name and is not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning for www.r-odaf.nl and scripts refuse to connect.
     request: {host: www.r-odaf.nl}
     assert:
       - {that: verified, eq: true}

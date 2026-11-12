@@ -20,6 +20,7 @@ checks:
     timeout: 20s
     via: [public, tgx1, tgx2]
     describe: The ExpoPortal home page loads within 15 seconds, through public DNS and on each node.
+    purpose: Shows that people can open ExpoPortal.
     request: {url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -32,6 +33,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain HTTP is redirected permanently to HTTPS.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://expoportal.biohackeu.bigcat-bioinformatics.org/", follow: false}
     assert:
       - {that: status, eq: 301}
@@ -43,6 +45,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of ExpoPortal.
     request: {host: expoportal.biohackeu.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -56,6 +59,7 @@ checks:
     every: 15m
     timeout: 20s
     describe: An ontology summary page (AOPO) renders, which needs the UI, the REST API and the triple store together.
+    purpose: Opening an ontology page needs every part of ExpoPortal working together.
     request: {url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/ontologies/AOPO"}
     assert:
       - {that: status, eq: 200}
@@ -67,6 +71,7 @@ checks:
     kind: http
     every: 1h
     describe: The old ontoportal name redirects permanently to the same page on the ExpoPortal name.
+    purpose: People with old links should still land on the right ExpoPortal page.
     request: {url: "https://ontoportal.biohackeu.bigcat-bioinformatics.org/ontologies", follow: false}
     assert:
       - {that: status, eq: 301}
@@ -78,6 +83,7 @@ checks:
     every: 1h
     timeout: 20s
     describe: The home page still carries the ExpoPortal branding, not the upstream portal's (the moving image tag can drop the overrides).
+    purpose: An automatic update can silently replace ExpoPortal's look with the generic portal's.
     request: {url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/"}
     assert:
       - {that: body, contains: "ExpoPortal"}
@@ -89,6 +95,7 @@ checks:
     kind: dns
     every: 1h
     describe: The portal name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The portal address must point at our servers, or nobody can reach it.
     request: {name: expoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -99,6 +106,7 @@ checks:
     kind: dns
     every: 1h
     describe: The old ontoportal name, still used by early registrations, resolves to tgx1.
+    purpose: Early registrations use the old address; it must still reach our servers.
     request: {name: ontoportal.biohackeu.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -109,6 +117,7 @@ checks:
     every: 1h
     timeout: 20s
     describe: The annotator page opens with a sample text within 15 seconds.
+    purpose: Shows that the text annotator, a main feature for users, still opens.
     request:
       url: "https://expoportal.biohackeu.bigcat-bioinformatics.org/annotator"
       params: {text: "adverse outcome pathway key event"}

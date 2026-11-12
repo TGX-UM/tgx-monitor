@@ -14,6 +14,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The BioDataFuse page loads, through public DNS and on each node.
+    purpose: Shows that people can open BioDataFuse.
     request: {url: "https://biodatafuse.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -25,6 +26,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: The front end's application scripts are served.
+    purpose: Without these scripts the page opens but stays blank.
     request:
       base: https://biodatafuse.bigcat-bioinformatics.org
       steps:
@@ -42,6 +44,7 @@ checks:
     kind: http
     every: 15m
     describe: The backend answers through the front end and asks an anonymous visitor to sign in (a server error would mean it is down).
+    purpose: The page is useless if the program behind it is down; this checks it answers.
     request: {url: "https://biodatafuse.bigcat-bioinformatics.org/api/datasources", parse_json: true}
     assert:
       - {that: status, eq: 401}
@@ -53,6 +56,7 @@ checks:
     every: 1d
     severity: low
     describe: The interactive API documentation and the API description it needs are both served.
+    purpose: Developers use this documentation to call BioDataFuse from their own code.
     request:
       base: https://biodatafuse.bigcat-bioinformatics.org
       steps:
@@ -70,6 +74,7 @@ checks:
     alert_after: 5m
     public: false
     describe: Both services of the stack, front end and backend, have their replica running.
+    purpose: BioDataFuse needs both its parts running.
     request: {check: replicas, services: ["biodatafuse_*"]}
     assert:
       - {that: not_converged_count, eq: 0}
@@ -82,6 +87,7 @@ checks:
     via: [core]
     public: false
     describe: Both images exist on every node the services may be scheduled to, so a reschedule cannot end in a missing image.
+    purpose: If a server fails, BioDataFuse can only move to the other one if its program is there too.
     request: {check: local_images, services: ["biodatafuse_*"]}
     assert:
       - {that: by.biodatafuse_biodatafuse-backend, len_eq: 2}
@@ -94,6 +100,7 @@ checks:
     via: [core]
     public: false
     describe: The application database is in place and not truncated.
+    purpose: Catches the BioDataFuse database going missing or getting damaged.
     request: {mount: biodatafuse-data, glob: biodatafuse.db}
     assert:
       - {that: count, eq: 1}
@@ -106,6 +113,7 @@ checks:
     via: [core]
     public: false
     describe: A copy of the application database less than 26 hours old exists.
+    purpose: Without a recent backup, users' BioDataFuse data could be lost.
     request: {mount: biodatafuse-backups, glob: "*biodatafuse*"}
     assert:
       - {that: count, gte: 1, label: a backup exists}

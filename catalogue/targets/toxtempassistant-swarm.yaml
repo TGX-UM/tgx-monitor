@@ -16,6 +16,7 @@ checks:
     every: 15m
     via: [tgx1, tgx2]
     describe: The cluster copy of the app answers on each node with a release number (its certificate is not trusted yet, so it is not verified here).
+    purpose: The cluster copy must be ready before the public address is moved to it.
     request: {url: "https://toxtempassistant.vhp4safety.nl/", verify: false}
     assert:
       - {that: status, eq: 200}
@@ -29,6 +30,7 @@ checks:
     via: [core]
     alert_after: 24h
     describe: The cluster copy runs the same release as the public site.
+    purpose: The cluster copy should run the same version as the live site before it takes over.
     request:
       left: {http_regex: {url: "https://toxtempassistant.vhp4safety.nl/", re: '(v\d+\.\d+\.\d+)'}}
       right:
@@ -45,6 +47,7 @@ checks:
     kind: dns
     every: 1h
     describe: The public name points at the cluster (tgx1), agreed by two public resolvers.
+    purpose: Shows whether the public address has been moved to the cluster yet.
     request: {name: toxtempassistant.vhp4safety.nl, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: consistent, eq: true}
@@ -56,6 +59,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the name, not the proxy's self-signed default (the certificate request fails while DNS points elsewhere).
+    purpose: The cluster copy can only get a valid certificate once the address points at it.
     request: {host: toxtempassistant.vhp4safety.nl}
     assert:
       - {that: is_traefik_default, eq: false}
@@ -68,6 +72,7 @@ checks:
     via: [core]
     alert_after: 5m
     describe: Every long-running service of the stack has its replica running (the one-shot storage init job is left out).
+    purpose: Every part of the cluster copy must run before it can take over.
     request: {check: replicas, services: ["toxtempass_*"], ignore: [toxtempass_minio_init]}
     assert:
       - {that: not_converged_count, eq: 0}

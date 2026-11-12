@@ -21,6 +21,7 @@ checks:
     every: 1h
     via: [core]
     describe: Only the two known services are pinned to one node, and no pinned service sits on a node that is down.
+    purpose: A service tied to one server cannot move when that server fails; we keep that list short and known.
     request: {check: placement}
     assert:
       - {that: pinned_services, eq: [robot, xploreaop], label: "pinned services are exactly robot and xploreaop"}
@@ -32,6 +33,7 @@ checks:
     every: 1h
     via: [core]
     describe: No service without a target of its own runs a locally built image that exists on one node only, and no running image has gone missing.
+    purpose: A service whose program exists on only one server cannot move to the other one in an emergency.
     request:
       check: local_images
       ignore: ["biodatafuse_*", robot, xploreaop, toxtempass_minio_init]
@@ -44,6 +46,7 @@ checks:
     kind: registry
     every: 1h
     describe: The proxy image can be pulled from Docker Hub, so the proxy can start on either node.
+    purpose: The web proxy that serves every site must be able to start on either server.
     request: {image: "traefik:v3"}
     assert:
       - {that: reachable, eq: true}
@@ -55,6 +58,7 @@ checks:
     kind: registry
     every: 6h
     describe: The cron scheduler image can be pulled from Docker Hub.
+    purpose: The job scheduler must be able to start on either server.
     request: {image: "crazymax/swarm-cronjob:1.16.0"}
     assert:
       - {that: reachable, eq: true}
@@ -67,6 +71,7 @@ checks:
     via: [core]
     severity: low
     describe: Shows services whose running image changed while their tag stayed the same (a moving tag pulled new code).
+    purpose: Shows services that quietly changed version without anyone deploying them.
     request:
       ignore: ["ontoportal_*", vhp-platform-pseudo, wikipathways_wikipathways-snorql]
     assert:

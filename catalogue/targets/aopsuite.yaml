@@ -14,6 +14,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The AOP Network Builder page loads in full, through public DNS and on each node.
+    purpose: Shows that users can open the AOP Network Builder.
     request: {url: "https://aopsuite.cloud.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -27,6 +28,7 @@ checks:
     kind: http
     every: 1h
     describe: The network drawing library the page relies on is served.
+    purpose: Without this drawing library the page opens but no network can be drawn.
     request: {url: "https://aopsuite.cloud.vhp4safety.nl/static/js/cytoscape.min.js"}
     assert:
       - {that: status, eq: 200}
@@ -37,6 +39,7 @@ checks:
     kind: http
     every: 15m
     describe: The application backend answers its session status call with JSON.
+    purpose: The page is useless if the program behind it does not respond, even when the page itself loads.
     request: {url: "https://aopsuite.cloud.vhp4safety.nl/session/status", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -47,6 +50,7 @@ checks:
     kind: security
     every: 1h
     describe: The development debugger console stays switched off.
+    purpose: A debugger left on lets anyone on the internet run commands on the server.
     request:
       url: "https://aopsuite.cloud.vhp4safety.nl/console"
       expect_status: [404]
@@ -60,6 +64,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: The AOP-Wiki RDF endpoint still describes AOP 1 with its first and last key events, which every network build reads.
+    purpose: The builder gets its AOPs from AOP-Wiki RDF, so if that source changes or breaks, every network build fails.
     request:
       endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
       file: q/vhp-tools/aop1-network.rq
@@ -74,6 +79,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: The compound wiki query service that supplies chemical data to the builder answers.
+    purpose: The builder adds chemical information from this source, which would be missing from networks if it stopped answering.
     request:
       endpoint: "https://compoundcloud.wikibase.cloud/query/sparql"
       ask: "ASK { ?s ?p ?o }"
@@ -90,6 +96,7 @@ checks:
     enabled: false
     timeout: 1m
     describe: With one session, a network built from AOP 1 has a molecular initiating event and at least five elements.
+    purpose: Builds a real network end to end, which is what users come to the tool for.
     request:
       base: https://aopsuite.cloud.vhp4safety.nl
       steps:
@@ -109,6 +116,7 @@ checks:
     every: 1d
     via: [core]
     describe: The published container image can be pulled, and both nodes hold a copy for a fast reschedule.
+    purpose: If the server running the app fails, the other server needs a copy of the app to take over quickly.
     request: {image: "ghcr.io/vhp4safety/aopsuite:latest"}
     assert:
       - {that: reachable, eq: true}

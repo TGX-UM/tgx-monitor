@@ -16,6 +16,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The dashboard reports itself healthy, with every startup plot loaded and its SPARQL endpoint up (a degraded dashboard still answers 200).
+    purpose: The dashboard can look fine while some plots silently failed to load; this catches that.
     request: {url: "https://aopwiki-dashboard.vhp4safety.nl/health", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -29,6 +30,7 @@ checks:
     kind: http
     every: 15m
     describe: The dashboard home page loads with its title.
+    purpose: Shows that people can open the dashboard.
     request: {url: "https://aopwiki-dashboard.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -40,6 +42,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the dashboard, not close to expiry.
+    purpose: Without a valid certificate, browsers show a security warning instead of the dashboard.
     request: {host: aopwiki-dashboard.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -53,6 +56,7 @@ checks:
     kind: http
     every: 1d
     describe: Plain http on the dashboard name redirects permanently to https.
+    purpose: Makes old or typed http links still land on the secure dashboard.
     request: {url: "http://aopwiki-dashboard.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -63,6 +67,7 @@ checks:
     kind: compare
     every: 1h
     describe: The dashboard, its plot store and the multi-release endpoint agree on the newest release, which is less than a quarter plus three weeks old.
+    purpose: Makes sure the dashboard shows the newest AOP-Wiki release and not months-old numbers.
     request:
       left: {http_json: {url: "https://aopwiki-dashboard.vhp4safety.nl/health", path: latest_version}}
       right: {http_json: {url: "https://aopwiki-dashboard.vhp4safety.nl/api/v2/manifest", path: latest_version}}
@@ -80,6 +85,7 @@ checks:
     kind: roundtrip
     every: 15m
     describe: A trend plot and a latest-release snapshot plot both render with content.
+    purpose: Checks that plots actually draw, which is what visitors come to see.
     request:
       base: "https://aopwiki-dashboard.vhp4safety.nl"
       steps:
@@ -102,6 +108,7 @@ checks:
     every: 6h
     timeout: 3m
     describe: Every plot on the trends page renders with data, not only the ones the health endpoint looks at.
+    purpose: Catches a single broken plot that the dashboard's own health report does not cover.
     request:
       base: "https://aopwiki-dashboard.vhp4safety.nl"
       steps:
@@ -225,6 +232,7 @@ checks:
     kind: http
     every: 1h
     describe: The entity-count data behind the main trend plot is complete, typed as documented, and covers every release.
+    purpose: The main growth plot is only right if its underlying numbers are complete; this catches gaps.
     request: {url: "https://aopwiki-dashboard.vhp4safety.nl/api/v2/data/aop_entity_counts_absolute", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -242,6 +250,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: The AOP list, the network graph, an AOP detail page and a CSV download all work.
+    purpose: "Exercises the other things users do on the dashboard: browse AOPs, view the network, download data."
     request:
       base: "https://aopwiki-dashboard.vhp4safety.nl"
       steps:

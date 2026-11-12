@@ -14,6 +14,7 @@ checks:
     kind: http
     every: 15m
     describe: The home page loads with its BridgeDb title and links to the webservice and gene database pages.
+    purpose: Shows that people can open the BridgeDb website.
     request: {url: "https://www.bridgedb.org/"}
     assert:
       - {that: status, eq: 200}
@@ -25,6 +26,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: The bare domain (http and https) and the github.io address redirect permanently to https://www.bridgedb.org/.
+    purpose: Makes other addresses for the site land on the main website.
     request:
       steps:
         - {url: "https://bridgedb.org/", follow: false, capture: {apex_https: {header: location}}}
@@ -42,6 +44,7 @@ checks:
     kind: http
     every: 1d
     describe: The gene database page leads to the data.bridgedb.org listing, which links at least 36 Zenodo or figshare downloads.
+    purpose: People find and download the mapping databases through this page.
     request: {url: "https://www.bridgedb.org/data/gene_database/"}
     assert:
       - {that: status, eq: 200}
@@ -52,6 +55,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: The data-source registry has at least 140 well-formed rows and the key system codes keep their names.
+    purpose: Tools use this list to know which databases BridgeDb covers and what their codes mean.
     request:
       steps: [{url: "https://www.bridgedb.org/datasources/datasources.tsv"}]
       derive:
@@ -77,6 +81,7 @@ checks:
     kind: http
     every: 1d
     describe: The webservice documentation page links to the live webservice.
+    purpose: The documentation should lead users to the live webservice.
     request: {url: "https://www.bridgedb.org/pages/webservice.html"}
     assert:
       - {that: status, eq: 200}
@@ -86,6 +91,7 @@ checks:
     kind: gha
     every: 1d
     describe: The last GitHub Pages build of the website completed successfully.
+    purpose: This job publishes the website; if it fails, changes never go live.
     request: {repo: bridgedb/bridgedb.github.io, workflow: "18226764"}
     assert:
       - {that: state, eq: active}

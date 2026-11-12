@@ -13,6 +13,7 @@ checks:
     kind: http
     every: 15m
     describe: The Streamlit server reports healthy.
+    purpose: Shows that the LLeMy app is running.
     request: {url: "https://llemy.vhp4safety.nl/_stcore/health"}
     assert:
       - {that: status, eq: 200}
@@ -23,6 +24,7 @@ checks:
     kind: http
     every: 15m
     describe: The app page shell loads.
+    purpose: Shows that people can open LLeMy.
     request: {url: "https://llemy.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -35,6 +37,7 @@ checks:
     every: 1h
     via: [core]
     describe: In a real browser the app renders its sign-in screen without exceptions (the language-model path needs a user's own key and is not tested).
+    purpose: Opens the app in a real browser, the way a user does, to catch errors a simple page load misses.
     request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser/latest.json", page: llemy}
     assert:
       - {that: page_found, eq: true}

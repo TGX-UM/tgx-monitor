@@ -14,6 +14,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The docking service reports healthy, through public DNS and on each node.
+    purpose: Shows that the MCT8 docking service is running.
     request: {url: "https://mct8-docking.vhp4safety.nl/health"}
     assert:
       - {that: status, eq: 200}
@@ -24,6 +25,7 @@ checks:
     kind: http
     every: 15m
     describe: The docking page loads.
+    purpose: Shows that people can open the docking page.
     request: {url: "https://mct8-docking.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -35,6 +37,7 @@ checks:
     kind: http
     every: 1h
     describe: The MCT8 receptor structure is served whole (8333 atoms).
+    purpose: Every docking run needs this protein structure; if it is cut short, results are wrong.
     request: {url: "https://mct8-docking.vhp4safety.nl/api/receptor", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -47,6 +50,7 @@ checks:
     kind: http
     every: 1h
     describe: The binding site definition is served whole (23 atoms).
+    purpose: Every docking run needs this binding site; if it is cut short, results are wrong.
     request: {url: "https://mct8-docking.vhp4safety.nl/api/binding_site", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -58,6 +62,7 @@ checks:
     kind: http
     every: 1h
     describe: The run-time estimator answers from the history of real dockings (an estimate only, nothing is docked).
+    purpose: Users see how long a docking run will take before starting it; this checks that estimate works.
     request:
       url: "https://mct8-docking.vhp4safety.nl/api/estimate"
       method: POST
@@ -74,6 +79,7 @@ checks:
     kind: security
     every: 1h
     describe: The development debugger console stays switched off.
+    purpose: A debugger left on lets anyone on the internet run commands on the server.
     request:
       url: "https://mct8-docking.vhp4safety.nl/console"
       expect_status: [404]
@@ -89,6 +95,7 @@ checks:
     severity: low
     public: false
     describe: The run-time log of real dockings exists, and shows when the tool was last used.
+    purpose: Shows whether and when the docking tool is actually being used.
     request: {mount: mct8-results, glob: runtimes.jsonl}
     assert:
       - {that: count, eq: 1}
@@ -101,6 +108,7 @@ checks:
     every: 1d
     via: [core]
     describe: The published image can be pulled, and both nodes hold a copy (a cold pull of 7.5 GB takes minutes).
+    purpose: The tool is very large to download, so both servers should already have it to take over quickly.
     request: {image: "ghcr.io/vhp4safety/mct8-docking:latest"}
     assert:
       - {that: reachable, eq: true}

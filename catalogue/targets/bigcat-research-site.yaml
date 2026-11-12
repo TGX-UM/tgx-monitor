@@ -14,6 +14,7 @@ checks:
     kind: http
     every: 15m
     describe: The BiGCaT research page on the university website loads and still mentions BiGCaT.
+    purpose: The department's public page should stay online and correct.
     request: {url: "https://www.maastrichtuniversity.nl/research/bioinformatics"}
     assert:
       - {that: status, eq: 200}

@@ -22,6 +22,7 @@ checks:
     via: [public, tgx1, tgx2]
     timeout: 20s
     describe: The endpoint answers a real query with CORS open, through public DNS and on each node.
+    purpose: Shows that the WikiPathways SPARQL endpoint is up and that web pages on other sites can query it.
     request: {endpoint: "https://sparql.wikipathways.org/sparql", ask: "ASK { ?s ?p ?o }"}
     assert:
       - {that: status, eq: 200}
@@ -36,6 +37,7 @@ checks:
     every: 30m
     timeout: 30s
     describe: Both nodes serve the same monthly release, and it is not older than one release cycle.
+    purpose: Both servers must give the same answers, whichever one a user happens to reach.
     request:
       endpoint: "https://sparql.wikipathways.org/sparql"
       left: {sparql: {file: q/wikipathways/release.rq}, via: tgx1, extract: '(\d{8})'}
@@ -52,6 +54,7 @@ checks:
     timeout: 30s
     alert_after: 48h
     describe: The served release equals the newest complete release on data.wikipathways.org, allowing the two days until the reload on the 12th.
+    purpose: Catches the endpoint serving last month's data after a new release came out.
     request:
       endpoint: "https://sparql.wikipathways.org/sparql"
       left: {sparql: {file: q/wikipathways/release.rq}, extract: '(\d{8})'}
@@ -66,6 +69,7 @@ checks:
     kind: sparql
     every: 1h
     describe: The store holds at least 2,750 real pathways and did not lose more than 5% within a week.
+    purpose: Catches pathways going missing from the endpoint.
     request: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/wikipathways/pathway-count.rq}
     assert:
       - {that: first.n, gte: 2750, label: "pathways ≥ 2750 (2902 on 2026-11-10)"}
@@ -76,6 +80,7 @@ checks:
     kind: sparql
     every: 1h
     describe: A known pathway (WP254, Apoptosis) comes back with its organism, its gene products and CASP3.
+    purpose: Asks about a well-known pathway with a known answer, to catch wrong or empty results.
     request: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/wikipathways/wp254-canary.rq}
     assert:
       - {that: first.title, eq: Apoptosis}
@@ -88,6 +93,7 @@ checks:
     kind: sparql
     every: 6h
     describe: Every ontology tag on a pathway (CL, DOID, PW and others) has a label, apart from the curation markers.
+    purpose: Ontology terms without names show up as bare codes; this catches a reload that dropped an ontology.
     request: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/wikipathways/unlabelled-ontology-tags.rq}
     assert:
       - {that: status, eq: 200}
@@ -99,6 +105,7 @@ checks:
     every: 1h
     via: [tgx1, tgx2]
     describe: The endpoint describes itself (SPARQL service description in Turtle) on each node.
+    purpose: Tools read this description to learn what the endpoint offers.
     request: {url: "https://sparql.wikipathways.org/sparql", headers: {Accept: text/turtle}}
     assert:
       - {that: status, eq: 200}
@@ -111,6 +118,7 @@ checks:
     every: 1h
     via: [tgx1, tgx2]
     describe: The VoID dataset description is served at /.well-known/void on each node.
+    purpose: Tools and catalogues read this description to learn what data the endpoint holds.
     request: {url: "https://sparql.wikipathways.org/.well-known/void"}
     assert:
       - {that: status, eq: 200}
@@ -125,6 +133,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the endpoint's name, with time to spare.
+    purpose: Without a valid certificate, browsers and scripts refuse to connect to the endpoint.
     request: {host: sparql.wikipathways.org}
     assert:
       - {that: verified, eq: true}
@@ -140,6 +149,7 @@ checks:
     timeout: 45s
     severity: low
     describe: The independent YummyData crawler still rates the endpoint A or B with a score of at least 80, and evaluated it recently.
+    purpose: An independent outside rating of the endpoint's quality; a drop means something users rely on got worse.
     request:
       left:
         http_regex: {url: "https://yummydata.org/api/endpoint/search", headers: {Accept: application/json}, re: '"id":18,"name":"WikiPathways"[^{]*\{[^}]*?"rank":"([A-Z])"'}

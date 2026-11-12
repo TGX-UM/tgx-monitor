@@ -13,6 +13,7 @@ checks:
     kind: http
     every: 15m
     describe: The CyTargetLinker home page loads.
+    purpose: Shows that people can open the CyTargetLinker website.
     request: {url: "https://cytargetlinker.github.io/"}
     assert:
       - {that: status, eq: 200}
@@ -23,6 +24,7 @@ checks:
     kind: http
     every: 1h
     describe: The linksets download page loads.
+    purpose: Users get the linksets from this page.
     request: {url: "https://cytargetlinker.github.io/pages/linksets"}
     assert:
       - {that: status, eq: 200}
@@ -34,6 +36,7 @@ checks:
     kind: http
     every: 6h
     describe: The app's page in the Cytoscape App Store is up.
+    purpose: Most users install CyTargetLinker from the Cytoscape App Store.
     request: {url: "https://apps.cytoscape.org/apps/cytargetlinker"}
     assert:
       - {that: status, eq: 200}
@@ -44,6 +47,7 @@ checks:
     kind: tls
     every: 1d
     describe: The site's certificate is trusted, with at least two weeks to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of the site.
     request: {host: cytargetlinker.github.io}
     assert:
       - {that: verified, eq: true}

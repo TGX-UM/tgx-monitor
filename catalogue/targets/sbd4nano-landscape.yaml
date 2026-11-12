@@ -19,6 +19,7 @@ checks:
     every: 15m
     via: [public, tgx1, tgx2]
     describe: The Snorql query page loads, through public DNS and on each node.
+    purpose: Shows that people can open the SbD4Nano query page.
     request: {url: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -30,6 +31,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain HTTP is redirected permanently to HTTPS.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/", follow: false}
     assert:
       - {that: status, eq: 301}
@@ -41,6 +43,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted Let's Encrypt certificate for the name, with time to spare.
+    purpose: Without a valid certificate, browsers and scripts refuse to connect.
     request: {host: sbd4nanolandscape.rdf.bigcat-bioinformatics.org}
     assert:
       - {that: verified, eq: true}
@@ -53,6 +56,7 @@ checks:
     kind: dns
     every: 1h
     describe: The name resolves to tgx1 through two public resolvers, and they agree.
+    purpose: The address must point at our servers, or nobody can reach it.
     request: {name: sbd4nanolandscape.rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: node, eq: tgx1}
@@ -63,6 +67,7 @@ checks:
     kind: http
     every: 1d
     describe: The endpoint publishes a SPARQL service description that names its public HTTPS address.
+    purpose: Tools read this description to find and use the endpoint.
     request:
       url: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql"
       headers: {Accept: text/turtle}
@@ -76,6 +81,7 @@ checks:
     kind: sparql
     every: 15m
     describe: The eNanoMapper and landscape graphs hold exactly the triples of the initial load, so the store is up and complete.
+    purpose: The data never changes, so any difference in size means data was lost or the database is down.
     request:
       endpoint: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/sbd4nano-graphs.rq
@@ -90,6 +96,7 @@ checks:
     kind: sparql
     every: 1h
     describe: Causal assertions, models and datasets are present in the expected numbers.
+    purpose: Catches parts of the SbD4Nano data going missing.
     request:
       endpoint: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/sbd4nano-classes.rq
@@ -104,6 +111,7 @@ checks:
     kind: sparql
     every: 1h
     describe: The landscape's "all databases" example query finds every labelled dataset.
+    purpose: Runs a published example query with a known answer, to catch wrong or missing data.
     request:
       endpoint: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql"
       file: q/rdf-portals-legacy/sbd4nano-datasets.rq
@@ -117,6 +125,7 @@ checks:
     via: [core]
     public: false
     describe: The Virtuoso and Snorql services both run their one replica.
+    purpose: Both the database and the query page must be running.
     request: {check: replicas, services: ["sbd4nano_*"]}
     assert:
       - {that: checked, eq: 2}

@@ -365,8 +365,8 @@ def _public_model(store: Store, cat: Catalogue, now: dt.datetime) -> dict[str, A
     for t in targets:
         pids = [pid for pid, _, _ in enabled_probes(t, public_only=True)]
         days = daily_uptime(store, pids, now)
-        checks = [public_text(c.describe) for c in t.checks
-                  if c.enabled and is_public(t, c) and c.describe]
+        checks = [{"describe": public_text(c.describe), "purpose": public_text(c.purpose)}
+                  for c in t.checks if c.enabled and is_public(t, c) and c.describe]
         rows.append({
             "id": t.id, "name": public_text(t.name), "group": public_text(t.group),
             "summary": public_text(t.public_summary), "state": states[t.id]["state"],

@@ -3,6 +3,7 @@
 {% block main %}
 <p>{{ probe(view) }} · target <a href="/target/{{ t.id }}">{{ t.name }}</a> · via <code>{{ via }}</code> · kind <code>{{ c.kind }}</code> every {{ c.every }}</p>
 {% if c.describe %}<p>{{ c.describe }}</p>{% endif %}
+{% if c.purpose %}<p><strong>Purpose:</strong> {{ c.purpose }}</p>{% endif %}
 
 <h2>Why it is in this state</h2>
 <dl class="kv">

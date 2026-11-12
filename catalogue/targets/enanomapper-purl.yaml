@@ -21,6 +21,7 @@ checks:
     every: 1h
     timeout: 1m
     describe: The eNanoMapper ontology PURL resolves to an OWL document.
+    purpose: Ontologies and papers link to eNanoMapper terms through these addresses; they must keep working.
     request: {url: "http://purl.enanomapper.org/onto/enanomapper.owl"}
     assert:
       - {that: status, eq: 200}
@@ -31,6 +32,7 @@ checks:
     kind: http
     every: 1h
     describe: The external eNanoMapper data search loads after its redirect.
+    purpose: People still find eNanoMapper data through this search.
     request: {url: "https://search.data.enanomapper.net/"}
     assert:
       - {that: status, eq: 200}

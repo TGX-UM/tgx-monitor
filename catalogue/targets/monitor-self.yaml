@@ -19,6 +19,7 @@ checks:
     every: 5m
     via: [core]
     describe: The monitor reaches a public DNS resolver and GitHub, so its own network path is fine.
+    purpose: If the monitor itself loses its internet connection, its other results can't be trusted.
     request: {signal: vantage}
     assert:
       - {that: vantage_ok, eq: true}
@@ -31,6 +32,7 @@ checks:
     every: 5m
     via: [core]
     describe: The scheduler ticked within the last two minutes.
+    purpose: Shows the monitor is still running its checks, so this page is up to date.
     request: {signal: tick}
     assert:
       - {that: tick_age_s, lt: 120}
@@ -40,6 +42,7 @@ checks:
     every: 5m
     via: [core]
     describe: Alerts leave the outbox within half an hour.
+    purpose: Makes sure alerts are actually sent and not stuck.
     request: {signal: outbox}
     assert:
       - {that: oldest_pending_age_min, lt: 30}
@@ -49,6 +52,7 @@ checks:
     every: 5m
     via: [core]
     describe: The deliberate test failure is switched off (test-incident --break turns this red to exercise the whole alert chain).
+    purpose: A switch for testing that alerts really reach people; normally off.
     request: {signal: selftest}
     assert:
       - {that: broken, eq: false}
@@ -58,6 +62,7 @@ checks:
     every: 1d
     via: [core]
     describe: The monitor's GitHub token is valid for at least another month.
+    purpose: When this token expires, the monitor can no longer open GitHub issues for alerts.
     request: {signal: token, secret: tgxmon_gh_token}
     assert:
       - {that: valid, eq: true}
@@ -69,6 +74,7 @@ checks:
     every: 1d
     via: [core]
     describe: The read-only registry token used for private images is valid for at least another month.
+    purpose: When this token expires, the monitor can no longer check private service images.
     request: {signal: token, secret: tgxmon_ghcr_read_pat}
     assert:
       - {that: valid, eq: true}

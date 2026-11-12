@@ -17,6 +17,7 @@ checks:
     every: 5m
     via: [public, tgx1, tgx2]
     describe: The explorer page loads with its title, through public DNS and on each node.
+    purpose: Shows that people can open the AOP-Wiki RDF Explorer.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/"}
     assert:
       - {that: status, eq: 200}
@@ -28,6 +29,7 @@ checks:
     kind: http
     every: 15m
     describe: The explorer also loads under its VHP4Safety name.
+    purpose: Many links use the VHP4Safety address for the explorer; those must keep working.
     request: {url: "https://aopwiki-rdf.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -38,6 +40,7 @@ checks:
     kind: http
     every: 1d
     describe: Plain http on the VHP4Safety name redirects permanently to https.
+    purpose: Makes old or typed http links to the VHP4Safety address land on the secure explorer.
     request: {url: "http://aopwiki-rdf.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -48,6 +51,7 @@ checks:
     kind: http
     every: 1h
     describe: The explorer's configuration points at the AOP-Wiki endpoint and the example query repository, so an image update did not lose its settings.
+    purpose: An update can reset the explorer's settings, leaving it pointed at the wrong data or without examples.
     request: {url: "https://aopwiki.rdf.bigcat-bioinformatics.org/assets/js/config.js"}
     assert:
       - {that: status, eq: 200}
@@ -60,6 +64,7 @@ checks:
     kind: compare
     every: 1d
     describe: The example query repository the explorer lists still holds at least 40 queries.
+    purpose: Catches the example queries disappearing, which users rely on to get started.
     request:
       left:
         http_list:
@@ -77,6 +82,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: The "count AOPs" example, sent exactly as the explorer sends it (bare aopo prefix), gives the same number as a direct count.
+    purpose: Runs an example the way a user would and checks the answer, so examples don't silently give wrong numbers.
     request:
       steps:
         - url: "https://raw.githubusercontent.com/marvinm2/AOP-Wiki-Queries/main/A.%20Metadata/count-aops.rq"

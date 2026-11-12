@@ -19,6 +19,7 @@ checks:
     kind: http
     every: 1d
     describe: The catalogue file is valid JSON with at least 45 tools, none missing an id, name or stage.
+    purpose: The platform builds its tool list from this file; if it is broken, tools disappear from the platform.
     request: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -33,6 +34,7 @@ checks:
     every: 1d
     timeout: 30s
     describe: Every catalogue entry has its detail JSON file in the repository, and there are no orphan detail files.
+    purpose: Each tool needs its detail file, or its page on the platform is empty.
     request:
       left: {http_list: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", re: '"id":\s*"([^"]+)"', pick: all}}
       right: {http_list: {url: "https://api.github.com/repos/VHP4Safety/cloud/contents/docs/service", re: '"name":\s*"((?!template\.)[^"/]+)\.json"', pick: all}, on_error: unknown}
@@ -43,6 +45,7 @@ checks:
     kind: http
     every: 1d
     describe: GitHub Pages serves a catalogue entry's detail JSON to the platform.
+    purpose: The platform reads tool details from this site; if it stops serving them, tool pages break.
     request: {url: "https://cloud.vhp4safety.nl/service/molaopbuilder.json", parse_json: true}
     assert:
       - {that: status, eq: 200}

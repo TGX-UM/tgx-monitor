@@ -18,9 +18,10 @@ notes: >-
 checks:
   - id: mb-home
     kind: http
-    every: 5m
+    every: 30m
     via: [public, tgx1, tgx2]
     describe: The Builder home page loads through public DNS and on each node.
+    purpose: Shows that people can open the molAOP Builder.
     request: {url: "https://molaop-builder.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -31,6 +32,7 @@ checks:
     kind: http
     every: 1h
     describe: Plain http is redirected to https on the same name.
+    purpose: Makes old or typed http links still land on the secure site.
     request: {url: "http://molaop-builder.vhp4safety.nl/", follow: false}
     assert:
       - {that: status, in: [301, 308]}
@@ -41,6 +43,7 @@ checks:
     every: 1d
     via: [tgx1, tgx2]
     describe: Both nodes serve a trusted certificate for the name, not Traefik's default, with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of the Builder.
     request: {host: molaop-builder.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}
@@ -53,6 +56,7 @@ checks:
     kind: http
     every: 5m
     describe: The health endpoint reports the database, embeddings, login and every suggestion service as working.
+    purpose: Tells us every part of the Builder works, not just the web page.
     request: {url: "https://molaop-builder.vhp4safety.nl/health", parse_json: true}
     assert:
       - {that: status, eq: 200}
@@ -75,6 +79,7 @@ checks:
     every: 1h
     timeout: 45s
     describe: The public API lists the WikiPathways, GO and Reactome mappings and the mapped AOPs, and none of the totals shrank.
+    purpose: Catches curated mappings going missing from the public API.
     request:
       base: https://molaop-builder.vhp4safety.nl
       steps:
@@ -106,6 +111,7 @@ checks:
     every: 6h
     timeout: 60s
     describe: The KE-WikiPathways GMT export has its provenance header only at the top and well-formed gene sets.
+    purpose: Users download these gene-set files for analysis; a broken file breaks their analysis tools.
     request:
       steps: [{url: "https://molaop-builder.vhp4safety.nl/exports/gmt/ke-wp"}]
     assert:
@@ -121,6 +127,7 @@ checks:
     every: 6h
     timeout: 60s
     describe: The KE-GO GMT export has its provenance header only at the top and well-formed gene sets.
+    purpose: Users download these gene-set files for analysis; a broken file breaks their analysis tools.
     request:
       steps: [{url: "https://molaop-builder.vhp4safety.nl/exports/gmt/ke-go"}]
     assert:
@@ -136,6 +143,7 @@ checks:
     every: 6h
     timeout: 60s
     describe: The KE-Reactome GMT export has its provenance header only at the top and well-formed gene sets.
+    purpose: Users download these gene-set files for analysis; a broken file breaks their analysis tools.
     request:
       steps: [{url: "https://molaop-builder.vhp4safety.nl/exports/gmt/ke-reactome"}]
     assert:
@@ -151,6 +159,7 @@ checks:
     alert_after: 2d
     timeout: 60s
     describe: The Builder knows the same AOPs as AOP-Wiki (within 3), and a known AOP has the same number of Key Events in both.
+    purpose: Catches the Builder falling behind AOP-Wiki, so new AOPs would be missing for curators.
     request:
       left: {http_json: {url: "https://molaop-builder.vhp4safety.nl/api/v1/aops?per_page=1", path: pagination.total}}
       right: {sparql: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/marvin-apps/aopwiki-aops-with-kes.rq}}

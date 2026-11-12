@@ -15,6 +15,7 @@ checks:
     kind: http
     every: 5m
     describe: The ToxTempAssistant front page loads with its release number.
+    purpose: Shows that people can open ToxTempAssistant.
     request: {url: "https://toxtempassistant.vhp4safety.nl/"}
     assert:
       - {that: status, eq: 200}
@@ -28,6 +29,7 @@ checks:
     kind: roundtrip
     every: 1h
     describe: The about page, sitemap, robots file and the ToxTemp question list (read from the database) are all served.
+    purpose: Checks the main pages and the question list, which comes from the database, all work.
     request:
       base: https://toxtempassistant.vhp4safety.nl
       steps:
@@ -51,6 +53,7 @@ checks:
     kind: http
     every: 1h
     describe: Protected pages send an anonymous visitor to the sign-in page.
+    purpose: Users' documents must stay private to people who are not signed in.
     request: {url: "https://toxtempassistant.vhp4safety.nl/stats/", follow: false}
     assert:
       - {that: status, eq: 302}
@@ -62,6 +65,7 @@ checks:
     every: 6h
     alert_after: 24h
     describe: The public site runs the latest GitHub release within a day of its publication.
+    purpose: Shows whether the live site runs the newest published version.
     request:
       left: {http_regex: {url: "https://toxtempassistant.vhp4safety.nl/", re: '(v\d+\.\d+\.\d+)'}}
       right:
@@ -76,6 +80,7 @@ checks:
     every: 1d
     via: [public]
     describe: The public site serves a trusted certificate with time to spare.
+    purpose: Without a valid certificate, browsers show a security warning instead of the site.
     request: {host: toxtempassistant.vhp4safety.nl}
     assert:
       - {that: verified, eq: true}

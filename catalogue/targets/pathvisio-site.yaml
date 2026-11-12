@@ -13,6 +13,7 @@ checks:
     kind: http
     every: 15m
     describe: The PathVisio home page loads.
+    purpose: Shows that people can open the PathVisio website.
     request: {url: "https://pathvisio.org/"}
     assert:
       - {that: status, eq: 200}
@@ -23,6 +24,7 @@ checks:
     kind: http
     every: 1h
     describe: www.pathvisio.org redirects to https://pathvisio.org/.
+    purpose: Makes the www address land on the main site.
     request: {url: "https://www.pathvisio.org/"}
     assert:
       - {that: status, eq: 200}
@@ -34,6 +36,7 @@ checks:
     every: 1h
     timeout: 60s
     describe: The download page links the zip, Windows, macOS and Linux installers, and each one downloads (checked with HEAD).
+    purpose: People download PathVisio from here; this checks every installer actually downloads.
     request:
       steps:
         - url: https://pathvisio.org/downloads.html
@@ -62,6 +65,7 @@ checks:
     kind: http
     every: 1h
     describe: The plugin repository page that PathVisio's plugin manager reads is up.
+    purpose: PathVisio installs its plugins from this page; if it is down, plugins can't be installed.
     request: {url: "https://pathvisio.github.io/plugins/plugins-repo"}
     assert:
       - {that: status, eq: 200}

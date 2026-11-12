@@ -15,6 +15,7 @@ checks:
     every: 1h
     via: [core]
     describe: A dump of the Icinga database less than 26 hours old exists off the cluster.
+    purpose: Without a backup, the old monitoring's history and settings would be lost if its database broke.
     request: {mount: hidrive, glob: "icinga/*.sql.gz", small_bytes: 10000}
     assert:
       - {that: count, gte: 1, label: "a backup exists"}

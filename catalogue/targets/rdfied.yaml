@@ -16,6 +16,7 @@ checks:
     kind: dns
     every: 1h
     describe: The planned public name resolves to tgx1 through two public resolvers.
+    purpose: The planned address must point at our servers before RDFied goes public.
     request: {name: rdfied.rdf.bigcat-bioinformatics.org, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: nxdomain, eq: false, label: "an explicit DNS record exists (the *.rdf names are not covered by the wildcard)"}
@@ -28,6 +29,7 @@ checks:
     via: [core]
     public: false
     describe: The four RDFied graphs hold the triples migrated from the original host.
+    purpose: Catches parts of the RDFied data going missing.
     request:
       endpoint: "http://rdfied:8890/sparql"
       file: q/rdf-portals-legacy/rdfied-graphs.rq
@@ -46,6 +48,7 @@ checks:
     via: [core]
     public: false
     describe: The all-in-one Virtuoso service runs its one replica.
+    purpose: Shows the RDFied database is running.
     request: {check: replicas, services: ["rdfied_*"]}
     assert:
       - {that: checked, eq: 1}

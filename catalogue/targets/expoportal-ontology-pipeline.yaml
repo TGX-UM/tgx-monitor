@@ -19,6 +19,7 @@ checks:
     every: 1h
     timeout: 30s
     describe: Processed submissions never decrease, and the number that failed parsing, scoring or diffing stays within its usual range.
+    purpose: Catches uploaded ontologies piling up unprocessed or failing to process.
     request:
       endpoint: https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql
       file: q/ops-jobs/expoportal-submission-status.rq
@@ -41,6 +42,7 @@ checks:
     timeout: 30s
     severity: low
     describe: The newest ontology submission is less than a month old; amber otherwise, as a sign of activity rather than a fault.
+    purpose: Shows whether people are still adding ontologies; a long quiet spell is worth knowing about.
     request:
       endpoint: https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql
       file: q/ops-jobs/expoportal-latest-submission.rq
@@ -55,6 +57,7 @@ checks:
     every: 15m
     via: [core]
     describe: Neither the pipeline worker nor its queue store was killed for lack of memory in the past day, which loses parse work.
+    purpose: When the processing worker runs out of memory, ontology uploads are silently lost.
     request:
       check: crash_loops
       services: [ontoportal_redis, ontoportal_ncbo_cron]

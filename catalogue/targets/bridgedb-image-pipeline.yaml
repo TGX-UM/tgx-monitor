@@ -19,6 +19,7 @@ checks:
     kind: invariant
     every: 6h
     describe: The latest tag on Docker Hub is the newest versioned image, so latest points at a tested release.
+    purpose: Anyone pulling the "latest" BridgeDb image should get the newest tested version.
     request:
       left: {http_json: {url: "https://hub.docker.com/v2/repositories/bigcatum/bridgedb/tags/latest", path: digest}, on_error: unknown}
       right: {http_json: {url: "https://hub.docker.com/v2/repositories/bigcatum/bridgedb/tags?page_size=1&ordering=last_updated&name=-", path: results.0.digest}, on_error: unknown}
@@ -31,6 +32,7 @@ checks:
     every: 6h
     alert_after: 48h
     describe: The newest webservice release has a Docker image, published within two days of the release.
+    purpose: A new BridgeDb release is only usable once its image is published; this catches a missing image.
     request:
       left: {http_json: {url: "https://api.github.com/repos/bridgedb/BridgeDbWebservice/releases/latest", path: tag_name}, on_error: unknown}
       right: {http_json: {url: "https://hub.docker.com/v2/repositories/bigcatum/bridgedb/tags?page_size=1&ordering=last_updated&name=-", path: results.0.name}, extract: '-([0-9][0-9.]*)$', on_error: unknown}
@@ -42,6 +44,7 @@ checks:
     kind: gha
     every: 1h
     describe: The weekly check of the published image is enabled and passed within the past eight days.
+    purpose: This weekly job tests the published image; if it stops, a broken image could go unnoticed.
     request: {repo: bridgedb/docker, workflow: verify-published-image.yml}
     assert:
       - {that: state, eq: active, label: "not disabled (GitHub turns schedules off after 60 quiet days)"}
@@ -53,6 +56,7 @@ checks:
     kind: gha
     every: 1h
     describe: The last image build on the main branch succeeded, so the next release can ship an image.
+    purpose: If this build is broken, the next BridgeDb release cannot be shipped.
     request: {repo: bridgedb/docker, workflow: buildandpush.yml, branch: main}
     assert:
       - {that: state, eq: active}

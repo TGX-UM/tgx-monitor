@@ -18,6 +18,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: The classic and webservice names are redirect stubs to the current site.
+    purpose: Old WikiPathways addresses should still send people to the current site.
     request:
       steps:
         - {url: "https://classic.wikipathways.org/"}
@@ -33,6 +34,7 @@ checks:
     kind: http
     every: 1d
     describe: new.wikipathways.org still serves the WikiPathways GitHub Pages redirect page (a change could mean someone else claimed the name).
+    purpose: If this old address starts showing something else, someone else may have taken it over.
     request: {url: "https://new.wikipathways.org/", verify: false}
     assert:
       - {that: status, eq: 200}
@@ -44,6 +46,7 @@ checks:
     kind: dns
     every: 1h
     describe: new.wikipathways.org still points at the WikiPathways GitHub Pages account.
+    purpose: If this old address moves elsewhere, someone else may have taken it over.
     request: {name: new.wikipathways.org, type: CNAME, resolvers: [1.1.1.1, 9.9.9.9]}
     assert:
       - {that: answers, has: wikipathways.github.io}
@@ -53,6 +56,7 @@ checks:
     kind: roundtrip
     every: 1d
     describe: The retired staging names still answer 404 from the proxy (known state; they serve nothing).
+    purpose: These retired addresses should stay inactive; a change means something was set up without us knowing.
     request:
       steps:
         - {url: "https://wikipathways-sparql.cloud.vhp4safety.nl/"}

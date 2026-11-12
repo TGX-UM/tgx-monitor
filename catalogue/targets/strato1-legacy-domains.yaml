@@ -16,6 +16,7 @@ checks:
     kind: security
     every: 1d
     describe: Records whether https://enanomapper.org/ answers again (known state is that nothing answers).
+    purpose: Records whether this old site starts answering again.
     request: {url: "https://enanomapper.org/", expect_status: [200, 301, 302]}
     assert:
       - {that: reachable, eq: false, label: "known state: the legacy web server is down"}
@@ -25,6 +26,7 @@ checks:
     kind: security
     every: 1d
     describe: Records whether https://dbnp.org/ answers again (known state is that nothing answers).
+    purpose: Records whether this old site starts answering again.
     request: {url: "https://dbnp.org/", expect_status: [200, 301, 302]}
     assert:
       - {that: reachable, eq: false, label: "known state: the legacy web server is down"}
@@ -34,6 +36,7 @@ checks:
     kind: security
     every: 1d
     describe: Records whether https://wikipathways.com/ answers again (known state is that nothing answers).
+    purpose: Records whether this old site starts answering again.
     request: {url: "https://wikipathways.com/", expect_status: [200, 301, 302]}
     assert:
       - {that: reachable, eq: false, label: "known state: the legacy web server is down"}
@@ -44,6 +47,7 @@ checks:
     every: 1d
     severity: low
     describe: The enanomapper.org registration does not run out within the next two months.
+    purpose: If the registration lapses, someone else can buy the name and misuse it.
     request:
       left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/enanomapper.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
       right: {const: "registration"}
@@ -56,6 +60,7 @@ checks:
     every: 1d
     severity: low
     describe: The dbnp.org registration does not run out within the next two months.
+    purpose: If the registration lapses, someone else can buy the name and misuse it.
     request:
       left: {http_regex: {url: "https://rdap.publicinterestregistry.org/rdap/domain/dbnp.org", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
       right: {const: "registration"}
@@ -68,6 +73,7 @@ checks:
     every: 1d
     severity: low
     describe: The wikipathways.com registration does not run out within the next two months.
+    purpose: If the registration lapses, someone else can buy the name and misuse it.
     request:
       left: {http_regex: {url: "https://rdap.verisign.com/com/v1/domain/wikipathways.com", re: '"eventAction":\s*"expiration",\s*"eventDate":\s*"([^"]+)"'}, on_error: unknown}
       right: {const: "registration"}
