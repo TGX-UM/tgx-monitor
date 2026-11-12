@@ -1,0 +1,84 @@
+id: job-sparql-examples-load
+name: Daily SPARQL examples load job
+group: Jobs and backups
+class: cron
+criticality: medium
+owners: [marvinm2]
+depends_on: [swarm, github-raw]
+public: true
+public_summary: Every day at 07:30 UTC a cluster job loads the WikiPathways and AOP-Wiki example queries into their SPARQL endpoints, so the examples can be queried next to the data.
+links:
+  - https://sparql.wikipathways.org/sparql
+  - https://aopwiki.rdf.bigcat-bioinformatics.org/sparql
+# Swarm service cronjobs_sparql-examples-load (30 7 * * *, added 2026-11-12). It loads each
+# examples-index/sparql-examples.ttl into the named graph <endpoint>/.well-known/sparql-examples
+# of aopwiki-snorql_virtuoso, wikipathways-ep and wikipathways-ep2, and exits 1 if any store
+# ends up with a different number of examples than the file.
+#
+# The data reloads wipe that graph (RDF_GLOBAL_RESET): AOP-Wiki on Sundays from 06:00, and the
+# WikiPathways store that goes live at 04:00 on the 12th was wiped at 02:00. The job puts it back
+# at 07:30, so the count checks wait 4h before alerting instead of following those windows.
+checks:
+  - id: job-sparql-examples-load-ran
+    kind: job_run
+    every: 15m
+    via: [core]
+    describe: The daily examples load ran at 07:30 UTC, exited cleanly and logged its finish line.
+    purpose: If this job stops, the example queries disappear from the endpoints after the next data reload.
+    request:
+      service: cronjobs_sparql-examples-load
+      grace: 30m
+      marker_re: '=== SPARQL examples load finished (\S+) ==='
+    assert:
+      - {that: schedule, eq: "30 7 * * *", label: "scheduled daily 07:30 UTC"}
+      - {that: ran, eq: true}
+      - {that: run.exit_code, eq: 0}
+      - {that: marker_found, eq: true, label: "log ends with '=== SPARQL examples load finished'"}
+
+  - id: sparql-examples-wp-count
+    kind: sparql
+    every: 1h
+    alert_after: 4h
+    describe: The WikiPathways endpoint holds its example queries in its sparql-examples graph.
+    purpose: People and tools that look up the WikiPathways examples with SPARQL find nothing if the graph is empty.
+    request: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/sparql-examples/count.rq}
+    assert:
+      - {that: first.n, gte: 85, label: "≥ 85 examples (WPQ001-085, identifiers are never removed)"}
+
+  - id: sparql-examples-wp-newest
+    kind: compare
+    every: 6h
+    alert_after: 30h
+    describe: The newest example identifier in the WikiPathways endpoint is the newest one in the published index.
+    purpose: Shows that new examples reach the endpoint, not only the editor.
+    request:
+      left: {sparql: {endpoint: "https://sparql.wikipathways.org/sparql", file: q/sparql-examples/newest-id.rq, value: id}}
+      right:
+        http_list: {url: "https://raw.githubusercontent.com/wikipathways/SPARQLQueries/examples-index/index.json", re: '"id":\s*"(WPQ[0-9]+)"', pick: newest}
+        on_error: unknown
+    assert:
+      - {that: left, eq_path: right, label: "endpoint newest == index newest"}
+
+  - id: sparql-examples-aopwiki-count
+    kind: sparql
+    every: 1h
+    alert_after: 4h
+    describe: The AOP-Wiki endpoint holds its example queries in its sparql-examples graph.
+    purpose: People and tools that look up the AOP-Wiki examples with SPARQL find nothing if the graph is empty.
+    request: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/sparql-examples/count.rq}
+    assert:
+      - {that: first.n, gte: 43, label: "≥ 43 examples (AOPQ001-043, identifiers are never removed)"}
+
+  - id: sparql-examples-aopwiki-newest
+    kind: compare
+    every: 6h
+    alert_after: 30h
+    describe: The newest example identifier in the AOP-Wiki endpoint is the newest one in the published index.
+    purpose: Shows that new examples reach the endpoint, not only the editor.
+    request:
+      left: {sparql: {endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql", file: q/sparql-examples/newest-id.rq, value: id}}
+      right:
+        http_list: {url: "https://raw.githubusercontent.com/marvinm2/AOP-Wiki-Queries/examples-index/index.json", re: '"id":\s*"(AOPQ[0-9]+)"', pick: newest}
+        on_error: unknown
+    assert:
+      - {that: left, eq_path: right, label: "endpoint newest == index newest"}

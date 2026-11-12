@@ -1,0 +1,8 @@
+# The highest example identifier in the endpoint's sparql-examples graph. Identifiers are never
+# reused or removed, so this equals the newest one in the published index once the job has run.
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+SELECT (MAX(STR(?id)) AS ?id) WHERE {
+  GRAPH ?g { ?ex a sh:SPARQLExecutable ; dcterms:identifier ?id }
+  FILTER(STRENDS(STR(?g), "/.well-known/sparql-examples"))
+}

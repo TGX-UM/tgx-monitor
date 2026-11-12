@@ -1,0 +1,7 @@
+# Example queries in the endpoint's own sparql-examples graph (loaded daily by
+# cronjobs_sparql-examples-load). FILTER on the graph name so one file serves both endpoints.
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+SELECT (COUNT(DISTINCT ?ex) AS ?n) WHERE {
+  GRAPH ?g { ?ex a sh:SPARQLExecutable }
+  FILTER(STRENDS(STR(?g), "/.well-known/sparql-examples"))
+}
