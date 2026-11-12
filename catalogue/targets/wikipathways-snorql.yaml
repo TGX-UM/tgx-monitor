@@ -60,7 +60,7 @@ checks:
     via: [core]
     describe: The pinned UI image can be pulled from the registry, and both nodes have it.
     purpose: If the server running the editor fails, the other one needs a copy of it to take over.
-    request: {image: "ghcr.io/wikipathways/snorql-ui:1.5.0"}
+    request: {image: "ghcr.io/wikipathways/snorql-ui:1.5.1"}
     assert:
       - {that: reachable, eq: true}
       - {that: missing_on_nodes, len_eq: 0}
