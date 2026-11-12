@@ -334,3 +334,15 @@ def test_known_issues_and_windows_are_validated(tmp_path):
     probs = problems(cat)
     assert any(p.startswith("maintenance.yaml:") for p in probs)
     assert any(p.startswith("known_issues.yaml:") for p in probs)
+
+
+def test_private_checks_need_no_purpose(tmp_path):
+    """Private checks come from a Docker secret; the purpose rule covers the public catalogue."""
+    import yaml
+
+    make(tmp_path)
+    priv = target("svc-p")
+    del priv["checks"][0]["purpose"]
+    cat = catmod.load(tmp_path, yaml.safe_dump([priv]))
+    assert problems(cat) == []
+    assert "svc-p" in cat.private_ids

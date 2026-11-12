@@ -213,6 +213,7 @@ class Catalogue:
                     self.problems.append(f"{path.name}: duplicate target id {t.id}")
                 self.targets[t.id] = t
         private_known: list[Any] = []
+        self.private_ids: set[str] = set()  # targets from the private secret, not from git
         if self.private_yaml:
             try:
                 raw = yaml.safe_load(self.private_yaml) or []
@@ -236,6 +237,7 @@ class Catalogue:
                 if t.id in self.targets:
                     self.problems.append(f"private checks: duplicate target id {t.id}")
                 self.targets[t.id] = t
+                self.private_ids.add(t.id)
         own = self.root / "owners.yaml"
         if own.exists():
             try:
@@ -356,7 +358,9 @@ class Catalogue:
                             probs.append(f"{t.id}/{c.id}: {exc}")
                 if c.enabled and not c.assert_:
                     probs.append(f"{t.id}/{c.id}: no assertions")
-                if c.enabled and not (c.describe and c.purpose):
+                # The purpose line is required in the public catalogue; private checks
+                # live in a Docker secret and get theirs when the secret is next rotated.
+                if c.enabled and t.id not in self.private_ids and not (c.describe and c.purpose):
                     probs.append(f"{t.id}/{c.id}: needs describe (what is checked) and "
                                  "purpose (why, in plain words)")
                 for a in c.assert_:
