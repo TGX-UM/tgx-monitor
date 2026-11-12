@@ -58,34 +58,34 @@ checks:
       - {that: body, contains: 'endpoint: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"'}
       - {that: body, contains: 'examplesRepo: "https://github.com/marvinm2/AOP-Wiki-Queries"'}
       - {that: body, contains: 'examplesBranch: "main"'}
+      - {that: body, contains: 'examplesFormat: "index"', label: "examples come from the published index (since 2026-11-12)"}
     inv_ids: [ui-config]
 
   - id: aopwiki-ui-examples-tree
     kind: compare
     every: 1d
-    describe: The example query repository the explorer lists still holds at least 40 queries.
+    describe: The examples index the explorer reads (examples-index branch of AOP-Wiki-Queries) still lists at least 40 queries.
     purpose: Catches the example queries disappearing, which users rely on to get started.
     request:
       left:
         http_list:
-          url: "https://api.github.com/repos/marvinm2/AOP-Wiki-Queries/git/trees/main?recursive=1"
-          re: '"path":\s*"([^"]+\.rq)"'
+          url: "https://raw.githubusercontent.com/marvinm2/AOP-Wiki-Queries/examples-index/index.json"
+          re: '"id":\s*"(AOPQ[0-9]+)"'
           pick: all
-          headers: {Accept: application/vnd.github+json}
         on_error: unknown
       right: {const: 40}
     assert:
-      - {that: left, len_gte: 40, label: "≥ 40 example .rq files"}
+      - {that: left, len_gte: 40, label: "≥ 40 examples in the index"}
     inv_ids: [ui-examples-tree]
 
   - id: aopwiki-ui-example-count-aops
     kind: roundtrip
     every: 1h
-    describe: The "count AOPs" example, sent exactly as the explorer sends it (bare aopo prefix), gives the same number as a direct count.
+    describe: The "count AOPs" example (AOPQ001, as published in the examples index) gives the same number as a direct count.
     purpose: Runs an example the way a user would and checks the answer, so examples don't silently give wrong numbers.
     request:
       steps:
-        - url: "https://raw.githubusercontent.com/marvinm2/AOP-Wiki-Queries/main/A.%20Metadata/count-aops.rq"
+        - url: "https://raw.githubusercontent.com/marvinm2/AOP-Wiki-Queries/examples-index/rq/A.%20Metadata/count-aops.rq"
           capture: {q: {regex: '(?s)(.+)'}}
         - url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql"
           params: {query: "{q}"}
