@@ -457,6 +457,11 @@ class RegistryKind(Kind):
                 unknown.append(node)
                 continue
             hits = [i for i in images if want & set(i.get("RepoTags") or [])]
+            if not hits and digest:
+                # A service pinned as tag@digest leaves the image untagged on a node that
+                # pulled it by digest only (RepoTags empty); it is still there to run.
+                hits = [i for i in images
+                        if f"{registry}/{repo}@{digest}" in (i.get("RepoDigests") or [])]
             (present if hits else missing).append(node)
             if hits and digest:
                 match[node] = any(d.endswith(digest) for i in hits

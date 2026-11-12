@@ -6,10 +6,10 @@ criticality: medium
 owners: [marvinm2, egonw]
 depends_on: [edge-tgx1, wikipathways-sparql, github-raw]
 public: true
-public_summary: The browser query editor at sparql.wikipathways.org, with example queries loaded from the SPARQLQueries repository.
+public_summary: The browser query editor at sparql.wikipathways.org, with example queries loaded from the index published by the SPARQLQueries repository.
 links: [https://sparql.wikipathways.org/]
 notes: >-
-  The example tree is fetched in the browser from wikipathways/SPARQLQueries on GitHub, so the
+  The example tree is fetched in the browser from the examples-index branch of wikipathways/SPARQLQueries on GitHub (index.json; the .rq files left master on 2026-11-11), so the
   examples depend on GitHub raw. The AOP-Wiki and nanosafety Snorql overlays build from the same
   snorql-ui base image, so a broken base image reaches them too. The known-answer query that the
   UI's "Genes of a Pathway" example runs is checked on the endpoint (wp-sparql-wp254).
@@ -37,16 +37,18 @@ checks:
       - {that: body, contains: 'endpoint: "https://sparql.wikipathways.org/sparql/"'}
       - {that: body, contains: 'examplesRepo: "https://github.com/wikipathways/SPARQLQueries"'}
       - {that: body, contains: 'examplesBranch: "master"'}
+      - {that: body, contains: 'examplesFormat: "index"', label: "examples come from the published index (since UI 1.4.0)"}
     inv_ids: [snorql-config]
 
   - id: snorql-examples-source
     kind: http
     every: 1h
-    describe: An example query the UI deep-links to is still published with its parameter header.
-    request: {url: "https://raw.githubusercontent.com/wikipathways/SPARQLQueries/master/D.%20General/GenesofPathway.rq"}
+    describe: The published example index the UI reads lists an example it deep-links to, with its parameter.
+    request: {url: "https://raw.githubusercontent.com/wikipathways/SPARQLQueries/examples-index/index.json"}
     assert:
       - {that: status, eq: 200}
-      - {that: body, contains: "# param: pathwayId"}
+      - {that: body, contains: '"id": "WPQ036"'}
+      - {that: body, contains: '"name": "pathwayId"'}
     inv_ids: [snorql-examples-source]
 
   - id: snorql-image
@@ -54,7 +56,7 @@ checks:
     every: 1h
     via: [core]
     describe: The pinned UI image can be pulled from the registry, and both nodes have it.
-    request: {image: "ghcr.io/wikipathways/snorql-ui:1.3.0"}
+    request: {image: "ghcr.io/wikipathways/snorql-ui:1.4.1"}
     assert:
       - {that: reachable, eq: true}
       - {that: missing_on_nodes, len_eq: 0}

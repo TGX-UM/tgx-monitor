@@ -1,14 +1,26 @@
-# Per-layer triple counts as recorded by the reload's VoID statistics in the void graph
-# (named-graph layout only; an old single-graph instance returns no rows). Reads stored
-# void:triples values, so it is cheap: it never counts the live graphs.
+# Per-layer triple counts. The release layers (wp, gpml, authors) come from the reload's VoID
+# statistics in the void graph, so they are cheap: the big graphs are never counted. The
+# ontologies layer is counted directly (~1.2M triples, well under a second): since the
+# 20261110 release the VoID gives one count per imported ontology file instead of one for the
+# graph. An old single-graph instance returns no VoID rows and an ontologies count of 0.
 PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX sd: <http://www.w3.org/ns/sparql-service-description#>
-SELECT ?g (MAX(?t) AS ?n) WHERE {
-  GRAPH <http://rdf.wikipathways.org/graph/void> {
-    { ?g void:triples ?t }
-    UNION
-    { ?x sd:name ?g ; sd:graph ?gr . ?gr void:triples ?t }
+SELECT ?g ?n WHERE {
+  {
+    SELECT ?g (MAX(?t) AS ?n) WHERE {
+      GRAPH <http://rdf.wikipathways.org/graph/void> {
+        { ?g void:triples ?t }
+        UNION
+        { ?x sd:name ?g ; sd:graph ?gr . ?gr void:triples ?t }
+      }
+      FILTER(STRSTARTS(STR(?g), "http://rdf.wikipathways.org/graph/")
+             && ?g != <http://rdf.wikipathways.org/graph/ontologies>)
+    }
+    GROUP BY ?g
   }
-  FILTER(STRSTARTS(STR(?g), "http://rdf.wikipathways.org/graph/"))
+  UNION
+  {
+    SELECT (<http://rdf.wikipathways.org/graph/ontologies> AS ?g) (COUNT(*) AS ?n)
+    WHERE { GRAPH <http://rdf.wikipathways.org/graph/ontologies> { ?s ?p ?o } }
+  }
 }
-GROUP BY ?g

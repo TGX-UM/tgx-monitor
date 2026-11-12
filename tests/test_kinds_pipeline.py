@@ -286,6 +286,24 @@ async def test_registry_public_with_nodes() -> None:
     assert o.values["nodes_unknown"] == ["tgx2"] and o.values["missing_on_nodes"] == []
 
 
+class DigestOnlyDocker(FakeDocker):
+    """tgx2 pulled the image by digest only (a tag@digest service pin): no RepoTags."""
+    async def images(self, node: str, calls: list[Call] | None = None) -> list[dict[str, Any]]:
+        if node == "tgx2":
+            return [{"RepoTags": [], "RepoDigests": ["ghcr.io/vhp4safety/oppbk@sha256:d1"]},
+                    {"RepoTags": [], "RepoDigests": ["ghcr.io/vhp4safety/oppbk@sha256:old"]}]
+        return await super().images(node, calls)
+
+
+async def test_registry_digest_only_image_counts_as_present() -> None:
+    c = ctx(registry_route(private=False), docker=DigestOnlyDocker())
+    o = await KINDS["registry"]().observe(
+        check("registry", {"image": "ghcr.io/vhp4safety/oppbk:latest"}), "public", c)
+    v = o.values
+    assert v["present_on_nodes"] == ["tgx1", "tgx2"] and v["missing_on_nodes"] == []
+    assert v["node_digest_match"] == {"tgx1": True, "tgx2": True}
+
+
 async def test_registry_private_needs_pat() -> None:
     chk = check("registry", {"image": "ghcr.io/vhp4safety/oppbk:latest"})
     o = await KINDS["registry"]().observe(chk, "public", ctx(registry_route(private=True)))
