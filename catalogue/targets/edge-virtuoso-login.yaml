@@ -1,0 +1,133 @@
+id: edge-virtuoso-login
+name: Virtuoso login paths closed at the edge
+group: Cluster
+class: security
+criticality: high
+owners: [marvinm2, egonw]
+depends_on: [edge-tgx1, edge-tgx2]
+public: true
+public_summary: The public SPARQL endpoints answer anonymous read-only queries; the database's login and admin paths are closed at the web proxy.
+links: []
+notes: >-
+  Traefik dynamic file virtuoso-auth-deny.yml (2026-11-13) answers 403 for /sparql-auth,
+  /sparql-graph-crud-auth, /DAV and /conductor on every public Virtuoso host; the label routers send
+  /sparql* or the whole host to Virtuoso, so without that file these paths reach the database.
+  One check per host on /sparql-auth, through both nodes (file-provider edits do not reach tgx2 by
+  themselves). The /conductor checks stay in their own targets.
+checks:
+  - id: virtuoso-login-closed-aopwiki
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on aopwiki.rdf.bigcat-bioinformatics.org is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://aopwiki.rdf.bigcat-bioinformatics.org/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
+
+  - id: virtuoso-login-closed-aopwiki-vhp
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on aopwiki-rdf.vhp4safety.nl is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://aopwiki-rdf.vhp4safety.nl/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
+
+  - id: virtuoso-login-closed-wikipathways
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on sparql.wikipathways.org is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://sparql.wikipathways.org/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
+
+  - id: virtuoso-login-closed-multirdf
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on aopwiki-multirdf.vhp4safety.nl is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://aopwiki-multirdf.vhp4safety.nl/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
+
+  - id: virtuoso-login-closed-aopdb
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on aopdb.rdf.bigcat-bioinformatics.org is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://aopdb.rdf.bigcat-bioinformatics.org/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
+
+  - id: virtuoso-login-closed-chembl
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on chemblmirror.rdf.bigcat-bioinformatics.org is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://chemblmirror.rdf.bigcat-bioinformatics.org/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
+
+  - id: virtuoso-login-closed-nanolinks
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on nanolinks.rdf.bigcat-bioinformatics.org is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://nanolinks.rdf.bigcat-bioinformatics.org/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
+
+  - id: virtuoso-login-closed-nanosafety
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on nanosafety.rdf.bigcat-bioinformatics.org is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://nanosafety.rdf.bigcat-bioinformatics.org/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
+
+  - id: virtuoso-login-closed-sbd4nano
+    kind: security
+    every: 1h
+    via: [tgx1, tgx2]
+    describe: The database login path on sbd4nanolandscape.rdf.bigcat-bioinformatics.org is closed at the web proxy, on both nodes.
+    purpose: A reachable login path lets anyone with a database password change or delete the data.
+    request:
+      url: "https://sbd4nanolandscape.rdf.bigcat-bioinformatics.org/sparql-auth"
+      expect_status: [403]
+      absent_markers: ["Digest realm"]
+    assert:
+      - {that: exposed, eq: false}
