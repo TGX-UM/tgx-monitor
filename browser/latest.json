@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-15T18:54:34+00:00",
+ "generated_at": "2026-11-16T06:32:33+00:00",
  "pages": [
   {
    "checks": {
@@ -12,7 +12,7 @@
    "found": 102,
    "id": "aopwiki-dashboard-trends",
    "marks": 156,
-   "ms": 26667,
+   "ms": 26121,
    "ok": true,
    "problems": [],
    "status": 200,
@@ -30,7 +30,7 @@
    "found": 12,
    "id": "vhp-platform-tools",
    "marks": 2,
-   "ms": 2064,
+   "ms": 1466,
    "ok": true,
    "problems": [],
    "status": 200,
@@ -48,7 +48,7 @@
    "found": 1,
    "id": "wikipathways-upload-landing",
    "marks": 1,
-   "ms": 1037,
+   "ms": 710,
    "ok": true,
    "problems": [],
    "status": 200,
@@ -66,7 +66,7 @@
    "found": 4,
    "id": "molaop-builder-landing",
    "marks": 4,
-   "ms": 1258,
+   "ms": 1050,
    "ok": true,
    "problems": [],
    "status": 200,
@@ -80,7 +80,7 @@
    "found": 0,
    "id": "oppbk",
    "marks": 0,
-   "ms": 64083,
+   "ms": 63899,
    "ok": false,
    "problems": [
     "TimeoutError: Page.wait_for_selector: Timeout 60000ms exceeded."
@@ -100,7 +100,7 @@
    "found": 1,
    "id": "xploreaop",
    "marks": 1,
-   "ms": 3567,
+   "ms": 2483,
    "ok": true,
    "problems": [],
    "status": 200,
@@ -114,7 +114,7 @@
    "found": 0,
    "id": "arrayanalysis",
    "marks": 0,
-   "ms": 61822,
+   "ms": 61338,
    "ok": false,
    "problems": [
     "TimeoutError: Page.wait_for_selector: Timeout 60000ms exceeded."
@@ -134,7 +134,7 @@
    "found": 1,
    "id": "llemy",
    "marks": 0,
-   "ms": 2459,
+   "ms": 1889,
    "ok": false,
    "problems": [
     "check text failed"
