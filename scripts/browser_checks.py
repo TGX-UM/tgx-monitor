@@ -70,12 +70,16 @@ def check_page(browser: Any, spec: dict[str, Any]) -> dict[str, Any]:
     try:
         resp = page.goto(spec["url"], wait_until="domcontentloaded")
         out["status"] = resp.status if resp else None
+        out["title"] = page.title()  # read again below; this one survives a timeout
         if spec.get("scroll"):
             page.wait_for_load_state("networkidle")
             _scroll_through(page)
         sel = spec.get("wait_for")
         if sel:
-            page.wait_for_selector(sel, state="visible")
+            # Playwright judges visibility on the FIRST match only. Pages whose first match
+            # is hidden (an empty Shiny output, an output on a tab that is not open) need
+            # wait_state: attached, which only asks that the element is in the page.
+            page.wait_for_selector(sel, state=spec.get("wait_state", "visible"))
             want = int(spec.get("min_count", 1))
             deadline = time.perf_counter() + timeout_ms / 1000
             while page.locator(sel).count() < want and time.perf_counter() < deadline:
@@ -91,7 +95,9 @@ def check_page(browser: Any, spec: dict[str, Any]) -> dict[str, Any]:
         if spec.get("text_contains"):
             out["checks"]["text"] = spec["text_contains"] in page.inner_text("body")
     except PWError as exc:
-        out["problems"].append(f"{type(exc).__name__}: {str(exc).splitlines()[0][:300]}")
+        # the second line often names the cause ("locator resolved to N elements ...")
+        detail = " | ".join(ln.strip() for ln in str(exc).splitlines()[:2] if ln.strip())
+        out["problems"].append(f"{type(exc).__name__}: {detail[:400]}")
     finally:
         out["ms"] = round((time.perf_counter() - t0) * 1000)
         ctx.close()

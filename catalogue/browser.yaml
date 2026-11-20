@@ -7,6 +7,9 @@
 # Per page:
 #   url, describe          what to open and why it matters
 #   wait_for               CSS selector that must appear (and be visible)
+#   wait_state             visible (default) or attached. Playwright tests visibility on the
+#                          first match only; use attached when that one may be hidden (an
+#                          empty Shiny output, or outputs on a tab that does not open first)
 #   min_count              at least this many matches of wait_for (default 1)
 #   marks                  CSS selector for drawn data (plot traces, numbers); must be >= 1
 #   title_contains         substring of <title>
@@ -55,6 +58,7 @@ pages:
     url: https://oppbk.cloud.vhp4safety.nl/
     describe: The OP PBK model app starts its Shiny session and draws its outputs.
     wait_for: ".shiny-bound-output"
+    wait_state: attached  # the opening tab (Model Structure) has no outputs; the rest are hidden
     min_count: 7
     title_contains: OP PBK model
     timeout: 60
@@ -71,6 +75,7 @@ pages:
     url: https://arrayanalysis.vhp4safety.nl/
     describe: ArrayAnalysis starts its Shiny session and binds its inputs and outputs.
     wait_for: ".shiny-bound-output"
+    wait_state: attached  # the first output (versionMessage) is empty, so never visible
     min_count: 100
     title_contains: ArrayAnalysis
     timeout: 60
@@ -78,7 +83,8 @@ pages:
   - id: llemy
     url: https://llemy.vhp4safety.nl/
     describe: Llemy's Streamlit app renders its login screen without console errors.
-    wait_for: "[data-testid=stApp]"
+    wait_for: "h1:has-text('API Key Login')"  # stApp is only the frame; wait for the script's output
+    title_contains: Llemy
     text_contains: API Key Login
     max_console_errors: 0
     timeout: 60

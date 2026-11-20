@@ -29,23 +29,3 @@
     DNS cutover.
   owner: egonw
   until: '2026-12-31'
-- target: oppbk
-  check: oppbk-browser
-  reason: The browser run does not publish its results yet and the page is not yet in browser.yaml.
-  owner: marvinm2
-  until: '2026-12-31'
-- target: xploreaop
-  check: xploreaop-browser
-  reason: The browser run does not publish its results yet and the page is not yet in browser.yaml.
-  owner: marvinm2
-  until: '2026-12-31'
-- target: arrayanalysis
-  check: arrayanalysis-browser
-  reason: The browser run does not publish its results yet and the page is not yet in browser.yaml.
-  owner: marvinm2
-  until: '2026-12-31'
-- target: llemy
-  check: llemy-browser
-  reason: The browser run does not publish its results yet and the page is not yet in browser.yaml.
-  owner: marvinm2
-  until: '2026-12-31'
