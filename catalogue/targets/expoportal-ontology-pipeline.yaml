@@ -12,13 +12,15 @@ links:
 # ncbo_cron works a Redis queue: an upload becomes UPLOADED, then RDF, indexing,
 # METRICS, ANNOTATOR and FAIRNESS_FOOPS. Large ontologies are deliberately left on the
 # queue, so the backlog never reaches zero. The error counts drift with new uploads, so
-# they are amber thresholds; the progress counts must never fall.
+# they are amber thresholds. The progress counts can fall when curators delete submissions
+# (159 at the BioHackathon peak, 135 after the clean-up of 2026-11-17), so the floors are
+# 95% of the level after that clean-up plus a guard against a sudden drop.
 checks:
   - id: expoportal-pipeline-status
     kind: sparql
     every: 1h
     timeout: 30s
-    describe: Processed submissions never decrease, and the number that failed parsing, scoring or diffing stays within its usual range.
+    describe: Processed submissions stay at their usual level with no sudden drop, and the number that failed parsing, scoring or diffing stays within its usual range.
     purpose: Catches uploaded ontologies piling up unprocessed or failing to process.
     request:
       endpoint: https://sparql.expoportal.biohackeu.bigcat-bioinformatics.org/sparql
@@ -26,14 +28,15 @@ checks:
       pivot: {key: status, value: n}
     assert:
       - {that: status, eq: 200}
-      - {that: by.UPLOADED, gte: 151, label: "≥ 151 submissions"}
-      - {that: by.RDF, gte: 82, label: "≥ 82 parsed to RDF"}
-      - {that: by.ANNOTATOR, gte: 80, label: "≥ 80 through the annotator"}
+      - {that: by.UPLOADED, gte: 128, label: "≥ 128 submissions"}
+      - {that: by.UPLOADED, max_drop_pct: 5, window: 7d, label: "no sudden drop in submissions"}
+      - {that: by.RDF, gte: 112, label: "≥ 112 parsed to RDF"}
+      - {that: by.ANNOTATOR, gte: 107, label: "≥ 107 through the annotator"}
       - {that: by.RDF, monotonic: true}
       - {that: by.ANNOTATOR, monotonic: true}
       - {that: by.ERROR_RDF, lte: 12, warn: true}
       - {that: by.ERROR_FAIRNESS_FOOPS, lte: 6, warn: true}
-      - {that: by.ERROR_DIFF, lte: 3, warn: true}
+      - {that: by.ERROR_DIFF, lte: 5, warn: true}
     inv_ids: [pipeline-status-histogram, pipeline-backlog]
 
   - id: expoportal-pipeline-activity

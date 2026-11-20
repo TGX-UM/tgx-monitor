@@ -23,6 +23,7 @@ checks:
     purpose: Service data is copied between both servers; if the copies drift apart, data can be lost or wrong.
     request: {signal: root_status}
     assert:
+      - {that: present, eq: true, label: "root status file present (host cron)"}
       - {that: gluster.available, eq: true, label: "the gluster CLI answered"}
       - {that: gluster.heal_pending, eq: 0}
       - {that: gluster.split_brain, eq: 0}

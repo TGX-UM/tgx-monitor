@@ -99,6 +99,7 @@ services:
       - {type: bind, source: /mnt/gluster/docker/mct8-docking/results, target: /mounts/mct8-results, read_only: true}
       - {type: bind, source: /mnt/gluster/docker/robot/data, target: /mounts/robot-data, read_only: true}
       - {type: bind, source: /mnt/gluster/docker/biodatafuse/data, target: /mounts/biodatafuse-data, read_only: true}
+      - {type: bind, source: /mnt/gluster/docker/ontoportal/data/fairness, target: /mounts/ontoportal-fairness, read_only: true}
       # Not mounted on purpose: the whole /mnt/gluster/docker (other services' files,
       # some with credentials). Backup directories that do not exist yet (robot,
       # biodatafuse, nsdra, ontoportal) are added when their backup jobs are.

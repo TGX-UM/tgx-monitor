@@ -1,13 +1,13 @@
 # Known live problems in the marvin-apps area (molAOP, qAOP, VHP platform, R-ODAF, ingredient-SMILES).
 # Shown on the page; they do not alert until `until`.
 - target: ingredient-smiles
-  check: null
+  check: ism-mariadistel
   reason: >-
-    The service is at 0/1 replicas since late 2026-11-10: its task exited cleanly and the
-    on-failure restart policy did not start a new one, so Traefik answers 404 for every page.
-    Needs a redeploy (and a restart policy of any).
+    123 cached compound rows (26 KNApSAcK IDs) have an empty SMILES: Wikidata still lists
+    KNApSAcK IDs that KNApSAcK has removed (mariadistel: C00032087). Fixed in the converter;
+    clears once the cache repair (repair_missing_smiles) has run on the cluster.
   owner: marvinm2
-  until: "2026-11-25"
+  until: "2026-11-27"
 - target: molaop-builder
   check: mb-aop-membership
   reason: >-

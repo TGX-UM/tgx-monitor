@@ -11,8 +11,8 @@ links:
   - https://data.expoportal.biohackeu.bigcat-bioinformatics.org/ofaire?ontologies=all
 # Stack-defined swarm-cronjob service ontoportal_fairness-cache (30 3 * * *). A stack
 # redeploy removes its task history, so the recorder must have picked the run up
-# within its 2-minute cycle; the output file's age (mount ontoportal-fairness, not yet
-# in stack.yml) is the second witness.
+# within its 2-minute cycle; the output file's age (mount ontoportal-fairness, the job's
+# output directory on Gluster) is the second witness.
 checks:
   - id: fairness-cache-ran
     kind: job_run
