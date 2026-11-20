@@ -28,8 +28,8 @@ networks:
 
 secrets:
   tgxmon_gh_app_key: {external: true, name: tgxmon_gh_app_key_v2}  # mounted as tgxmon_gh_app_key
-  tgxmon_gh_token: {external: true}
-  tgxmon_ghcr_read_pat: {external: true}
+  tgxmon_gh_token: {external: true, name: tgxmon_gh_token_v2}  # fine-grained, TGX-UM, Actions read on cronjobs + tgx-monitor, expires 2027-11-21
+  tgxmon_ghcr_read_pat: {external: true, name: tgxmon_ghcr_read_pat_v2}  # classic, read:packages only, expires 2027-11-20
   tgxmon_smtp: {external: true}
   tgxmon_contacts: {external: true}
   tgxmon_users: {external: true, name: tgxmon_users_v3}  # mounted as tgxmon_users (marvinm2, egonw)
