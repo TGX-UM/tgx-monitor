@@ -88,13 +88,27 @@ checks:
     every: 1h
     via: [core]
     public: false
-    describe: A copy of the user database less than 26 hours old exists.
-    purpose: Without a recent backup, ROBOT's user data could be lost.
-    request: {mount: robot-backups, glob: "*pbpk*"}
+    describe: A nightly copy of the user database and the saved drafts, less than 26 hours old, exists and decompresses cleanly.
+    purpose: Without a recent backup, ROBOT's users and their saved drafts could be lost.
+    request: {mount: robot-backups, glob: "robot-pbpk-*.tar.gz", small_bytes: 1000}
     assert:
       - {that: count, gte: 1, label: a backup exists}
       - {that: newest_age_h, lt: 26}
       - {that: small_count, eq: 0}
+      - {that: gzip_ok, eq: true}
+    inv_ids: [robot-data-presence]
+
+  - id: robot-backup-offsite
+    kind: file_age
+    every: 6h
+    via: [core]
+    public: false
+    describe: The nightly ROBOT backup also has an off-cluster copy on HiDrive less than 26 hours old.
+    purpose: A copy on the cluster alone is lost with the cluster's storage.
+    request: {mount: hidrive, glob: "robot/robot-pbpk-*.tar.gz", small_bytes: 1000}
+    assert:
+      - {that: count, gte: 1, label: an off-cluster copy exists}
+      - {that: newest_age_h, lt: 26}
     inv_ids: [robot-data-presence]
 
   - id: robot-pin

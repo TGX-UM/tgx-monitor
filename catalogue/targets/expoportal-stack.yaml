@@ -9,8 +9,11 @@ public: false
 public_summary: The cluster services behind ExpoPortal (web UI, API, triple store, search, caches, MCP).
 links: []
 notes: >-
-  Twelve long-running services plus the fairness-cache job (0/0 between runs, which the
-  replica check leaves out). The API, UI and ncbo_cron images run the moving `master`
+  Twelve long-running services plus four jobs, 0/0 between runs, which the replica check
+  leaves out: fairness-cache and, since 2026-11-20, backup-mysql (daily),
+  backup-virtuoso and backup-repository (weekly, Sundays). Backups go beside the stack on
+  GlusterFS (mount ontoportal-backups) and to HiDrive expoportal/ (mount hidrive); caches
+  (redis, solr, mgrep) are not backed up. The API, UI and ncbo_cron images run the moving `master`
   tag, so a recreated task can silently pull new code.
 checks:
   - id: expoportal-stack-replicas
@@ -42,11 +45,49 @@ checks:
     every: 1h
     via: [core]
     timeout: 2m
-    describe: A fresh, non-empty backup of the ExpoPortal database, repository and Redis data exists.
-    purpose: Without recent backups, ExpoPortal's ontologies and settings could be lost.
-    request: {mount: ontoportal-backups, glob: "*/*.gz", recursive: true, small_bytes: 1000}
+    describe: The nightly dump of the ExpoPortal UI database is less than 26 hours old and decompresses cleanly.
+    purpose: Without recent backups, ExpoPortal's settings and accounts could be lost.
+    request: {mount: ontoportal-backups, glob: "mysql/expoportal-mysql-*.sql.gz", small_bytes: 100000}
     assert:
       - {that: count, gte: 1, label: a backup exists}
       - {that: newest_age_h, lt: 26}
+      - {that: small_count, eq: 0}
       - {that: gzip_ok, eq: true}
+    inv_ids: [ontoportal-backup]
+
+  - id: expoportal-virtuoso-backup
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: The weekly online backup of ExpoPortal's triple store (ontology and submission records, user accounts) is less than eight days old on GlusterFS and on HiDrive.
+    purpose: The triple store holds what cannot be rebuilt; without a fresh copy, a corrupted store would lose the registered ontologies and accounts.
+    request: {mount: ontoportal-backups, glob: "virtuoso/expoportal-virtuoso-*.tar.gz", small_bytes: 100000000, verify_gzip: false}
+    assert:
+      - {that: count, gte: 1, label: a backup exists}
+      - {that: newest_age_h, lt: 192}
+      - {that: small_count, eq: 0}
+    inv_ids: [ontoportal-backup]
+
+  - id: expoportal-virtuoso-backup-offsite
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: The same triple-store backup has an off-cluster copy on HiDrive less than eight days old.
+    purpose: A copy on the cluster alone is lost with the cluster's storage.
+    request: {mount: hidrive, glob: "expoportal/virtuoso/expoportal-virtuoso-*.tar.gz", small_bytes: 100000000, verify_gzip: false}
+    assert:
+      - {that: count, gte: 1, label: an off-cluster copy exists}
+      - {that: newest_age_h, lt: 192}
+    inv_ids: [ontoportal-backup]
+
+  - id: expoportal-repository-mirror
+    kind: file_age
+    every: 6h
+    via: [core]
+    describe: The weekly mirror of the uploaded ontology files on HiDrive finished less than eight days ago.
+    purpose: The uploaded ontology files are the source of every submission; the mirror is their only copy off the cluster.
+    request: {mount: hidrive, glob: "expoportal/repository.last-sync"}
+    assert:
+      - {that: count, eq: 1, label: the mirror has completed at least once}
+      - {that: newest_age_h, lt: 192}
     inv_ids: [ontoportal-backup]
