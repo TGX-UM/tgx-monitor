@@ -144,7 +144,8 @@ printf '{"wikipathways-reload": "%s", "wikipathways-switch": "%s", "aopwiki-snor
 # healthchecks.io: check name -> ping URL (the URL is the credential)
 cat > "$d/hc.json" <<'EOF'
 {"core-cycle": "<URL>", "delivery-watchdog": "<URL>", "agent-tgx1": "<URL>",
- "agent-tgx2": "<URL>", "monitor-backup": "<URL>"}
+ "agent-tgx2": "<URL>", "monitor-backup": "<URL>", "hidrive-copy": "<URL>"}
+# (gha-probe's URL goes in the repo secret HC_PROBE_URL, not here)
 EOF
 "${EDITOR:-nano}" "$d/hc.json"; docker secret create tgxmon_hc_urls "$d/hc.json"
 

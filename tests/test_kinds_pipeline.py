@@ -360,6 +360,13 @@ async def test_self_store_signals() -> None:
         store.execute("INSERT INTO outbox(created_at,channel,event,payload,next_attempt_at,"
                       "dry_run,dead) VALUES(?,?,?,?,?,?,?)",
                       (iso(created), "slack", "open", "{}", iso(created), dry, dead))
+    # not counted: a dead heartbeat ping, a dry-run row, and a dead letter from last month
+    for created, channel, dry in ((NOW - dt.timedelta(minutes=5), "hc", 0),
+                                  (NOW - dt.timedelta(minutes=5), "smtp", 1),
+                                  (NOW - dt.timedelta(days=30), "github", 0)):
+        store.execute("INSERT INTO outbox(created_at,channel,event,payload,next_attempt_at,"
+                      "dry_run,dead,sent_at) VALUES(?,?,?,?,?,?,1,?)",
+                      (iso(created), channel, "open", "{}", iso(created), dry, iso(created)))
     o = await run(check("self", {"signal": "outbox"}, via=["core"]), "core", c)
     assert o.values == {"pending": 1, "oldest_pending_age_min": 30.0, "dead_letters": 1}
     o = await run(check("self", {"signal": "selftest"}, via=["core"]), "core", c)

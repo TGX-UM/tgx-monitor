@@ -49,13 +49,14 @@ from urllib.parse import urlencode
 
 from ..catalogue import Check
 from ..http import NODES, Fetched
-from ..model import Call, Observation
+from ..model import Call, Observation, iso
 from ..redact import redact_text
 from .base import Context, Kind, github_read_token, register
 
 GITHUB_API = "https://api.github.com"
 GH_HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
 AGENT_STALE_S = 180.0
+DEAD_LETTER_WINDOW = dt.timedelta(days=7)  # a handled dead letter stops counting
 NO_EXPIRY_DAYS = 36500  # fine-grained tokens can be set to never expire
 
 
@@ -570,8 +571,11 @@ class SelfKind(Kind):
             row = await asyncio.to_thread(
                 ctx.store.one, "SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM outbox "
                 "WHERE sent_at IS NULL AND dead=0 AND dry_run=0")
+            # A dead letter is a message a person did not get, recently: heartbeat pings
+            # (hc) are replaced by the next one, and old rows stay in the table for good.
             dead = await asyncio.to_thread(
-                ctx.store.one, "SELECT COUNT(*) AS n FROM outbox WHERE dead=1")
+                ctx.store.one, "SELECT COUNT(*) AS n FROM outbox WHERE dead=1 AND dry_run=0 "
+                "AND channel != 'hc' AND created_at >= ?", (iso(now - DEAD_LETTER_WINDOW),))
             age = _age_h((row or {}).get("oldest"), now)
             values = {"pending": (row or {}).get("n", 0),
                       "oldest_pending_age_min": round(age * 60, 1) if age is not None else 0.0,

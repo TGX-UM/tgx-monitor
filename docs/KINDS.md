@@ -679,7 +679,7 @@ General rule for all five kinds: nothing raises. When a source is absent, rate-l
 ## self (via `core`)
 - **Request:** `{signal: tick|outbox|vantage|selftest|token, secret?}`.
 - **tick:** store meta `last_tick` → `last_tick`, `tick_age_s`. `unknown` if the meta is missing.
-- **outbox:** `pending` (sent_at NULL, dead=0, dry_run=0), `oldest_pending_age_min` (0 when none), `dead_letters`.
+- **outbox:** `pending` (sent_at NULL, dead=0, dry_run=0), `oldest_pending_age_min` (0 when none), `dead_letters` (dead rows of the last 7 days that a person should have had: not `hc` heartbeat pings, not dry-run).
 - **vantage:** TCP connect to 1.1.1.1:53 plus `GET https://api.github.com/zen` (with the token if present; any HTTP answer counts as reachable). Values: `dns_tcp_ok`, `github_ok`, `github_status`, `vantage_ok`.
 - **selftest:** `broken` = (meta `selftest_broken` == "1").
 - **token:**
