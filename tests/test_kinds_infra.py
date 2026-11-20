@@ -22,6 +22,7 @@ from tgx_monitor.kinds.infra import (
     cron_prev,
     ingest_push,
     is_local_build,
+    keep_log,
     parse_cron,
     parse_registry,
     record_job_runs,
@@ -257,6 +258,35 @@ async def test_record_job_runs(swarm: FakeSwarm, store: Store) -> None:
     assert len(log_reqs) == 3  # known tasks are not fetched again
 
 
+async def test_record_job_runs_keeps_the_status_table_past_progress_bars(
+        swarm: FakeSwarm, store: Store) -> None:
+    """The molAOP corpora job prints its status table first, then tqdm bars (carriage
+    returns, no newlines) and hundreds of lines; the table must survive."""
+    swarm.tasks = [task("tq1", "sc", "complete", "2026-11-16T04:30:00Z", exit_code=0,
+                        created="2026-11-16T04:00:00Z")]
+    bar = "".join(f"\rEncoding pathway titles: {i}%" for i in range(101)) + "\n"
+    body = ("SOURCE DEPLOYED UPSTREAM STATUS\n"
+            "reactome v98 v98 current\n"
+            + bar * 3 + "".join(f"step {i}\n" for i in range(400)) + "rebuild complete\n")
+    swarm.logs["tq1"] = frame(body)
+    await record_job_runs(store, swarm.api())
+    log = store.one("SELECT log_tail FROM job_runs WHERE task_id='tq1'")["log_tail"]
+    assert "reactome v98 v98 current" in log and "rebuild complete" in log
+    assert "Encoding pathway titles: 100%" in log and "titles: 99%" not in log
+    assert "lines omitted" in log and "step 399" in log
+    logs = [r for r in swarm.requests if r.url.path.endswith("/logs")]
+    assert [r.url.params["tail"] for r in logs] == ["all"]
+
+
+def test_keep_log_head_and_tail() -> None:
+    short = [f"l{i}" for i in range(250)]
+    assert keep_log(short) == short
+    long = [f"l{i}" for i in range(1000)]
+    kept = keep_log(long)
+    assert kept[:50] == long[:50] and kept[-200:] == long[-200:]
+    assert kept[50] == "[... 750 lines omitted ...]" and len(kept) == 251
+
+
 async def test_job_run_ran(swarm: FakeSwarm, store: Store) -> None:
     swarm.tasks = reload_tasks()
     swarm.logs["tok2"] = frame("340667 triples\n")
@@ -335,6 +365,10 @@ def test_ingest_push(store: Store) -> None:
     assert row["started_at"] == "2026-11-10T01:30:00+00:00"
     assert json.loads(row["markers"]) == {"graphs": "38", "triples": "5892342"}
     assert "ghp_" not in row["log_tail"]
+    bars = ingest_push(store, "job", {"exit_code": 0, "run_id": "r2",
+                                      "log": "table row\n10%\r55%\r100%\r\ndone\n"})
+    assert store.one("SELECT log_tail FROM job_runs WHERE id=?", (bars,))["log_tail"] == (
+        "table row\n100%\ndone")
     failed = ingest_push(store, "job", {"exit_code": 3})
     assert store.one("SELECT state FROM job_runs WHERE id=?", (failed,))["state"] == "failed"
     for bad_job, bad in [("../x", {}), ("job", {"exit_code": [1]}), ("job", {"started_at": "x"}),

@@ -114,6 +114,15 @@ def demux(raw: bytes) -> str:
     return raw.decode("utf-8", "replace")
 
 
+def split_log(text: str) -> list[str]:
+    """Log text to lines as a terminal shows them: a progress bar that redraws itself with
+    carriage returns (tqdm) is one line holding its last state, not hundreds of lines that
+    push everything else out of a kept tail."""
+    if text.endswith("\n"):
+        text = text[:-1]
+    return [line.rstrip("\r").rsplit("\r", 1)[-1] for line in text.split("\n")] if text else []
+
+
 async def resolve_proxy(dns: str = PROXY_DNS, port: int = PROXY_PORT) -> list[str]:
     """One base URL per proxy task, via the swarm's internal DNS."""
     try:
@@ -275,13 +284,17 @@ class DockerAPI:
             n["NodeHostname"], n["Alias"] = host, node_alias(host)
         return redact_spec(out)
 
-    async def task_logs(self, task_id: str, tail: int = 200,
+    async def task_logs(self, task_id: str, tail: int | str = 200,
                         calls: list[Call] | None = None) -> list[str]:
+        """The task's log lines, redacted; ``tail="all"`` for the whole log."""
         if not _TASK_ID.match(task_id or ""):
             raise DockerError(f"not a task id: {task_id!r}")
+        n = None if tail == "all" else int(tail)
         raw = await self._any(f"/tasks/{task_id}/logs",
-                              {"stdout": 1, "stderr": 1, "tail": int(tail)}, calls, raw=True)
-        return [redact_text(line, cap=4000) for line in demux(raw).splitlines()][-int(tail):]
+                              {"stdout": 1, "stderr": 1, "tail": "all" if n is None else n},
+                              calls, raw=True)
+        lines = [redact_text(line, cap=4000) for line in split_log(demux(raw))]
+        return lines if n is None else lines[-n:]
 
     # ------------------------------------------------------------------ node-local
     async def info(self, node: str | None = None,

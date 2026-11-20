@@ -43,7 +43,7 @@ from typing import Any
 
 from ..assertions import parse_duration
 from ..catalogue import Check
-from ..docker import TERMINAL_STATES, DockerAPI, DockerError, node_alias, parse_ts
+from ..docker import TERMINAL_STATES, DockerAPI, DockerError, node_alias, parse_ts, split_log
 from ..model import Call, Observation, iso
 from ..redact import redact_text
 from .base import Context, Kind, register
@@ -53,7 +53,7 @@ SCHEDULE_LABEL = "swarm.cronjob.schedule"
 OWNER_LABEL = "tgx.service.owner"
 MARKER = re.compile(r"^TGXMON-MARKER\s+([A-Za-z0-9_.-]+)=(.*)$")
 JOB_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,120}$")
-LOG_TAIL = 200
+LOG_HEAD, LOG_TAIL = 50, 200  # a run keeps the start of its log and the end
 KILLED = {137, 139}  # OOM / SIGKILL, segfault
 
 
@@ -393,6 +393,18 @@ class SwarmKind(Kind):
 
 
 # ---------------------------------------------------------------------- job runs
+def keep_log(lines: list[str]) -> list[str]:
+    """What a job run keeps of its log: the first LOG_HEAD lines and the last LOG_TAIL.
+
+    Jobs often print their status table first (molAOP corpora: source, deployed, upstream)
+    and the outcome last; a tail alone loses the table whenever the work in between is long.
+    """
+    if len(lines) <= LOG_HEAD + LOG_TAIL:
+        return lines
+    cut = len(lines) - LOG_HEAD - LOG_TAIL
+    return lines[:LOG_HEAD] + [f"[... {cut} lines omitted ...]"] + lines[-LOG_TAIL:]
+
+
 def extract_markers(lines: list[str]) -> dict[str, str]:
     out = {}
     for line in lines:
@@ -436,7 +448,7 @@ def _scheduled_for(expr: str | None, started: dt.datetime) -> str | None:
 
 
 async def record_job_runs(store: Any, docker: DockerAPI) -> int:
-    """Copy every finished swarm-cronjob task into ``job_runs`` with its log tail.
+    """Copy every finished swarm-cronjob task into ``job_runs`` with its log (see keep_log).
 
     Idempotent (UNIQUE(job, task_id), and known task ids are skipped before their logs
     are fetched). Call it every couple of minutes: logs disappear with the task.
@@ -460,7 +472,7 @@ async def record_job_runs(store: Any, docker: DockerAPI) -> int:
             if started is None:
                 continue
             try:
-                lines = await docker.task_logs(t["ID"], tail=LOG_TAIL)
+                lines = keep_log(await docker.task_logs(t["ID"], tail="all"))
             except DockerError as exc:
                 lines = [f"[logs unavailable: {exc}]"]
             code = (st.get("ContainerStatus") or {}).get("ExitCode")
@@ -480,7 +492,7 @@ def ingest_push(store: Any, job: str, payload: dict[str, Any]) -> int:
     """Store a run a cron script POSTed (source=push); returns the row id.
 
     payload: ``exit_code`` (int), ``started_at``/``finished_at`` (ISO, default now),
-    ``state`` (default from exit_code), ``node``, ``log`` (text, last 200 lines kept,
+    ``state`` (default from exit_code), ``node``, ``log`` (text, kept as by keep_log,
     redacted), ``markers`` (mapping), ``run_id`` (dedupe key; default push-<started_at>).
     Raises ValueError on a malformed payload; the web handler answers 400.
     """
@@ -496,8 +508,7 @@ def ingest_push(store: Any, job: str, payload: dict[str, Any]) -> int:
     code = int(code) if code is not None else None
     state = str(payload.get("state") or ("complete" if code == 0 else "failed" if code is not None
                                          else "unknown"))[:20]
-    lines = [redact_text(x, cap=4000) for x in str(payload.get("log") or "").splitlines()]
-    lines = lines[-LOG_TAIL:]
+    lines = keep_log([redact_text(x, cap=4000) for x in split_log(str(payload.get("log") or ""))])
     markers = extract_markers(lines)
     extra = payload.get("markers") or {}
     if not isinstance(extra, dict):

@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 import pytest
 
-from tgx_monitor.docker import DockerAPI, DockerError, demux, node_alias, parse_ts
+from tgx_monitor.docker import DockerAPI, DockerError, demux, node_alias, parse_ts, split_log
 
 NODE_IDS = {"tgx1": "7rndtzofc52aedxyxv38airpi", "tgx2": "ipniz5ps89mrcoe8wzxl8p9cm"}
 HOSTS = {"p1": "tgx1", "p2": "tgx2"}
@@ -239,6 +239,14 @@ async def test_task_logs_demux_and_redact(swarm: FakeSwarm) -> None:
     assert lines == ["starting", "password=[redacted]", "TGXMON-MARKER triples=340667"]
     assert swarm.requests[-1].url.params["tail"] == "200"
     assert demux(b"plain tty output\n") == "plain tty output\n"
+
+
+def test_split_log_collapses_carriage_return_redraws() -> None:
+    assert split_log("") == []
+    assert split_log("a\nb\n") == ["a", "b"]
+    assert split_log("crlf\r\nnext") == ["crlf", "next"]
+    assert split_log("bar 1%\rbar 50%\rbar 100%\nafter\n") == ["bar 100%", "after"]
+    assert split_log("\n\nx\n") == ["", "", "x"]
 
 
 async def test_task_logs_reject_odd_ids_without_asking(swarm: FakeSwarm) -> None:
