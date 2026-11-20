@@ -7,9 +7,9 @@ owners: [marvinm2]
 depends_on: [swarm]
 public: false
 public_summary: The Curation Portal database (reviews, identifier reservations) is backed up off the cluster.
-# wikipathways-submit-db (Postgres) has no scheduled dump; its only protection is the
-# Gluster replica, which replicates deletes and corruption too. The check expects a
-# nightly dump copied to the off-cluster drive under wikipathways-submit/.
+# Since 2026-11-11 cronjobs_wikipathways-submit-backup (02:45 UTC) writes a pg_dump custom-format
+# file (-Fc, not gzip; checked with pg_restore --list by the job) beside the service and to the
+# off-cluster drive under wikipathways-submit/, 14 kept. The check reads the off-cluster copy.
 checks:
   - id: bk-wp-submit-exists
     kind: file_age
@@ -17,11 +17,10 @@ checks:
     via: [core]
     describe: A dump of the Curation Portal database less than 26 hours old exists off the cluster.
     purpose: Without a backup, curators' reviews would be lost if the database broke.
-    request: {mount: hidrive, glob: "wikipathways-submit/*.sql.gz", small_bytes: 10000}
+    request: {mount: hidrive, glob: "wikipathways-submit/wikipathways-submit-*.dump", small_bytes: 5000}
     assert:
       - {that: count, gte: 1, label: "a backup exists"}
       - {that: newest_age_h, lt: 26}
-      - {that: gzip_ok, eq: true}
       - {that: small_count, eq: 0}
     inv_ids: [cp-backup-fresh]
 
