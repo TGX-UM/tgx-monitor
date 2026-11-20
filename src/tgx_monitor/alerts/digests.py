@@ -133,7 +133,7 @@ def line(inc: dict[str, Any], engine: AlertEngine, now: dt.datetime) -> str:
 def _mail(db: sqlite3.Connection, engine: AlertEngine, now: dt.datetime, severity: str,
           since: dt.datetime, title: str) -> int:
     owners = engine.catalogue.owners
-    if owners is None:
+    if owners is None or not engine.sendable("smtp"):
         return 0
     per: dict[str, list[str]] = defaultdict(list)
     for inc in incidents(db, severity, since):
@@ -153,7 +153,7 @@ def _mail(db: sqlite3.Connection, engine: AlertEngine, now: dt.datetime, severit
 def _slack_info(db: sqlite3.Connection, engine: AlertEngine, now: dt.datetime,
                 since: dt.datetime) -> None:
     rows = incidents(db, "info", since)
-    if not rows:
+    if not rows or not engine.sendable("slack"):
         return
     names = ", ".join(dict.fromkeys(engine.target_for(r["target_id"]).name for r in rows))
     open_n = sum(1 for r in rows if not r["closed_at"])

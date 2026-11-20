@@ -296,3 +296,26 @@ def test_no_watchdog_rows_without_a_healthchecks_channel(world: World) -> None:
     w.engine.watchdog = False
     w.engine.tick()
     assert w.store.one("SELECT COUNT(*) AS n FROM outbox WHERE event='watchdog'")["n"] == 0
+
+
+async def test_unconfigured_channels_are_not_queued_live(world: World) -> None:
+    """GitHub-only go-live: e-mail and Slack have no secret yet. Their messages are not
+    queued (they would only dead-letter); GitHub still gets the issue."""
+    w = world
+    w.engine.channels = frozenset({"github", "hc"})
+    del w.channels["smtp"], w.channels["slack"]
+    _fail_until_open(w, LEAF, 4)
+    assert {r["channel"] for r in w.rows(event="open")} == {"github"}
+    _fail_until_open(w, {"canary"}, 4)  # private: e-mail and Slack only, so nothing
+    assert [i["private"] for i in w.incidents()] == [1]  # the canary's incident is open
+    assert {r["channel"] for r in w.rows(event="open")} == {"github"}
+    await w.dispatch()
+    assert w.store.one("SELECT COUNT(*) AS n FROM outbox WHERE dead=1")["n"] == 0
+
+
+def test_dry_run_still_records_every_channel(world: World) -> None:
+    w = world
+    w.engine.channels = frozenset({"github"})
+    w.engine.dry_run = True
+    _fail_until_open(w, LEAF, 4)
+    assert {r["channel"] for r in w.rows(event="open")} == {"github", "smtp", "slack"}

@@ -97,7 +97,8 @@ class Service:
         self.engine = AlertEngine(self.store, self.catalogue, dry_run=self.dry_run,
                                   private_base_url=env("TGXMON_PRIVATE_URL"),
                                   public_base_url=env("TGXMON_PUBLIC_URL"),
-                                  watchdog="hc" in self.channels)
+                                  watchdog="hc" in self.channels,
+                                  channels=frozenset(self.channels))
         admins = self.catalogue.owners.admins if self.catalogue.owners else []
         self.dispatcher = Dispatcher(self.store, self.channels, admins=admins)
         self.scheduler = Scheduler(ctx=self.ctx, catalogue=self.catalogue,

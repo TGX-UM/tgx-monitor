@@ -170,8 +170,13 @@ class AlertEngine:
     def __init__(self, store: Store, catalogue: Catalogue, *,
                  now: Callable[[], dt.datetime] = utcnow, dry_run: bool = True,
                  private_base_url: str = "", public_base_url: str = "",
-                 watchdog: bool = True) -> None:
+                 watchdog: bool = True, channels: frozenset[str] | None = None) -> None:
         self.store = store
+        # Channels that can deliver (their secret is set); None = all. Live, a message for
+        # any other channel is not queued: it could only dead-letter as "not configured"
+        # and turn alert delivery red. In dry run everything is still recorded, so the
+        # shadow numbers stay complete.
+        self.channels = channels
         # False while tgxmon_hc_urls is unset: pings with nowhere to go would only pile up
         # as dead letters and turn delivery-dead-letters red for no reason.
         self.watchdog = watchdog
@@ -622,6 +627,10 @@ class AlertEngine:
         for channel, rcpt in routes.items():
             if channel in skip:
                 continue
+            if not self.sendable(channel):
+                log.info("%s %s for %s not sent: channel %s not configured",
+                         event, "(private)" if private else "", inc["key"], channel)
+                continue
             # A public issue must not name a private (security) target held behind it.
             names = [self.catalogue.targets[b].name if b in self.catalogue.targets else b
                      for b in blocked_ids
@@ -636,6 +645,9 @@ class AlertEngine:
                            incident_id=inc["id"], dry_run=self.dry_run,
                            payload=router.render(channel, event, ctx))
         return True
+
+    def sendable(self, channel: str) -> bool:
+        return self.dry_run or self.channels is None or channel in self.channels
 
     @staticmethod
     def _has_issue(db: sqlite3.Connection, inc: dict[str, Any]) -> bool:
@@ -653,6 +665,8 @@ class AlertEngine:
             return
         private = router.is_private(target, [check])
         for channel, rcpt in router.routes("flapping", sev, target, owners, private).items():
+            if not self.sendable(channel):
+                continue
             ctx = {"key": f"{target.id}-flap", "target": target, "checks": [(check.id, check)],
                    "severity": sev, "since": now, "now": now, "opened_at": now,
                    "issue_number": None, "blocked_names": [], "private": private,

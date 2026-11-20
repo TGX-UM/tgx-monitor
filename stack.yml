@@ -50,9 +50,9 @@ services:
     # and write the 2775 data directories. It grants no Docker access here.
     user: "10001:1000"
     environment:
-      # Shadow mode: everything runs and is recorded, nothing is sent. DEPLOY.md
+      # "1" = shadow mode: everything runs and is recorded, nothing is sent. DEPLOY.md
       # "Enabling alerts" is the only place this changes.
-      TGXMON_DRY_RUN: "1"
+      TGXMON_DRY_RUN: "0"   # live since 2026-11-20, GitHub issues only (no SMTP or Slack secret yet)
       TGXMON_DB: /data/monitor.db
       TGXMON_BACKUP_DIR: /data/backups
       TGXMON_PUBLIC_DIR: /public
