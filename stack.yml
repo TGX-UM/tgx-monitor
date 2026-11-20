@@ -28,7 +28,6 @@ networks:
 
 secrets:
   tgxmon_gh_app_key: {external: true, name: tgxmon_gh_app_key_v2}  # mounted as tgxmon_gh_app_key
-  tgxmon_gh_token: {external: true, name: tgxmon_gh_token_v2}  # fine-grained, TGX-UM, Actions read on cronjobs + tgx-monitor, expires 2027-11-21
   tgxmon_ghcr_read_pat: {external: true, name: tgxmon_ghcr_read_pat_v2}  # classic, read:packages only, expires 2027-11-20
   tgxmon_smtp: {external: true}
   tgxmon_contacts: {external: true}
@@ -67,11 +66,11 @@ services:
       TGXMON_PRIVATE_URL: https://monitor.bigcat-bioinformatics.org
       TGXMON_PUBLIC_URL: https://status.bigcat-bioinformatics.org
       # GitHub issues are opened by the App tgx-monitor[bot] (its key is the secret
-      # tgxmon_gh_app_key). Ids are not secret; empty means "App not set up yet" and
-      # the channel falls back to tgxmon_gh_token. DEPLOY.md step 2.
+      # tgxmon_gh_app_key). Ids are not secret. The App also reads the GitHub API for the
+      # checks (Actions read on the private TGX-UM/cronjobs), so no PAT is mounted. DEPLOY.md step 2.
       TGXMON_GH_REPO: TGX-UM/tgx-monitor
       TGXMON_GH_APP_ID: "5712665"            # GitHub App tgx-monitor (owner marvinm2); not secret
-      TGXMON_GH_INSTALLATION_ID: "180881279"  # installed on TGX-UM/tgx-monitor only
+      TGXMON_GH_INSTALLATION_ID: "180881279"  # installed on TGX-UM/tgx-monitor and TGX-UM/cronjobs
       TGXMON_GH_CLIENT_ID: Iv23lixZJmJoHOB61hnP   # same App, as OAuth client for "Sign in with GitHub"; public
       TGXMON_GITHUB_ONLY: "1"                  # 1 once GitHub sign-in works: no password form, GitHub (with its 2FA) only
     networks: [core, tgxmon_int, tgxmon_dockerapi]
@@ -105,7 +104,6 @@ services:
       # biodatafuse, nsdra, ontoportal) are added when their backup jobs are.
     secrets:
       - tgxmon_gh_app_key
-      - tgxmon_gh_token
       - tgxmon_ghcr_read_pat
       - tgxmon_smtp
       - tgxmon_contacts

@@ -52,14 +52,17 @@ agent-hb, root-status) are created in step 1.
 1. **GitHub App** `tgx-monitor` (done 2026-11-11): App id 5712665, owned by the
    `marvinm2` account (only organisation owners can create an App under TGX-UM, and a
    repository admin may install one on a repository they administer). Permissions:
-   Issues read/write, Metadata read; no webhook. Installed on `TGX-UM/tgx-monitor`
-   only, installation id 180881279. Both ids are in `stack.yml` and are not secret.
+   Issues read/write, Actions read, Metadata read; no webhook. Installed on
+   `TGX-UM/tgx-monitor` and `TGX-UM/cronjobs` (added 2026-11-20 by a repo admin; the
+   Actions permission needed an org owner to accept), installation id 180881279. Both ids are in `stack.yml` and are not secret.
    The private key is the Docker secret `tgxmon_gh_app_key_v2`, mounted as
    `tgxmon_gh_app_key`. It was created with the manifest flow, piped straight from
    `POST /app-manifests/<code>/conversions` into `docker secret create`. Issues come
    from the App because GitHub does not notify you about an issue you opened yourself.
-   Without `tgxmon_gh_token` the read-only GitHub checks also use the App's
-   installation token: any public repository, 5,000 calls an hour.
+   Without `tgxmon_gh_token` (the default since 2026-11-20) the read-only GitHub checks
+   use the App's installation token: any public repository plus the private ones it is
+   installed on, 5,000 calls an hour. To watch another private repository's workflows,
+   add it to the installation rather than creating a PAT.
    To rotate the key: generate a new one on the App's settings page, create
    `tgxmon_gh_app_key_v3`, point `stack.yml` at it, redeploy, then delete the old key.
    **Sign in with GitHub** uses the same App as OAuth client (client id in `stack.yml`,
@@ -70,7 +73,7 @@ agent-hb, root-status) are created in step 1.
    Only handles that are keys of `tgxmon_users` get in; the value may be a password hash
    or the word `github` (GitHub sign-in only). Once it works, `TGXMON_GITHUB_ONLY: "1"`
    turns the password form off.
-2. **`tgxmon_gh_token`** (optional since the App): a fine-grained PAT with read-only
+2. **`tgxmon_gh_token`** (not used since 2026-11-20; the App covers it. Kept for reference): a fine-grained PAT with read-only
    *Actions* and *Metadata* on the private repositories whose workflows the catalogue
    watches (`TGX-UM/cronjobs`), plus *Actions: write* on
    `TGX-UM/tgx-monitor` (the daily keepalive re-enables `probe.yml` and `browser.yml`).

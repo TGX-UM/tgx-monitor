@@ -57,18 +57,6 @@ checks:
     assert:
       - {that: broken, eq: false}
 
-  - id: self-gh-token-expiry
-    kind: self
-    every: 1d
-    via: [core]
-    describe: The monitor's GitHub token is valid for at least another month.
-    purpose: When this token expires, the monitor can no longer open GitHub issues for alerts.
-    request: {signal: token, secret: tgxmon_gh_token}
-    assert:
-      - {that: valid, eq: true}
-      - {that: days_left, gte: 30, warn: true}
-      - {that: days_left, gte: 7}
-
   - id: self-ghcr-pat-expiry
     kind: self
     every: 1d
