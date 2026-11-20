@@ -206,6 +206,7 @@ Also public: `validate_source(spec, where)`, `relation(a, b)`, `as_date(v)` (ISO
   - `relation`: one of equal | left_newer | right_newer | incomparable. It compares by date, then number, then natural string order.
   - For every value that reads as a date: `<name>_date` (ISO, so `max_age` can use it) and `<name>_age_days`.
   - `<name>_error` when a source fails.
+  - When both sides are lists: `only_left` and `only_right` (sorted, distinct), and the evidence names them.
 ```yaml
 - id: aopwiki-version-master
   kind: compare

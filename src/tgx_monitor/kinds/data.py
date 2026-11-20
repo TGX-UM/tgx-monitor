@@ -368,7 +368,8 @@ class CompareKind(_SourceKind):
     ``endpoint``. values: ``left right`` and each named source, ``equal``,
     ``relation`` (equal | left_newer | right_newer | incomparable), and for every value
     that reads as a date (ISO, yyyymmdd, 2026.11.07) ``<name>_date`` (ISO, for
-    ``max_age``) and ``<name>_age_days``.
+    ``max_age``) and ``<name>_age_days``. When both sides are lists: ``only_left`` and
+    ``only_right`` (sorted, distinct), so a check can name what is missing on which side.
     A source with ``on_error: unknown`` (an upstream we do not own) makes the check
     unknown rather than failed when it cannot be read.
     """
@@ -392,7 +393,16 @@ class CompareKind(_SourceKind):
             return _source_failure(obs, errs, soft)
         obs.values["equal"] = _same(vals["left"], vals["right"])
         obs.values["relation"] = relation(vals["left"], vals["right"])
-        obs.evidence = ", ".join(f"{k}={v!r}"[:200] for k, v in vals.items())
+        left, right = vals["left"], vals["right"]
+        if isinstance(left, list) and isinstance(right, list):
+            only_l = sorted({str(x) for x in left} - {str(x) for x in right})
+            only_r = sorted({str(x) for x in right} - {str(x) for x in left})
+            obs.values["only_left"], obs.values["only_right"] = only_l, only_r
+            obs.evidence = (f"left {len(left)} items, right {len(right)} items; "
+                            f"only left: {', '.join(only_l) or '-'}; "
+                            f"only right: {', '.join(only_r) or '-'}")[:2000]
+        else:
+            obs.evidence = ", ".join(f"{k}={v!r}"[:200] for k, v in vals.items())
         return obs
 
 

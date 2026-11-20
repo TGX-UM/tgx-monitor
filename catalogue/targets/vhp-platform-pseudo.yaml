@@ -6,12 +6,15 @@ criticality: low
 owners: [ozancinar, johannehouweling, marvinm2]
 depends_on: [edge-tgx1, github-raw]
 public: true
-public_summary: The test instance of the VHP4Safety platform, which runs the newest published release.
+public_summary: The test instance of the VHP4Safety platform, which runs the newest build of its test branch.
 links: [https://pseudo.platform.vhp4safety.nl/]
 notes: >-
-  Runs the :latest tag with no digest in the service spec, so any new task (crash, node
-  restart, reschedule) silently pulls whatever :latest is. Its certificate renews on a
-  separate cycle from the other hosts.
+  Runs the `pseudo` branch build (`:pseudo@sha256:<digest>`), deployed by the cron job
+  cronjobs_vhp-platform-pseudo-deploy within ten minutes of a new Docker Hub digest; releases
+  do not reach it by themselves. Since the linked-data work (Nov 2026) it keeps its own tool
+  records, imported once from the cloud catalogue and edited inside the platform, so its
+  tools page may hold extra records; a catalogue tool missing there is what matters. Its
+  certificate renews on a separate cycle from the other hosts.
 checks:
   - id: pseudo-home
     kind: http
@@ -42,26 +45,27 @@ checks:
     kind: compare
     every: 1d
     timeout: 30s
-    describe: Every tool in the VHP4Safety cloud catalogue appears on the test instance's tools page, and no other.
-    purpose: The test version should list exactly the tools in the catalogue, so changes can be checked before going live.
+    describe: Every tool in the VHP4Safety cloud catalogue appears on the test instance's tools page; extra records there are flagged for review.
+    purpose: A tool added to the catalogue should show up on the test version too, so it can be checked before going live.
     request:
       left: {http_list: {url: "https://raw.githubusercontent.com/VHP4Safety/cloud/refs/heads/main/cap/service_index.json", re: '"id":\s*"([^"]+)"', pick: all}, on_error: unknown}
       right: {http_list: {url: "https://pseudo.platform.vhp4safety.nl/tools", re: "location\\.href='/tools/([^']+)'", pick: all}}
     assert:
-      - {that: equal, eq: true, label: "tools page lists exactly the catalogue's tools"}
+      - {that: only_left, len_eq: 0, label: "every catalogue tool is on the tools page"}
+      - {that: only_right, len_lte: 5, warn: true, label: "at most a few extra tool records"}
     inv_ids: [pseudo-catalogue]
   - id: pseudo-image-latest
     kind: registry
     every: 1d
     via: [core]
     severity: low
-    describe: Shows when the test instance no longer runs the image that Docker Hub's latest tag points to.
-    purpose: Shows when the test version is not running the newest release it should be testing.
-    request: {image: "vhp4safety/virtual-human-platform:latest"}
+    describe: Shows when the test instance no longer runs the image that Docker Hub's pseudo tag points to.
+    purpose: Shows when the test version is not running the newest build of the test branch, for example when its deploy job stopped.
+    request: {image: "vhp4safety/virtual-human-platform:pseudo"}
     assert:
       - {that: reachable, eq: true}
       - {that: node_digest_match, not_contains: "False", warn: true,
-         label: "every node holding :latest holds the registry's digest"}
+         label: "every node holding :pseudo holds the registry's digest"}
     inv_ids: [pseudo-vs-latest-and-main]
   - id: pseudo-digest-drift
     kind: digest_drift

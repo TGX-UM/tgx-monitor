@@ -248,6 +248,30 @@ async def test_compare_standby_holds_previous_release(cat):
     assert obs.values["equal"] is True and obs.values["relation"] == "equal"
 
 
+async def test_compare_lists_name_what_each_side_lacks(cat):
+    cat_url, page = "https://raw.example/service_index.json", "https://pseudo.example/tools"
+    ctx = mkctx(cat, {
+        ("GET", cat_url): (200, '[{"id": "aop-builder"}, {"id": "expoportal"}, {"id": "qaop"}]'),
+        ("GET", page): (200, "".join(f"location.href='/tools/{t}' " for t in (
+            "qaop", "aop-builder", "aop-builder-2", "tempo-seq"))),
+    })
+    check = mkcheck("compare", {
+        "left": {"http_list": {"url": cat_url, "re": r'"id":\s*"([^"]+)"', "pick": "all"}},
+        "right": {"http_list": {"url": page, "re": r"location\.href='/tools/([^']+)'",
+                                "pick": "all"}},
+    }, [{"that": "only_left", "len_eq": 0},
+        {"that": "only_right", "len_lte": 5, "warn": True}])
+    obs = await KINDS["compare"]().observe(check, "public", ctx)
+    assert obs.values["equal"] is False
+    assert obs.values["only_left"] == ["expoportal"]
+    assert obs.values["only_right"] == ["aop-builder-2", "tempo-seq"]
+    assert "only left: expoportal" in obs.evidence
+    assert "only right: aop-builder-2, tempo-seq" in obs.evidence
+    target = Target.model_validate({"id": "t-1", "name": "t", "class": "data"})
+    res = await run_probe(target, check, "c-1", "public", ctx)
+    assert res.status == "failed" and "only_left" in res.summary
+
+
 def test_source_kind_validation():
     v = KINDS["compare"].validate_request
     assert v({"left": {"const": 1}, "right": {"const": 2}}, ["public"]) == []
