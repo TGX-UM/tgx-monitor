@@ -12,8 +12,14 @@ updates:
     groups:
       actions: {patterns: ["*"]}
 
-  # the python:3.13-slim base image digest in the Dockerfile
+  # the python:3.13-slim base image digest in the Dockerfile. Digest and patch updates
+  # only: a new Python minor (3.15, PR #6) needs requirements.lock re-locked for that
+  # version first (no prebuilt wheels otherwise, and the slim image has no compiler), so
+  # it is a deliberate upgrade together with relock.yml and CI, not a Dependabot PR.
   - package-ecosystem: docker
     directory: /
     schedule: {interval: weekly, day: monday}
     cooldown: {default-days: 14}
+    ignore:
+      - dependency-name: python
+        update-types: [version-update:semver-major, version-update:semver-minor]
