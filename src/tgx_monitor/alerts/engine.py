@@ -104,6 +104,14 @@ def blind_limit(check: Check) -> dt.timedelta:
     return max(dt.timedelta(hours=6), dt.timedelta(seconds=3 * check.interval_s))
 
 
+def stale_after(check: Check) -> dt.timedelta:
+    """How old a probe's last result may be for the clock alone to turn PENDING into
+    FAILING. Older than that, the monitor has not looked recently (on 2026-11-22 the
+    scheduler stalled for 22 h and an hourly check paged from a 17-hour-old failure that
+    had long been fixed): the next real result decides instead."""
+    return max(dt.timedelta(minutes=30), dt.timedelta(seconds=2 * check.interval_s))
+
+
 def _confirmed(r: dict[str, Any], check: Check, ts: dt.datetime) -> bool:
     if r["consecutive_fail"] < failures_needed(check):
         return False
@@ -526,6 +534,9 @@ class AlertEngine:
             if row["state"] == "FLAPPING" and len(_flips(row, now)) <= FLAP_LEAVE:
                 new = _settled(row, tc[1], now)
             elif row["state"] == "PENDING" and _confirmed(row, tc[1], now):
+                last = _ts(row["last_run_at"])
+                if last is None or now - last > stale_after(tc[1]):
+                    continue
                 new = "FAILING"
             else:
                 continue

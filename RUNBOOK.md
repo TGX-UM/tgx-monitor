@@ -74,7 +74,7 @@ from the private secret.
 
 | Alert (healthchecks.io e-mail unless noted) | Means | Do |
 |---|---|---|
-| `core-cycle` down | no complete scheduler cycle for 10 min: core is dead, stuck or restarting | `docker service ps tgx-monitor_core`; logs; `/livez` |
+| `core-cycle` down or `/fail` | no scheduler tick for 10 min (core dead, stuck or restarting), or the body says "no check result for N s": the loop runs but probes are stuck | `docker service ps tgx-monitor_core`; logs; `/livez`; for stuck probes `docker service update --force tgx-monitor_core` after saving the logs |
 | `delivery-watchdog` down | the outbox stopped delivering (the synthetic notification did not arrive) | `tgx-monitor outbox --dead`; channel secrets; the dispatcher in the logs |
 | `agent-tgx1` / `agent-tgx2` down or `/fail` | that node's agent is gone, or it sees core's or the peer's heartbeat older than 5 min | the reason is in the ping body; a stale *peer* heartbeat with core fine points at Gluster |
 | `gha-probe` down | the outside probe has not run for 6 h (schedule disabled, Actions outage) | Actions tab: enable "Outside probe", run it by hand |

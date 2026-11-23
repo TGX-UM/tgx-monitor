@@ -116,7 +116,8 @@ security | pipeline), `criticality` (high | medium | low | muted), `owners`,
 
 **Check:** `id`, `kind`, `every`, `via` (public, tgx1, tgx2, core, agent:tgx1,
 agent:tgx2; one probe per vantage point), `request` (kind-specific), `assert`,
-`severity` (overrides criticality), `alert_after`, `retry` (sparse checks: one quick
+`severity` (overrides criticality), `alert_after` (only a recent failure, from the last
+max(30 min, 2 × interval), is promoted by the clock alone), `retry` (sparse checks: one quick
 retry), `timeout`, `enabled`, `public`, `inv_ids` (the inventory checks it covers).
 
 **Assertions** are one grammar for every kind: a kind *observes* a flat dict of values,
@@ -351,12 +352,16 @@ filesystems do not reliably provide, and the corruption shows weeks later);
 | hourly rollups | 400 days |
 | daily rollups, daily metric values (long baselines), `job_runs`, incidents, audit | indefinitely |
 
-Rollups and deletes run nightly, then `incremental_vacuum`. Expected size under 500 MB.
+Rollups and deletes run nightly, then `incremental_vacuum`. Measured: about 45 MB a day
+(~50k results), so roughly 1.5–1.7 GB once the 35-day window is full (mid-December 2026).
 
 **Backup chain:**
 
 1. Nightly online backup (`sqlite3` backup API) to `data/backups/monitor-<date>.db` with
-   a manifest (row counts, sha256, `integrity_check`); 14 kept. The CLI
+   a manifest (row counts, sha256, `integrity_check`); 14 kept. Core takes the snapshot in
+   `TGXMON_TMP` on local disk (the only step that holds the store lock, ~1.5 s for 900 MB),
+   checks it there and then copies it to Gluster (~80 s), all in a worker thread and its
+   own task, so the scheduler never waits on it. The CLI
    `tgx-monitor backup` opens the live file read-only, so a manual backup is never a
    second writer.
 2. A root job in `TGX-UM/cronjobs` copies the newest to `/mnt/hidrive/docker/tgx-monitor/`
@@ -432,7 +437,7 @@ Ten healthchecks.io checks, each e-mailing Marvin and Egon:
 
 | Check | Pinged by | Period / grace |
 |---|---|---|
-| `core-cycle` | core, only after a complete scheduler cycle | 5 min / 10 min |
+| `core-cycle` | core: success while the scheduler ticks **and** check results arrive; `/fail` after 15 min without a result | 5 min / 10 min |
 | `delivery-watchdog` | an always-firing synthetic notification through the **real** outbox and dispatcher | 5 min / 10 min |
 | `agent-tgx1`, `agent-tgx2` | each agent; `/fail` with the reason when core's or the peer's heartbeat is older than 5 min | 1 min / 5 min |
 | `gha-probe` | `probe.yml` | 20 min / 6 h |

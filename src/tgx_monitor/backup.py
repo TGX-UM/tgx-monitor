@@ -89,15 +89,19 @@ def _prune(dest_dir: Path, keep: int) -> list[str]:
 
 
 def backup(store: Store, dest_dir: Path, keep: int = KEEP,
-           now: dt.datetime | None = None) -> dict[str, Any]:
-    """Copy ``store`` to ``dest_dir/monitor-<date>.db``, write its manifest, prune."""
+           now: dt.datetime | None = None, scratch: Path | None = None) -> dict[str, Any]:
+    """Copy ``store`` to ``dest_dir/monitor-<date>.db``, write its manifest, prune.
+
+    ``scratch``: a local directory to take and check the snapshot in (see
+    :meth:`Store.backup_to`); core passes ``TGXMON_TMP``."""
     now = now or utcnow()
     dest_dir = Path(dest_dir)
     dest = dest_dir / f"{PREFIX}{now:%Y-%m-%d}.db"
-    info = store.backup_to(dest)
+    schema_version = store.get_meta("schema_version")
+    info = store.backup_to(dest, scratch=scratch)
     manifest = {
         **info, "sha256": sha256(dest), "bytes": dest.stat().st_size,
-        "source": Path(store.path).name, "schema_version": store.get_meta("schema_version"),
+        "source": Path(store.path).name, "schema_version": schema_version,
         "ok": info["integrity"] == "ok",
     }
     tmp = dest.with_suffix(".json.part")

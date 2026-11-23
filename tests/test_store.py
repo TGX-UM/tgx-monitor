@@ -182,6 +182,26 @@ def test_backup_to_is_a_consistent_copy(store, tmp_path):
     assert not (tmp_path / "out" / "copy.db.part").exists()
 
 
+def test_backup_to_via_local_scratch(store, tmp_path):
+    """Core snapshots to local scratch (only that part holds the store lock), checks it
+    there, then copies to the slow shared volume. Nothing is left behind in scratch."""
+    fill(store)
+    scratch = tmp_path / "scratch"
+    dest = tmp_path / "gluster" / "copy.db"
+    (scratch).mkdir()
+    (scratch / "copy.db.part").write_text("left over from a killed run")
+    info = store.backup_to(dest, scratch=scratch)
+    assert info["integrity"] == "ok" and info["counts"]["results"] == 5
+    assert list(scratch.iterdir()) == []
+    assert not dest.with_name("copy.db.part").exists()
+    copy = sqlite3.connect(dest)
+    assert copy.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 5
+    copy.close()
+    m = B.backup(store, tmp_path / "gluster", now=NOW, scratch=scratch)
+    assert m["ok"] and m["sha256"] == B.sha256(tmp_path / "gluster" / m["file"])
+    assert m["schema_version"] == "1"
+
+
 # ---------------------------------------------------------------- backup.py
 def test_backup_writes_manifest_and_keeps_fourteen(store, tmp_path):
     fill(store)

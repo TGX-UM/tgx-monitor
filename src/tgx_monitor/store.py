@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import json
+import os
 import sqlite3
 import threading
 from collections.abc import Iterable
@@ -255,20 +256,39 @@ class Store:
             self._db.execute("PRAGMA incremental_vacuum").fetchall()
         return stats
 
-    def backup_to(self, dest: Path) -> dict[str, Any]:
-        """Online backup (sqlite3 backup API) plus a manifest of what was copied."""
+    def backup_to(self, dest: Path, scratch: Path | None = None) -> dict[str, Any]:
+        """Online backup (sqlite3 backup API) plus a manifest of what was copied.
+
+        With ``scratch`` (a directory on local disk) the snapshot is taken there, which is
+        the only part that holds the store lock, and checked there; only then is it copied
+        to ``dest``. On GlusterFS writing 900 MB takes about 80 s against 1.5 s on local
+        disk (2026-11-23), and every thread and the event loop wait for the lock meanwhile.
+        """
         dest.parent.mkdir(parents=True, exist_ok=True)
-        tmp = dest.with_suffix(dest.suffix + ".part")
-        with self._lock:
-            out = sqlite3.connect(str(tmp))
-            self._db.backup(out)
-            out.close()
-        tmp.replace(dest)
-        chk = sqlite3.connect(str(dest))
-        integrity = chk.execute("PRAGMA integrity_check").fetchone()[0]
-        counts = {t: chk.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-                  for t in ("results", "incidents", "job_runs", "rollup_daily")}
-        chk.close()
+        part = dest.with_suffix(dest.suffix + ".part")
+        stage = Path(scratch) / part.name if scratch else part
+        stage.parent.mkdir(parents=True, exist_ok=True)
+        stage.unlink(missing_ok=True)  # left over from a run that was killed
+        try:
+            with self._lock:
+                out = sqlite3.connect(str(stage))
+                self._db.backup(out)
+                out.close()
+            chk = sqlite3.connect(str(stage))
+            integrity = chk.execute("PRAGMA integrity_check").fetchone()[0]
+            counts = {t: chk.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                      for t in ("results", "incidents", "job_runs", "rollup_daily")}
+            chk.close()
+            if stage != part:
+                with stage.open("rb") as fi, part.open("wb") as fo:
+                    while chunk := fi.read(1 << 20):
+                        fo.write(chunk)
+                    fo.flush()
+                    os.fsync(fo.fileno())
+            part.replace(dest)
+        finally:
+            if stage != part:
+                stage.unlink(missing_ok=True)
         return {"file": dest.name, "integrity": integrity, "counts": counts, "at": iso()}
 
 

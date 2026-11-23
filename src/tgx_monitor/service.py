@@ -11,7 +11,8 @@ Wired here:
   every 60 s  alert engine tick (holds, windows, reminders, digests, watchdog) and the
               outbox dispatcher, the job-run recorder, the public snapshot,
   every 5 min GitHub reconcile,
-  nightly     rollups + retention, then an online backup into ``TGXMON_BACKUP_DIR``;
+  nightly     rollups + retention, then an online backup into ``TGXMON_BACKUP_DIR``
+              (its own task, the slow parts in a worker thread);
 * the private web app (uvicorn) on port 8000, in the same loop;
 * catalogue hot reload when any file under the catalogue changes (rejected, keeping the
   old one, if it does not validate -- a typo must never close every incident).
@@ -44,6 +45,9 @@ from .store import Store
 
 log = logging.getLogger("tgx_monitor.service")
 
+# core-cycle reports failure after this long without a single check result.
+RESULTS_QUIET_S = 900.0
+
 
 def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
@@ -54,6 +58,11 @@ def _mounts(root: Path) -> dict[str, Path]:
     if not root.is_dir():
         return {}
     return {p.name: p for p in sorted(root.iterdir()) if p.is_dir()}
+
+
+def _log_task_error(task: asyncio.Task[Any]) -> None:
+    if not task.cancelled() and task.exception() is not None:
+        log.error("task %s failed", task.get_name(), exc_info=task.exception())
 
 
 def _catalogue_mtime(root: Path) -> float:
@@ -104,12 +113,18 @@ class Service:
         self.scheduler = Scheduler(ctx=self.ctx, catalogue=self.catalogue,
                                    on_result=self._on_result, on_tick=self._on_tick,
                                    max_concurrency=int(env("TGXMON_CONCURRENCY", "20")))
+        tmp = env("TGXMON_TMP")
+        self.scratch_dir = Path(tmp) if tmp else None
         self._last: dict[str, float] = {}
         self._tick_written = 0.0
+        self._nightly_task: asyncio.Task[None] | None = None
+        self._started_mono = time.monotonic()
+        self._last_result_mono: float | None = None
 
     # ------------------------------------------------------------------ callbacks
     def _on_result(self, probe_id: str, via: str, target: Any, check: Any, result: Any,
                    rid: int) -> None:
+        self._last_result_mono = time.monotonic()
         self.engine.ingest(probe_id, via, target, check, result, rid)
 
     def _on_tick(self) -> None:
@@ -135,7 +150,7 @@ class Service:
             ("jobruns", 60, self._record_job_runs),
             ("snapshot", 60, self._snapshot),
             ("reconcile", 300, self._reconcile),
-            ("nightly", 3600, self._nightly),
+            ("nightly", 3600, self._start_nightly),
             ("hc-cycle", 120, self._hc_cycle),
         ]
         # Hooks that only read the store and write files run in a worker thread: on the
@@ -205,34 +220,72 @@ class Service:
 
         last = parse_ts(self.store.get_meta("last_tick"))
         age = (utcnow() - last).total_seconds() if last else None
-        if age is not None and age < 180:
-            await hc.ping("core-cycle", "success", f"tick {age:.0f}s ago")
-        else:
+        quiet = self._results_quiet_s()
+        if age is None or age >= 180:
             await hc.ping("core-cycle", "fail", f"scheduler tick {age}s old")
+        elif quiet is not None:
+            # The loop ticks but no check has reported: on 2026-11-22 this went on for
+            # 22 h while the tick (the only thing measured then) stayed green.
+            await hc.ping("core-cycle", "fail", f"no check result for {quiet:.0f}s")
+        else:
+            await hc.ping("core-cycle", "success", f"tick {age:.0f}s ago")
+
+    def _results_quiet_s(self, limit: float = RESULTS_QUIET_S) -> float | None:
+        """Seconds since the last check result, when that is over ``limit``; else None.
+        With ~850 probes a result arrives every second or two, so 15 minutes of silence
+        means the scheduler is stuck. The first ``limit`` after start counts as quiet only
+        if nothing has arrived by then."""
+        now = time.monotonic()
+        since = now - (self._last_result_mono or self._started_mono)
+        return since if since > limit else None
+
+    def _start_nightly(self) -> None:
+        """Start the nightly work as its own task. Awaiting it here would hold up every
+        other hook and the scheduler, which awaits the hooks between dispatch rounds."""
+        if self._nightly_task is not None and not self._nightly_task.done():
+            return
+        self._nightly_task = asyncio.create_task(self._nightly(), name="nightly")
+        self._nightly_task.add_done_callback(_log_task_error)
 
     async def _nightly(self) -> None:
-        """Once a day, after 01:00 UTC: rollups + retention, then a backup."""
+        """Once a day, after 01:00 UTC: rollups + retention, then a backup.
+
+        Both run in a worker thread; the store lock is held only for the prune
+        transaction and the snapshot to local scratch (see Store.backup_to). The day is
+        marked done as soon as the backup returns: a lost healthchecks ping must not make
+        it run again every hour (2026-11-22, when the ping shared a 120 s timeout with a
+        backup that had grown past it)."""
         now = utcnow()
         day = now.date().isoformat()
         if now.hour < 1 or self.store.get_meta("nightly_done") == day:
             return
-        stats = self.store.rollup_and_prune(now)
-        log.info("rollup and prune: %s", stats)
         from .backup import backup
 
-        hc = self.channels.get("hc")
+        started = time.monotonic()
+        stats = await asyncio.to_thread(self.store.rollup_and_prune, now)
+        log.info("rollup and prune: %s (%.1fs)", stats, time.monotonic() - started)
+        started = time.monotonic()
         try:
-            manifest = backup(self.store, self.backup_dir)
+            manifest = await asyncio.to_thread(backup, self.store, self.backup_dir,
+                                               scratch=self.scratch_dir)
         except Exception as exc:
-            if hc is not None:
-                await hc.ping("monitor-backup", "fail", f"{type(exc).__name__}: {exc}")
+            await self._hc_ping("monitor-backup", "fail", f"{type(exc).__name__}: {exc}")
             raise
-        log.info("backup: %s", manifest)
-        if hc is not None:
-            await hc.ping("monitor-backup", "success" if manifest.get("ok") else "fail",
-                          f"{manifest.get('file')} {manifest.get('bytes')} bytes "
-                          f"integrity {manifest.get('integrity')}")
+        log.info("backup: %s (%.1fs)", manifest, time.monotonic() - started)
         self.store.set_meta("nightly_done", day)
+        await self._hc_ping("monitor-backup", "success" if manifest.get("ok") else "fail",
+                            f"{manifest.get('file')} {manifest.get('bytes')} bytes "
+                            f"integrity {manifest.get('integrity')}")
+
+    async def _hc_ping(self, check: str, status: str, body: str) -> None:
+        """A direct healthchecks.io ping with its own timeout; never raises."""
+        hc = self.channels.get("hc")
+        if hc is None:
+            return
+        try:
+            await asyncio.wait_for(hc.ping(check, status, body), timeout=30)
+        except Exception:  # noqa: BLE001 - the ping is a report, not the work
+            log.exception("healthchecks ping %s (%s) failed", check, status)
 
     def _maybe_reload(self) -> None:
         m = _catalogue_mtime(self.cat_root)

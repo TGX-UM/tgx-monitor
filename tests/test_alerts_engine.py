@@ -319,3 +319,31 @@ def test_dry_run_still_records_every_channel(world: World) -> None:
     w.engine.dry_run = True
     _fail_until_open(w, LEAF, 4)
     assert {r["channel"] for r in w.rows(event="open")} == {"github", "smtp", "slack"}
+
+
+def test_alert_after_does_not_fire_on_a_stale_result(world: World) -> None:
+    """2026-11-22: the scheduler stalled for 22 h, and the engine's clock turned an
+    hourly check's 17-hour-old failure into a critical incident, although the cause had
+    been fixed hours before. The clock alone may only promote a recent failure."""
+    w = world
+    t, c = w.cat.checks["info-thing-up"]
+    lazy = c.model_copy(update={"alert_after": "2h"})
+    w.cat.checks["info-thing-up"] = (t, lazy)
+    r = E.blank("info-thing-up")
+    for _ in range(3):
+        r = E.step(r, "failed", w.clock(), lazy)
+        w.clock.advance(minutes=5)
+    assert r["state"] == "PENDING"
+    r.update(check_id=lazy.id, target_id=t.id, via="public")
+    with w.store.transaction() as db:
+        E._save(db, r)
+
+    def state() -> str:
+        return w.store.one("SELECT state FROM probe_state WHERE probe_id='info-thing-up'")[
+            "state"]
+
+    w.clock.advance(hours=2)  # alert_after has passed, but the last result is 2 h old
+    w.engine.tick()
+    assert state() == "PENDING" and not w.incidents()
+    w.feed("info-thing-up", "failed")  # a fresh result decides
+    assert state() == "FAILING"
