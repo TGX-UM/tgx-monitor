@@ -181,6 +181,13 @@ def _copy(src: Path, dest: Path) -> None:
         part.replace(dest)
 
 
+def _read(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
 def offsite_copy(src_dir: Path, dest_dir: Path, keep: int = KEEP) -> dict[str, Any]:
     """Copy the newest backup + manifest to ``dest_dir``, verify the copy, prune."""
     src_dir, dest_dir = Path(src_dir), Path(dest_dir)
@@ -197,6 +204,12 @@ def offsite_copy(src_dir: Path, dest_dir: Path, keep: int = KEEP) -> dict[str, A
     if not (dest.is_file() and want and sha256(dest) == want):
         _copy(manifest, dest.with_suffix(".json"))
         _copy(newest, dest)
+        copied = True
+    elif _read(dest.with_suffix(".json")) != manifest.read_bytes():
+        # The database is already there but its manifest is not this one: a copy made
+        # while core was rewriting the backup pairs one run's manifest with the next
+        # run's database (2026-11-23), and skipping the copy left that for ever.
+        _copy(manifest, dest.with_suffix(".json"))
         copied = True
     out = restore_verify(dest)
     out["copied"] = copied

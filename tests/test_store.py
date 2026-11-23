@@ -305,6 +305,25 @@ def test_offsite_copy_copies_verifies_and_skips_a_second_time(store, tmp_path):
     assert again["ok"] and not again["copied"]
 
 
+def test_offsite_copy_repairs_a_stale_manifest(store, tmp_path):
+    """2026-11-23: the job copied while core rewrote the day's backup, so HiDrive held the
+    new database beside the old run's manifest. The database matched, so the copy was
+    skipped and every later run failed on the same sha256 mismatch."""
+    fill(store)
+    src, dst = tmp_path / "gluster", tmp_path / "hidrive"
+    dst.mkdir()
+    m = B.backup(store, src, now=NOW)
+    assert B.offsite_copy(src, dst)["ok"]
+    stale = json.loads((dst / m["file"]).with_suffix(".json").read_text())
+    stale["sha256"] = "0" * 64
+    (dst / m["file"]).with_suffix(".json").write_text(json.dumps(stale))
+    assert not B.restore_verify(dst / m["file"])["ok"]
+    out = B.offsite_copy(src, dst)
+    assert out["ok"], out["problems"]
+    assert out["copied"]
+    assert B.offsite_copy(src, dst)["copied"] is False
+
+
 def test_offsite_copy_keeps_fourteen(store, tmp_path):
     fill(store)
     src, dst = tmp_path / "gluster", tmp_path / "hidrive"
