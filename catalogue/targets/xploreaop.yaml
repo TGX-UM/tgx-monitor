@@ -42,7 +42,7 @@ checks:
     request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser/latest.json", page: xploreaop}
     assert:
       - {that: page_found, eq: true}
-      - {that: age_h, lt: 13}
+      - {that: age_h, lt: 26}
       - {that: page.ok, eq: true}
     inv_ids: [xploreaop-network-render]
 

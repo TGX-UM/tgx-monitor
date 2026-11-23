@@ -1,6 +1,6 @@
 # Pages that only a real browser can judge: they answer 200 with an empty frame when
 # their JavaScript breaks. Chromium does not run on the cluster; GitHub Actions runs
-# scripts/browser_checks.py over this list every 6 h (.github/workflows/browser.yml)
+# scripts/browser_checks.py over this list every 2 h (.github/workflows/browser.yml)
 # and commits browser/latest.json to the `history` branch. The `browser_artifact`
 # checks in catalogue/targets/ read that file (request: {url, page: <id below>}).
 #

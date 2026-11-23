@@ -2,7 +2,7 @@
 """Render the JS-heavy pages in ``catalogue/browser.yaml`` and record what drew.
 
 Why this runs in GitHub Actions and not on the cluster: a headless Chromium is several
-hundred MB of memory and a large attack surface, for a check that is fine every 6 h.
+hundred MB of memory and a large attack surface, for a check that is fine every 2 h.
 Actions runs it; this script writes ``browser/latest.json``; the workflow commits it to
 the ``history`` branch; the ``browser_artifact`` check in core reads it and alerts like
 any other check. If this workflow stops, the artifact ages and that check goes red.

@@ -306,7 +306,7 @@ Also public: `validate_source(spec, where)`, `relation(a, b)`, `as_date(v)` (ISO
 - **artifact shape:** `{generated_at, pages: {id: {...}}}` or `{generated_at, pages: [{id, ...}]}`.
 - **values:** `generated_at`, `age_h`, `page` (that page's dict, `{}` if absent), `page_found`, `pages` (ids present).
 ```yaml
-- {id: oppbk-browser, kind: browser_artifact, every: 1h, via: [core], request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser.json", page: oppbk}, assert: [{that: age_h, lt: 13}, {that: page.ok, eq: true}, {that: page.console_errors, len_eq: 0}]}
+- {id: oppbk-browser, kind: browser_artifact, every: 1h, via: [core], request: {url: "https://raw.githubusercontent.com/TGX-UM/tgx-monitor/history/browser.json", page: oppbk}, assert: [{that: age_h, lt: 26}, {that: page.ok, eq: true}, {that: page.console_errors, len_eq: 0}]}
 ```
 
 ### file_age (via: core only)

@@ -1,11 +1,11 @@
 name: Browser checks
 
-# Renders the JS-heavy pages in catalogue/browser.yaml with Playwright every 6 h and
+# Renders the JS-heavy pages in catalogue/browser.yaml with Playwright every 2 h and
 # commits browser/latest.json to the orphan branch `history`, where core's
 # browser_artifact checks read it. Chromium never runs on the cluster.
 on:
   schedule:
-    - cron: "13 */6 * * *"
+    - cron: "13 */2 * * *"
   workflow_dispatch:
 
 permissions:

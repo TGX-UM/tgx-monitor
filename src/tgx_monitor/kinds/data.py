@@ -723,7 +723,7 @@ def _find_page(doc: Any, page_id: str) -> dict[str, Any] | None:
 
 @register
 class BrowserArtifactKind(Kind):
-    """Reads the JSON the 6-hourly Playwright run commits; Chromium never runs on the cluster.
+    """Reads the JSON the 2-hourly Playwright run commits; Chromium never runs on the cluster.
 
     request: ``url`` (raw JSON, e.g. on the repo's history branch), ``page`` (id).
     The artifact is ``{generated_at, pages: {id: {...}}}`` or ``pages: [{id, ...}]``.

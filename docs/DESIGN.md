@@ -194,7 +194,7 @@ Each kind, what it asserts, and the incident or finding it would have caught.
   the empty service description.)
 - **shiny**: `__sockjs__/info` says `websocket: true`, then a session opens. (200 with
   dead sessions.)
-- **browser_artifact**: reads the JSON of the 6-hourly Playwright run in `browser.yml`;
+- **browser_artifact**: reads the JSON of the 2-hourly Playwright run in `browser.yml`;
   Chromium stays off the cluster. (JS apps that render blank.)
 - **job_run**: arms at each `swarm.cronjob.schedule` + 2 min, records task state, exit
   code and log markers in `job_runs`, checks ordering (switch after reload); jobs also
